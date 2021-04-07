@@ -1,0 +1,48 @@
+.DS_Store
+.env
+.gclient_done
+**/.npmrc
+.tags*
+.vs/
+.vscode/
+*.log
+*.pyc
+*.sln
+*.swp
+*.VC.db
+*.VC.VC.opendb
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.xcodeproj
+/.idea/
+/dist/
+/external_binaries/
+/out/
+node_modules/
+SHASUMS256.txt
+compile_commands.json
+.envrc
+.cache
+yarn-error.log
+.DS_Store
+
+# probot
+!mock-cert.pem
+*.pem
+.env
+coverage
+lib
+node_modules
+npm-debug.log
+
+# Test report
+report.json
+
+# npm package
+/npm/dist
+/npm/path.txt
+
+# Electron Fiddle-Specific
+/static/contributors.json
+/static/css/root.css
