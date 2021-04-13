@@ -18,7 +18,7 @@
     "lint:prettier:fix": "prettier --write package.json src/**/*.ts",
     "make": "run-s build",
     "start:client": "tsc && probot run ./lib/client/github-client.js",
-    "test": "jest --config=jest.json --coverage"
+    "test": "jest --coverage"
   },
   "devDependencies": {
     "@octokit/types": "^6.13.0",
