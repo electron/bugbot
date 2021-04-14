@@ -1,6 +1,7 @@
-import * as debug from 'debug';
+import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
+import { parseIssueBody } from '../util/issue-parser';
 
 export = (robot: Probot): void => {
   const d = debug('github-client:probot');
@@ -13,7 +14,19 @@ export = (robot: Probot): void => {
     d('issue_comment', inspect(context.payload));
   });
   robot.on('issues.opened', (context) => {
-    d('issues.opened', inspect(context.payload));
+    try {
+      const fiddleInput = parseIssueBody(context.payload.issue.body);
+      const comment = context.issue({
+        body: `I've detected that you want to run Fiddle with the following input:\n ${JSON.stringify(
+          fiddleInput,
+          null,
+          2,
+        )}`,
+      });
+      context.octokit.issues.createComment(comment);
+    } catch (e) {
+      d('error', inspect(e));
+    }
   });
   robot.on('issues.labeled', (context) => {
     d('issues.labeled', inspect(context.payload));

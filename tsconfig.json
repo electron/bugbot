@@ -3,10 +3,13 @@
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
+    "esModuleInterop": true,
     "experimentalDecorators": true,
     "importHelpers": true,
     "jsx": "react",
-    "lib": [ "es2019" ],
+    "lib": [
+      "es2019"
+    ],
     "module": "commonjs",
     "moduleResolution": "node",
     "noEmitHelpers": true,
@@ -25,14 +28,16 @@
     "strictNullChecks": true,
     "suppressImplicitAnyIndexErrors": true,
     "target": "es2019",
-    "typeRoots": [ "./node_modules/@types" ]
+    "typeRoots": [
+      "./node_modules/@types"
+    ]
   },
   "exclude": [
     "coverage",
     "lib",
     "node_modules",
-    "prettier.config.js",
-    "tests"
+    "prettierrc.js",
+    "spec"
   ],
   "formatCodeOptions": {
     "indentSize": 2,
