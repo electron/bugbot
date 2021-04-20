@@ -40,10 +40,10 @@ export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
 
   // Try to parse out the final bisect versions
   const passedVersion = endOutput.match(
-    /Runner: autobisect ✅ passed (\d+\.\d+\.\d+)/,
+    /Runner: autobisect ✅ passed ([^\s]+)/,
   );
   const failedVersion = endOutput.match(
-    /Runner: autobisect ❌ failed (\d+\.\d+\.\d+)/,
+    /Runner: autobisect ❌ failed ([^\s]+)/,
   );
 
   if (passedVersion === null || failedVersion === null) {
