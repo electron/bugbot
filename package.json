@@ -18,6 +18,7 @@
     "lint:prettier:fix": "prettier --write package.json src/**/*.ts",
     "make": "run-s build",
     "start:client": "tsc && probot run ./lib/client/github-client.js",
+    "start:server": "tsc && node ./lib/server/main.js",
     "test": "jest --coverage"
   },
   "devDependencies": {
