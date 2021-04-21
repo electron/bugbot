@@ -41,16 +41,16 @@ app.post('/fiddle/bisect', (req, res) => {
   }
   if (
     !objHasOwnKey(req.body, 'badVersion') ||
-    typeof req.body.goodVersion !== 'string'
+    typeof req.body.badVersion !== 'string'
   ) {
-    res.status(400).end('missing or incorrect parameter "goodVersion"');
+    res.status(400).end('missing or incorrect parameter "badVersion"');
     return;
   }
   if (
     !objHasOwnKey(req.body, 'gistId') ||
-    typeof req.body.goodVersion !== 'string'
+    typeof req.body.gistId !== 'string'
   ) {
-    res.status(400).end('missing or incorrect parameter "goodVersion"');
+    res.status(400).end('missing or incorrect parameter "gistId"');
     return;
   }
 
