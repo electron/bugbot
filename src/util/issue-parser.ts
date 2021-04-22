@@ -13,7 +13,7 @@ const TESTCASE_URL = 'Testcase Gist URL';
 const FIRST_KNOWN_BAD_VERSION = 'Electron Version';
 const LAST_KNOWN_GOOD_VERSION = 'Last Known Working Electron version';
 
-interface FiddleInput {
+export interface FiddleInput {
   goodVersion: string;
   badVersion: string;
   gistId: string;
