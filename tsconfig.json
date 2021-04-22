@@ -32,12 +32,8 @@
       "./node_modules/@types"
     ]
   },
-  "exclude": [
-    "coverage",
-    "lib",
-    "node_modules",
-    "prettierrc.js",
-    "spec"
+  "include": [
+    "src/**/*"
   ],
   "formatCodeOptions": {
     "indentSize": 2,
