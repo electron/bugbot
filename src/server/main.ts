@@ -88,12 +88,16 @@ app.post('/fiddle/bisect', (req, res) => {
         return;
       }
 
-      // Parse fiddle's output and pass it back to the request
-      const result = parseFiddleBisectOutput(stdout);
-      res
-        .status(200)
-        .header('Content-Type', 'application/json')
-        .end(JSON.stringify(result));
+      try {
+        // Parse fiddle's output and pass it back to the request
+        const result = parseFiddleBisectOutput(stdout);
+        res
+          .status(200)
+          .header('Content-Type', 'application/json')
+          .end(JSON.stringify(result));
+      } catch (_err) {
+        res.status(500).end('server error: could not parse bisect result');
+      }
     },
   );
 });
