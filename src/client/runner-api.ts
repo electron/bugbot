@@ -10,7 +10,9 @@ import { FiddleInput } from '../util/issue-parser';
 const { FIDDLE_RUNNER_BASE_URL } = process.env;
 if (!FIDDLE_RUNNER_BASE_URL) {
   // Just to make it more visible
-  console.error('[!!!] WARNING: `FIDDLE_RUNNER_BASE_URL` env variable is not set!');
+  console.error(
+    '[!!!] WARNING: `FIDDLE_RUNNER_BASE_URL` env variable is not set!',
+  );
 }
 
 export class RunnerError extends Error {

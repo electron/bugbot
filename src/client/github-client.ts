@@ -21,20 +21,27 @@ export = (robot: Probot): void => {
 
       // this comment is for debugging purposes to make sure the input was passed in properly
       const debugComment = context.issue({
-        body: `I've detected that you want to run Fiddle with the following input:\n ${JSON.stringify(
+        body: `🤖 I've detected that you want to bisect a Fiddle with the following input:\n ${JSON.stringify(
           fiddleInput,
           null,
           2,
         )}`,
       });
       await context.octokit.issues.createComment(debugComment);
-      const result = await bisectFiddle(fiddleInput);
 
+      const result = await bisectFiddle(fiddleInput);
       // TODO: take action based on this
+
+      const botResponse = result.success
+        ? [
+            '🤖 The bisect ✅ succeeded!',
+            `* **Good version**: ${result.goodVersion}`,
+            `* **Bad version**: ${result.badVersion}`,
+            // TODO: diff url?
+          ].join('\n')
+        : '🤖 The bisect ❌ failed. This Fiddle did not narrow down to two versions in the specified range.';
       const resultComment = context.issue({
-        body: `Beep boop, here's what the runner returned:\n ${JSON.stringify(
-          result,
-        )}`,
+        body: botResponse,
       });
       await context.octokit.issues.createComment(resultComment);
     } catch (e) {
