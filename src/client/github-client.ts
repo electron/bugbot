@@ -2,6 +2,7 @@ import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
 import { parseIssueBody } from '../util/issue-parser';
+import { bisectFiddle } from './runner-api';
 
 export = (robot: Probot): void => {
   const d = debug('github-client:probot');
@@ -13,17 +14,29 @@ export = (robot: Probot): void => {
   robot.on('issue_comment', (context) => {
     d('issue_comment', inspect(context.payload));
   });
-  robot.on('issues.opened', (context) => {
+  robot.on('issues.opened', async (context) => {
+    // TODO: refactor this into its own function
     try {
       const fiddleInput = parseIssueBody(context.payload.issue.body);
-      const comment = context.issue({
+
+      // this comment is for debugging purposes to make sure the input was passed in properly
+      const debugComment = context.issue({
         body: `I've detected that you want to run Fiddle with the following input:\n ${JSON.stringify(
           fiddleInput,
           null,
           2,
         )}`,
       });
-      context.octokit.issues.createComment(comment);
+      await context.octokit.issues.createComment(debugComment);
+      const result = await bisectFiddle(fiddleInput);
+
+      // TODO: take action based on this
+      const resultComment = context.issue({
+        body: `Beep boop, here's what the runner returned:\n ${JSON.stringify(
+          result,
+        )}`,
+      });
+      await context.octokit.issues.createComment(resultComment);
     } catch (e) {
       d('error', inspect(e));
     }
