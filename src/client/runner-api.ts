@@ -4,13 +4,13 @@ import { URL } from 'url';
 import { FiddleInput } from '../util/issue-parser';
 
 /**
- * This is the path to the fiddle executable. This is read from the environment
- * variable named `FIDDLE_EXEC_PATH`.
+ * This is the base URL where the runner is hosted. The API will then ping the /fiddle/bisect path.
+ * This is read from the environment variable named `FIDDLE_RUNNER_BASE_URL`.
  */
-const { FIDDLE_RUNNER_URL } = process.env;
-if (!FIDDLE_RUNNER_URL) {
+const { FIDDLE_RUNNER_BASE_URL } = process.env;
+if (!FIDDLE_RUNNER_BASE_URL) {
   // Just to make it more visible
-  console.error('[!!!] WARNING: `FIDDLE_RUNNER_URL` env variable is not set!');
+  console.error('[!!!] WARNING: `FIDDLE_RUNNER_BASE_URL` env variable is not set!');
 }
 
 export class RunnerError extends Error {
@@ -29,7 +29,7 @@ export async function bisectFiddle(
   fiddle: FiddleInput,
 ): Promise<FiddleBisectResult> {
   // Determine the url to send the request to
-  const url = new URL('fiddle/bisect', FIDDLE_RUNNER_URL);
+  const url = new URL('fiddle/bisect', FIDDLE_RUNNER_BASE_URL);
 
   return await fetch(url.toString(), {
     body: JSON.stringify(fiddle),
