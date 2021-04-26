@@ -1,10 +1,4 @@
-export type FiddleBisectResult =
-  | { success: false }
-  | {
-      success: true;
-      goodVersion: string;
-      badVersion: string;
-    };
+import { FiddleBisectResult } from '../interfaces';
 
 export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
   // In an attempt to guard against any output from the fiddles, only take the

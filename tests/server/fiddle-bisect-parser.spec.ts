@@ -4,11 +4,11 @@ import * as path from 'path';
 import {
   FiddleBisectResult,
   parseFiddleBisectOutput,
-} from '../src/server/fiddle-bisect-parser';
+} from '../../src/server/fiddle-bisect-parser';
 
 describe('fiddle-bisect-parser', () => {
   function getBisectResult(basename: string) {
-    const filename = path.resolve('./spec/fixtures', basename);
+    const filename = path.resolve(__dirname, 'fixtures', basename);
     const output = fs.readFileSync(filename).toString();
     return parseFiddleBisectOutput(output) as FiddleBisectResult & {
       success: true;

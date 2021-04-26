@@ -2,12 +2,12 @@ import * as SemVer from 'semver';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { parseIssueBody } from '../src/util/issue-parser';
+import { parseIssueBody } from '../../src/util/issue-parser';
 
 describe('issue-parser', () => {
   describe('parseIssueBody()', () => {
     function getIssueBody(basename: string) {
-      const filename = path.resolve('./spec/fixtures/', basename);
+      const filename = path.resolve(__dirname, 'fixtures', basename);
       return fs.readFileSync(filename).toString();
     }
 

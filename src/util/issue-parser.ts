@@ -4,6 +4,7 @@ import fromMarkdown from 'mdast-util-from-markdown';
 import toString from 'mdast-util-to-string';
 import SemVer from 'semver';
 import { Node } from 'unist';
+import { BisectOptions } from '../client/interfaces';
 
 // no types exist for this module
 //eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -12,12 +13,6 @@ const heading = require('mdast-util-heading-range');
 const TESTCASE_URL = 'Testcase Gist URL';
 const FIRST_KNOWN_BAD_VERSION = 'Electron Version';
 const LAST_KNOWN_GOOD_VERSION = 'Last Known Working Electron version';
-
-export interface FiddleInput {
-  goodVersion: string;
-  badVersion: string;
-  gistId: string;
-}
 
 function getHeadingContent(tree: Node, test: string) {
   let str = '';
@@ -48,7 +43,7 @@ function getGistId(input: string): string | null {
  * @param markdown The markdown content of the issue body
  * @returns Details needed to run Fiddle from the command line
  */
-export function parseIssueBody(markdown: string): FiddleInput {
+export function parseIssueBody(markdown: string): BisectOptions {
   const d = debug('github-client:issue-parser');
   const tree = fromMarkdown(markdown);
 

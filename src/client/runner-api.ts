@@ -1,7 +1,7 @@
 import fetch, { Response } from 'node-fetch';
-import { FiddleBisectResult } from 'src/server/fiddle-bisect-parser';
+import { BisectOptions } from './interfaces';
+import { FiddleBisectResult } from '../interfaces';
 import { URL } from 'url';
-import { FiddleInput } from '../util/issue-parser';
 
 /**
  * This is the base URL where the runner is hosted. The API will then ping the /fiddle/bisect path.
@@ -28,7 +28,7 @@ export class RunnerError extends Error {
  * Makes a request to the runner to bisect a fiddle.
  */
 export async function bisectFiddle(
-  fiddle: FiddleInput,
+  fiddle: BisectOptions,
 ): Promise<FiddleBisectResult> {
   // Determine the url to send the request to
   const url = new URL('fiddle/bisect', FIDDLE_RUNNER_BASE_URL);
