@@ -1,31 +1,25 @@
 import debug from 'debug';
 import { inspect } from 'util';
 
-import { BisectOptions, Label, Task, TaskType } from './interfaces';
+import {
+  BisectOptions,
+  Label,
+  Task,
+  TaskType,
+  createAddLabelsTask,
+  createCommentTask,
+  createRemoveLabelsTask,
+} from './tasks';
 import { bisectFiddle } from './runner-api';
 
 const d = debug('github-client:probot');
 
-// helpers
-
-function createCommentTask(comment: string): Task {
-  return { comment, type: TaskType.comment };
-}
-
-function createAddLabelsTask(...labels: Label[]): Task {
-  return { labels, type: TaskType.addLabels };
-}
-
-function createRemoveLabelsTask(...labels: Label[]): Task {
-  return { labels, type: TaskType.removeLabels };
-}
+// do some work
 
 function addComment(body: string, context: any): Promise<void> {
   const commentBody = context.issue({ body });
   return context.octokit.issues.createComment(commentBody);
 }
-
-// do some work
 
 async function autobisect(options: BisectOptions): Promise<Task[]> {
   const tasks: Task[] = [];
@@ -61,12 +55,31 @@ async function autobisect(options: BisectOptions): Promise<Task[]> {
   return tasks;
 }
 
+async function removeLabels(removeMe: Label[], context: any) {
+  // there's no "remove set of labels" function,
+  // so assign labels = prevLabels - removeMe
+  const params = context.issue();
+  const response = await context.octokit.issues.listLabelsOnIssue(params);
+  const labels = new Set(response.data.map((item: any) => item.name));
+  d('removeLabels()', 'existing labels', labels);
+  for (const label of removeMe) {
+    labels.delete(label);
+  }
+  d('removeLabels()', 'updated labels', labels);
+  return context.octokit.issues.setLabels({ ...params, labels });
+}
+
 export async function runTasks(tasks: Task[], context: any) {
   for (;;) {
     const task = tasks.shift();
-    switch (task?.type) {
+    if (!task) {
+      break;
+    }
+
+    d('runTasks()', JSON.stringify(task));
+    switch (task.type) {
       case TaskType.addLabels:
-        throw new Error('not implemented yet');
+        throw new Error(`${task.type} not implemented yet`);
         break;
 
       case TaskType.bisect:
@@ -74,15 +87,11 @@ export async function runTasks(tasks: Task[], context: any) {
         break;
 
       case TaskType.comment:
-        await addComment(task.comment!, context);
+        await addComment(task.body!, context);
         break;
 
       case TaskType.removeLabels:
-        throw new Error('not implemented yet');
-        break;
-
-      default:
-        d('unhandled:', task);
+        await removeLabels(task.labels!, context);
         break;
     }
   }

@@ -7,7 +7,7 @@ import { runTasks } from './run-tasks';
 const d = debug('github-client:probot');
 
 function processPayload(context: any) {
-  d(`processPayload ${context.payload.action}`);
+  d('processPayload()', context.payload.action);
   runTasks(getTasksFromPayload(context.payload), context);
 }
 

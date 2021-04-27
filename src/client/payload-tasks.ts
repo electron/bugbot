@@ -1,6 +1,6 @@
 import debug from 'debug';
 
-import { Label, Task, TaskType } from './interfaces';
+import { Label, Task, createBisectTask, createCommentTask } from './tasks';
 import { parseIssueBody } from '../util/issue-parser';
 
 const d = debug('github-client:payload-tasks');
@@ -13,14 +13,8 @@ function maybeAddBisection(tasks: Task[], payload: any) {
     const bisect = parseIssueBody(payload.issue.body);
     const str = JSON.stringify(bisect, null, 2);
     tasks.push(
-      {
-        comment: `🤖 Bisection info found: ${str}`,
-        type: TaskType.comment,
-      },
-      {
-        bisect: parseIssueBody(payload.issue.body),
-        type: TaskType.bisect,
-      },
+      createCommentTask(`🤖 Bisection info found: ${str}`),
+      createBisectTask(parseIssueBody(payload.issue.body)),
     );
   } catch (error) {
     d('Not enough info for a bisect run');

@@ -1,10 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import {
-  FiddleBisectResult,
-  parseFiddleBisectOutput,
-} from '../../src/server/fiddle-bisect-parser';
+import { FiddleBisectResult } from '../../src/interfaces';
+import { parseFiddleBisectOutput } from '../../src/server/fiddle-bisect-parser';
 
 describe('fiddle-bisect-parser', () => {
   function getBisectResult(basename: string) {

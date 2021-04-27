@@ -1,5 +1,5 @@
 import fetch, { Response } from 'node-fetch';
-import { BisectOptions } from './interfaces';
+import { BisectOptions } from './tasks';
 import { FiddleBisectResult } from '../interfaces';
 import { URL } from 'url';
 

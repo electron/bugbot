@@ -4,7 +4,7 @@ import fromMarkdown from 'mdast-util-from-markdown';
 import toString from 'mdast-util-to-string';
 import SemVer from 'semver';
 import { Node } from 'unist';
-import { BisectOptions } from '../client/interfaces';
+import { BisectOptions } from '../client/tasks';
 
 // no types exist for this module
 //eslint-disable-next-line @typescript-eslint/no-var-requires

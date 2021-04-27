@@ -1,5 +1,3 @@
-// interfaces used by the client
-
 export interface BisectOptions {
   badVersion: string;
   gistId: string;
@@ -8,7 +6,7 @@ export interface BisectOptions {
 
 export interface Task {
   bisect?: BisectOptions;
-  comment?: string;
+  body?: string;
   labels?: Label[];
   test?: null;
   type: TaskType;
@@ -25,4 +23,20 @@ export const enum Label {
   'bisectDone' = 'bugbot/bisect-done',
   'bisectFailed' = 'bugbot/bisect-failed',
   'bisectNeeded' = 'bugbot/bisect-needed',
-};
+}
+
+export function createBisectTask(bisect: BisectOptions) {
+  return { bisect, type: TaskType.bisect };
+}
+
+export function createCommentTask(body: string): Task {
+  return { body, type: TaskType.comment };
+}
+
+export function createAddLabelsTask(...labels: Label[]): Task {
+  return { labels, type: TaskType.addLabels };
+}
+
+export function createRemoveLabelsTask(...labels: Label[]): Task {
+  return { labels, type: TaskType.removeLabels };
+}

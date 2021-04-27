@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { TaskType } from '../../src/client/interfaces';
+import { TaskType } from '../../src/client/tasks';
 import { getTasksFromPayload } from '../../src/client/payload-tasks';
 
 function getFixturePayload(fixture: string) {
