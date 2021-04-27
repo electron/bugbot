@@ -18,10 +18,11 @@ export const enum TaskType {
   'addLabels' = 'addLabels',
   'bisect' = 'bisect',
   'comment' = 'comment',
-  'removeLabels' = 'addLabels',
+  'removeLabels' = 'removeLabels',
 }
 
 export const enum Label {
+  'bisectDone' = 'bugbot/bisect-done',
   'bisectFailed' = 'bugbot/bisect-failed',
   'bisectNeeded' = 'bugbot/bisect-needed',
 };
