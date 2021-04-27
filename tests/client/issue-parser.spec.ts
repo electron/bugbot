@@ -2,24 +2,24 @@ import * as SemVer from 'semver';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { parseIssueBody } from '../../src/util/issue-parser';
+import { getBisectOptionsFromBody } from '../../src/util/issue-parser';
 
 describe('issue-parser', () => {
-  describe('parseIssueBody()', () => {
+  describe('getBisectOptionsFromBody()', () => {
     function getIssueBody(basename: string) {
       const filename = path.resolve(__dirname, 'fixtures', basename);
       return fs.readFileSync(filename).toString();
     }
 
     function expectValidRegressionReport(issueBody: string) {
-      const { goodVersion, badVersion, gistId } = parseIssueBody(issueBody);
+      const { goodVersion, badVersion, gistId } = getBisectOptionsFromBody(issueBody);
       expect(SemVer.valid(goodVersion)).toBe('13.0.0');
       expect(SemVer.valid(badVersion)).toBe('12.0.0');
       expect(typeof gistId).toBe('string');
     }
 
     function expectIssueToThrow(name: string, errmsg: string) {
-      expect(() => parseIssueBody(getIssueBody(name))).toThrow(errmsg);
+      expect(() => getBisectOptionsFromBody(getIssueBody(name))).toThrow(errmsg);
     }
 
     it('extracts a version range and a gist from an issue string', () => {

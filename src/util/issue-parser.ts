@@ -43,7 +43,7 @@ function getGistId(input: string): string | null {
  * @param markdown The markdown content of the issue body
  * @returns Details needed to run Fiddle from the command line
  */
-export function parseIssueBody(markdown: string): BisectOptions {
+export function getBisectOptionsFromBody(markdown: string): BisectOptions {
   const d = debug('github-client:issue-parser');
   const tree = fromMarkdown(markdown);
 
