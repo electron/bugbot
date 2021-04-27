@@ -73,7 +73,6 @@ module.exports = {
     'no-this-before-super': 'error',
     'no-throw-literal': 'error',
     'no-undef-init': 'error',
-    'no-undefined': 'error',
     'no-unmodified-loop-condition': 'error',
     'no-unreachable-loop': 'error',
     'no-unused-expressions': 'error',

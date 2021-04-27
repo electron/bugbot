@@ -1,43 +1,83 @@
 import debug from 'debug';
 
-import { Label, Task, createBisectTask, createCommentTask } from './tasks';
-import { getBisectOptionsFromBody } from '../util/issue-parser';
+import {
+  Label,
+  Task,
+  createBisectTask,
+  createCommentTask,
+  createTestTask,
+} from './tasks';
+import {
+  getBisectOptionsFromBody,
+  getTestOptionsFromBody,
+} from '../util/issue-parser';
 
 const d = debug('github-client:payload-tasks');
 
-// FIXME: processIssueOpened should also check labels...
-// FIXME: ...and under current impl that would create two bisect tasks
+function maybeBisect(payload: any): Task[] {
+  const tasks: Task[] = [];
 
-function maybeAddBisection(tasks: Task[], payload: any) {
-  try {
-    const bisect = getBisectOptionsFromBody(payload.issue.body);
-    const str = JSON.stringify(bisect, null, 2);
+  const opts = getBisectOptionsFromBody(payload.issue.body);
+  if (!opts) {
+    d('Not enough info for a bisect run');
+  } else {
+    const str = JSON.stringify(opts, null, 2);
     tasks.push(
       createCommentTask(`🤖 Bisection info found: ${str}`),
-      createBisectTask(getBisectOptionsFromBody(payload.issue.body)),
+      createBisectTask(opts),
     );
-  } catch (error) {
-    d('Not enough info for a bisect run');
   }
+
+  return tasks;
+}
+
+function maybeTest(payload: any): Task[] {
+  const tasks: Task[] = [];
+
+  const opts = getTestOptionsFromBody(payload.issue.body);
+  if (!opts) {
+    d('Not enough info for a test run');
+  } else {
+    const str = JSON.stringify(opts, null, 2);
+    tasks.push(
+      createCommentTask(`🤖 Bisection info found: ${str}`),
+      createTestTask(opts),
+    );
+  }
+
+  return tasks;
 }
 
 function processLabels(payload: any): Task[] {
   const tasks: Task[] = [];
+  const names = new Set(payload.issue.labels.map((label: any) => label.name));
+  d('processLabels()', 'found labels', [...names]);
 
-  const test = (label: any) => label.name === Label.bisectNeeded;
-  if (payload.issue.labels.some(test)) {
-    maybeAddBisection(tasks, payload);
+  if (names.has(Label.bisectNeeded)) {
+    tasks.push(...maybeBisect(payload));
+  }
+  if (names.has(Label.testNeeded)) {
+    tasks.push(...maybeTest(payload));
   }
 
   return tasks;
+}
+
+function removeDuplicates(tasks: Task[]): Task[] {
+  const map: Map<string, Task> = new Map(
+    tasks.map((task) => [JSON.stringify(task), task]),
+  );
+  return [...map.values()];
 }
 
 function processIssueOpened(payload: any): Task[] {
   const tasks: Task[] = [];
 
-  maybeAddBisection(tasks, payload);
+  tasks.push(...processLabels(payload));
+  tasks.push(...maybeBisect(payload));
+  tasks.push(...maybeTest(payload));
 
-  return tasks;
+  return removeDuplicates(tasks);
 }
 
 // Takes no action on its own.

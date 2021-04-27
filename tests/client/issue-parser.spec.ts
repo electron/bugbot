@@ -11,15 +11,17 @@ describe('issue-parser', () => {
       return fs.readFileSync(filename).toString();
     }
 
-    function expectValidRegressionReport(issueBody: string) {
-      const { goodVersion, badVersion, gistId } = getBisectOptionsFromBody(issueBody);
+    function expectValidRegressionReport(body: string) {
+      const opts = getBisectOptionsFromBody(body);
+      expect(opts).toBeTruthy();
+      const { goodVersion, badVersion, gistId } = opts!;
       expect(SemVer.valid(goodVersion)).toBe('13.0.0');
       expect(SemVer.valid(badVersion)).toBe('12.0.0');
       expect(typeof gistId).toBe('string');
     }
 
-    function expectIssueToThrow(name: string, errmsg: string) {
-      expect(() => getBisectOptionsFromBody(getIssueBody(name))).toThrow(errmsg);
+    function expectUndefinedBisect(name: string) {
+      expect(getBisectOptionsFromBody(getIssueBody(name))).toBeUndefined();
     }
 
     it('extracts a version range and a gist from an issue string', () => {
@@ -37,31 +39,19 @@ describe('issue-parser', () => {
     });
 
     it('handles gists', () => {
-      expectIssueToThrow(
-        'issue-gist-invalid.md',
-        'URL https://github.com/erickzhao/electron is invalid',
-      );
+      expectUndefinedBisect('issue-gist-invalid.md');
     });
 
-    it('throws if parameters are missing', () => {
-      expectIssueToThrow(
-        'issue-missing-info.md',
-        'One or more required parameters is missing in issue body',
-      );
+    it('returns undefined if parameters are missing', () => {
+      expectUndefinedBisect('issue-missing-info.md');
     });
 
-    it('throws if version numbers are invalid', () => {
-      expectIssueToThrow(
-        'issue-versions-invalid.md',
-        'One or more required parameters is missing in issue body',
-      );
+    it('returns undefined if version numbers are invalid', () => {
+      expectUndefinedBisect('issue-versions-invalid.md');
     });
 
-    it('throws if testcase gist is invalid', () => {
-      expectIssueToThrow(
-        'issue-gist-invalid.md',
-        'Testcase URL https://github.com/erickzhao/electron is invalid',
-      );
+    it('returns undefined if testcase gist is invalid', () => {
+      expectUndefinedBisect('issue-gist-invalid.md');
     });
   });
 });

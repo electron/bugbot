@@ -4,14 +4,14 @@ import fromMarkdown from 'mdast-util-from-markdown';
 import toString from 'mdast-util-to-string';
 import SemVer from 'semver';
 import { Node } from 'unist';
-import { BisectOptions } from '../client/tasks';
+import { BisectOptions, TestOptions } from '../client/tasks';
 
 // no types exist for this module
 //eslint-disable-next-line @typescript-eslint/no-var-requires
 const heading = require('mdast-util-heading-range');
 
 const TESTCASE_URL = 'Testcase Gist URL';
-const FIRST_KNOWN_BAD_VERSION = 'Electron Version';
+const BUGGY_VERSION = 'Electron Version';
 const LAST_KNOWN_GOOD_VERSION = 'Last Known Working Electron version';
 
 function getHeadingContent(tree: Node, test: string) {
@@ -37,34 +37,68 @@ function getGistId(input: string): string | null {
   return null;
 }
 
+const d = debug('github-client:issue-parser');
+
+function getVersionFromHeading(
+  tree: any,
+  headerName: string,
+): string | undefined {
+  const content = getHeadingContent(tree, headerName);
+  return SemVer.coerce(content)?.version;
+}
+
+function parseBody(markdown: string): any {
+  const opts: any = {};
+  const tree = fromMarkdown(markdown);
+
+  const badVersion = getVersionFromHeading(tree, BUGGY_VERSION);
+  if (badVersion) {
+    opts.badVersion = badVersion;
+  }
+
+  const gistUrl = getHeadingContent(tree, TESTCASE_URL);
+  if (gistUrl) {
+    const gistId = getGistId(gistUrl);
+    if (!gistId) {
+      d('Invalid gist URL, returning', { gistUrl });
+    } else {
+      opts.gistId = gistId;
+    }
+  }
+
+  const goodVersion = getVersionFromHeading(tree, LAST_KNOWN_GOOD_VERSION);
+  if (goodVersion) {
+    opts.goodVersion = goodVersion;
+  }
+
+  d('parseBody got', JSON.stringify(opts));
+  return opts;
+}
+
 /**
  * Parses a markdown string and returns the testcase gist URL,
  * the last known good version, and first known bad version.
  * @param markdown The markdown content of the issue body
  * @returns Details needed to run Fiddle from the command line
  */
-export function getBisectOptionsFromBody(markdown: string): BisectOptions {
-  const d = debug('github-client:issue-parser');
-  const tree = fromMarkdown(markdown);
+export function getBisectOptionsFromBody(markdown: string): BisectOptions | undefined {
+  const opts = parseBody(markdown);
 
-  const gistUrl = getHeadingContent(tree, TESTCASE_URL);
-  const goodVersion = SemVer.coerce(
-    getHeadingContent(tree, LAST_KNOWN_GOOD_VERSION),
-  )?.version;
-  const badVersion = SemVer.coerce(
-    getHeadingContent(tree, FIRST_KNOWN_BAD_VERSION),
-  )?.version;
-
-  if (!gistUrl || !goodVersion || !badVersion) {
-    d('Undefined value, returning', { badVersion, gistUrl, goodVersion });
-    throw new Error('One or more required parameters is missing in issue body');
+  const { badVersion, gistId, goodVersion } = opts;
+  if (!badVersion || !gistId || !goodVersion) {
+    return undefined;
   }
 
-  const gistId = getGistId(gistUrl);
-  if (!gistId) {
-    d('Invalid gist URL, returning', { gistUrl });
-    throw new Error(`Testcase URL ${gistUrl} is invalid`);
+  return opts as BisectOptions;
+}
+
+export function getTestOptionsFromBody(markdown: string): TestOptions | undefined {
+  const opts = parseBody(markdown);
+
+  const { badVersion, gistId } = opts;
+  if (!badVersion || !gistId) {
+    return undefined;
   }
 
-  return { badVersion, gistId, goodVersion };
+  return opts as TestOptions;
 }
