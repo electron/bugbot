@@ -1,3 +1,0 @@
-[5:53:24 PM] Runner: autobisect Electron 10.1.6 - finished test ❌ failed
-[5:53:24 PM] Runner: autobisect 'good' 10.1.6 and 'bad' 10.1.7 both returned ❌ failed
-[5:53:24 PM] Task: Bisect  invalid
