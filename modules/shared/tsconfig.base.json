@@ -1,0 +1,15 @@
+/**
+ * This file is the "base" configuration used by each TypeScript module. This is the place to
+ * define sensible defaults that are used in each TypeScript module.
+ */
+{
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true, // required by "composite"
+
+    "target": "ES2019",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+  }
+}
