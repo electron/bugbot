@@ -9,6 +9,12 @@
   ],
   "scripts": {
     "build": "tsc -b",
+    "start:bot": "yarn workspace @electron/bugbot-bot start",
+    "start:broker": "yarn workspace @electron/bugbot-broker start",
+    "start:runner": "yarn workspace @electron/bugbot-runner start",
+    "test": "run-p test:runner test:shared",
+    "test:runner": "yarn workspace @electron/bugbot-runner test",
+    "test:shared": "yarn workspace @electron/bugbot-shared test",
     "lint": "run-p lint:eslint lint:prettier",
     "lint:fix": "run-p lint:eslint:fix lint:prettier:fix",
     "lint:eslint": "eslint modules/*/src/**/*.ts",
