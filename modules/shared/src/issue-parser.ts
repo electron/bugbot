@@ -1,7 +1,7 @@
 import debug from 'debug';
 import { Heading } from 'mdast';
 import fromMarkdown = require('mdast-util-from-markdown');
-import { toString } from 'mdast-util-to-string';
+import toString = require('mdast-util-to-string');
 import * as SemVer from 'semver';
 import { Node } from 'unist';
 
