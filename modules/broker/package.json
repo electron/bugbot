@@ -3,6 +3,9 @@
   "name": "@electron/bugbot-broker",
   "version": "0.0.1",
   "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -b"
+  },
   "dependencies": {
     "@electron/bugbot-shared": "*"
   }

@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "main": "dist/github-client.js",
   "scripts": {
+    "build": "tsc -b",
     "start": "probot run ./dist/github-client.js"
   },
   "dependencies": {
