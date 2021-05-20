@@ -4,7 +4,7 @@
 
 BugBot is split into multiple modules, connected in development via [Yarn Workspaces](https://classic.yarnpkg.com/en/docs/workspaces/) and [TypeScript Project References](https://www.typescriptlang.org/docs/handbook/project-references.html). Each module can be found within the `modules/` top-level directory.
 
-After cloning BugBot, run the following commands to setup your workspace:
+After cloning BugBot, run the following commands to set up your workspace:
 ```sh
 $ yarn
 $ yarn run build
