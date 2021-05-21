@@ -1,7 +1,7 @@
 import fetch, { Response } from 'node-fetch';
-import { FiddleBisectResult } from 'src/server/fiddle-bisect-parser';
+import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { URL } from 'url';
-import { FiddleInput } from '../util/issue-parser';
+import { FiddleInput } from '@electron/bugbot-shared/lib/issue-parser';
 
 /**
  * This is the base URL where the runner is hosted. The API will then ping the /fiddle/bisect path.

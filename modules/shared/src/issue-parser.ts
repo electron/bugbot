@@ -1,8 +1,8 @@
 import debug from 'debug';
 import { Heading } from 'mdast';
-import fromMarkdown from 'mdast-util-from-markdown';
-import toString from 'mdast-util-to-string';
-import SemVer from 'semver';
+import fromMarkdown = require('mdast-util-from-markdown');
+import toString = require('mdast-util-to-string');
+import * as SemVer from 'semver';
 import { Node } from 'unist';
 
 // no types exist for this module

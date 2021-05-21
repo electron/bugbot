@@ -1,0 +1,17 @@
+{
+  "private": true,
+  "name": "@electron/bugbot-bot",
+  "version": "0.0.1",
+  "main": "dist/github-client.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "probot run ./dist/github-client.js"
+  },
+  "dependencies": {
+    "@electron/bugbot-shared": "*",
+    "probot": "^11.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^15.3.0"
+  }
+}

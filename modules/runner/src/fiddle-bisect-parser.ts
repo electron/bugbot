@@ -35,7 +35,7 @@ export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
 
   // If we failed, we're done
   if (!success) {
-    return { success };
+    return { success: success as false };
   }
 
   // Try to parse out the final bisect versions

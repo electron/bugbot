@@ -1,7 +1,7 @@
 import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
-import { parseIssueBody } from '../util/issue-parser';
+import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
 import { bisectFiddle } from './runner-api';
 
 export = (robot: Probot): void => {
