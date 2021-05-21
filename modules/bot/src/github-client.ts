@@ -1,8 +1,8 @@
 import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
-import { FiddleBisectResult } from '../server/fiddle-bisect-parser';
-import { parseIssueBody } from '../util/issue-parser';
+import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
+import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
 import {
   bisectFiddle,
   checkComplete,
