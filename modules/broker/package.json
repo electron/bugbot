@@ -5,9 +5,12 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -b",
+    "start": "node ./dist/main.js",
     "test": "jest --coverage"
   },
   "dependencies": {
-    "@electron/bugbot-shared": "*"
+    "@electron/bugbot-shared": "*",
+    "express": "^4.17.1",
+    "uuid": "^8.3.2"
   }
 }

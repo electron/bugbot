@@ -2,8 +2,8 @@
   "extends": "@electron/bugbot-shared/tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "tsBuildInfoFile": "dist/.tsbuildinfo",
     "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],
   "references": [
