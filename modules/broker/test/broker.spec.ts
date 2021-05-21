@@ -1,6 +1,6 @@
 describe('broker', () => {
   describe('/api/jobs (POST)', () => {
-    it.todo('creates a job');
+    it.todo('creates a bisect job');
     it.todo('rejects unknown operating systems');
     it.todo('remembers client_data');
     it.todo('requires a gist');
@@ -41,4 +41,6 @@ describe('broker', () => {
   });
 
   it.todo('remembers state when restarted');
+  it.todo('rejects unauthenticated requsts');
+  it.todo('marks jobs as timed-out when inactive for too long');
 });
