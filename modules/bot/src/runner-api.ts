@@ -50,3 +50,29 @@ export async function bisectFiddle(
     })
     .then((res) => res.json());
 }
+
+/**
+ * Checks if the runner already has a test running for this issue
+ * @returns If the current issue already has a test running
+ */
+export function hasRunningTest(issue: string): boolean {
+  console.log('hasRunningTest', { issue });
+  return false;
+}
+
+export function stopTest(issue: string): void {
+  console.log('stopTest', { issue });
+}
+
+export function startTest(): void {
+  console.log('startTest');
+}
+
+export function checkComplete(issue: string): boolean {
+  console.log('checkComplete', { issue });
+  return true;
+}
+
+export function markAsComplete(): void {
+  console.log('markAsComplete');
+}
