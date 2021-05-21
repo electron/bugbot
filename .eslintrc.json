@@ -75,7 +75,6 @@
     "no-this-before-super": "error",
     "no-throw-literal": "error",
     "no-undef-init": "error",
-    "no-undefined": "error",
     "no-unmodified-loop-condition": "error",
     "no-unreachable-loop": "error",
     "no-unused-expressions": "error",
@@ -118,6 +117,7 @@
     "unicorn/no-fn-reference-in-iterator": "off",
     "unicorn/no-null": "off",
     "unicorn/no-reduce": "off",
+    "unicorn/no-undefined": "off",
     "unicorn/no-unused-properties": "off",
     "unicorn/prevent-abbreviations": "off"
   }
