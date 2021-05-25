@@ -8,6 +8,7 @@
     "declaration": true, // required by "composite"
 
     "target": "ES2019",
+    "lib": ["ES2019"],
     "module": "CommonJS",
     "moduleResolution": "node",
     "esModuleInterop": true,
