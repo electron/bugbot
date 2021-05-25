@@ -1,5 +1,7 @@
 import { v4 as mkuuid } from 'uuid';
 
+import { isKnownOS } from './utils';
+
 function currentTimeT() {
   return Math.floor(Date.now() / 1000);
 }
@@ -25,7 +27,19 @@ export class Task {
     for (const [key, val] of Object.entries(props)) {
       this[key] = val;
     }
+  }
 
-    console.debug(`new task's id is ${this.id}`);
+  public static createBisectTask(props: Record<string, any>): Task {
+    const required = ['gist'];
+    for (const name of required) {
+      if (!props[name]) {
+        throw new Error(`missing property: ${name}`);
+      }
+    }
+
+    if (props.os && !isKnownOS(props.os)) {
+      throw new Error(`unrecognized operating system: ${props.os}`);
+    }
+    return new Task(props);
   }
 }

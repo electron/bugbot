@@ -3,6 +3,7 @@ import { validate as is_uuid } from 'uuid';
 
 import { Broker } from '../src/broker';
 import { Server } from '../src/server';
+import { Task } from '../src/task';
 
 describe('broker', () => {
   let broker: Broker;
@@ -10,8 +11,9 @@ describe('broker', () => {
   const port = 8088;
 
   beforeEach(() => {
+    const { createBisectTask } = Task;
     broker = new Broker();
-    server = new Server({ broker, port });
+    server = new Server({ broker, createBisectTask, port });
     server.listen();
   });
 
@@ -21,22 +23,51 @@ describe('broker', () => {
 
   describe('/api/jobs (POST)', () => {
     const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
+    const headers = { 'Content-Type': 'application/json' };
+    const method = 'POST';
     const os = 'linux';
+    const url = `http://localhost:${port}/api/jobs`;
 
     it('creates a bisect job', async () => {
-      const response = await fetch(`http://localhost:${port}/api/jobs`, {
-        body: JSON.stringify({ gist, os }),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      });
+      const body = JSON.stringify({ gist, os });
+      const response = await fetch(url, { body, headers, method });
+      expect(response.status).toBe(201);
+    });
+
+    it('rejects unknown operating systems', async () => {
+      const android = 'android';
+      const body = JSON.stringify({ gist, os: android });
+      const response = await fetch(url, { body, headers, method });
+      expect(response.status).toBe(422);
+
+      const data = await response.text();
+      expect(data.includes(android));
+    });
+
+    it.todo('remembers client_data');
+
+    it('checks for required parameters', async () => {
+      const required_params = ['gist'];
+      for (const name of required_params) {
+        const body_params = { gist, os };
+        delete body_params[name];
+        const body = JSON.stringify(body_params);
+        const response = await fetch(url, { body, headers, method });
+        expect(response.status).toBe(422);
+
+        const data = await response.text();
+        expect(data.includes(name));
+      }
+    });
+
+    it('returns a job uuid', async () => {
+      const body = JSON.stringify({ gist, os });
+      const response = await fetch(url, { body, headers, method });
+      expect(response.status).toBe(201);
+
       const data = await response.json();
       expect(is_uuid(data)).toBe(true);
     });
-
-    it.todo('rejects unknown operating systems');
-    it.todo('remembers client_data');
-    it.todo('requires a gist');
-    it.todo('returns a job uuid');
   });
 
   describe('/api/jobs/$job_id (GET)', () => {
