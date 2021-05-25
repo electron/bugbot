@@ -8,11 +8,11 @@ function currentTimeT() {
 // With current requirements, this could probably just be a POJO
 export class Task {
   public readonly id: string;
-  public os: string;
   public gist: string;
+  public os: string;
   public time_created: Date;
-  public time_started: Date | undefined = undefined;
   public time_finished: Date | undefined = undefined;
+  public time_started: Date | undefined = undefined;
 
   constructor(props = {}) {
     const defaultProps = {

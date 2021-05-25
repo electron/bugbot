@@ -12,5 +12,8 @@
     "@electron/bugbot-shared": "*",
     "express": "^4.17.1",
     "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "node-fetch": "^2.6.1"
   }
 }

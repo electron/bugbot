@@ -26,7 +26,6 @@
     "eqeqeq": "error",
     "grouped-accessor-pairs": "error",
     "guard-for-in": "error",
-    "init-declarations": "error",
     "no-array-constructor": "error",
     "no-caller": "error",
     "no-confusing-arrow": "error",

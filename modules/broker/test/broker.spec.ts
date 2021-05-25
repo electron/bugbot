@@ -1,6 +1,38 @@
+import fetch from 'node-fetch';
+import { validate as is_uuid } from 'uuid';
+
+import { Broker } from '../src/broker';
+import { Server } from '../src/server';
+
 describe('broker', () => {
+  let broker: Broker;
+  let server: Server;
+  const port = 8088;
+
+  beforeEach(() => {
+    broker = new Broker();
+    server = new Server({ broker, port });
+    server.listen();
+  });
+
+  afterEach(() => {
+    server.close();
+  });
+
   describe('/api/jobs (POST)', () => {
-    it.todo('creates a bisect job');
+    const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
+    const os = 'linux';
+
+    it('creates a bisect job', async () => {
+      const response = await fetch(`http://localhost:${port}/api/jobs`, {
+        body: JSON.stringify({ gist, os }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+      const data = await response.json();
+      expect(is_uuid(data)).toBe(true);
+    });
+
     it.todo('rejects unknown operating systems');
     it.todo('remembers client_data');
     it.todo('requires a gist');
