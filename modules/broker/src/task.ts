@@ -6,6 +6,10 @@ function currentTimeT() {
   return Math.floor(Date.now() / 1000);
 }
 
+function isKnownType(type: string): boolean {
+  return ['bisect', 'test'].includes(type.toLowerCase());
+}
+
 // FIXME(@ckerr) still thinking this one through.
 // With current requirements, this could probably just be a POJO
 export class Task {
@@ -16,7 +20,7 @@ export class Task {
   public time_finished: Date | undefined = undefined;
   public time_started: Date | undefined = undefined;
 
-  constructor(props = {}) {
+  constructor(props) {
     const defaultProps = {
       id: mkuuid(),
       time_created: currentTimeT(),
@@ -30,13 +34,15 @@ export class Task {
   }
 
   public static createBisectTask(props: Record<string, any>): Task {
-    const required = ['gist'];
+    const required = ['gist', 'type'];
     for (const name of required) {
       if (!props[name]) {
         throw new Error(`missing property: ${name}`);
       }
     }
-
+    if (!isKnownType(props.type)) {
+      throw new Error(`unrecognized type: ${props.type}`);
+    }
     if (props.os && !isKnownOS(props.os)) {
       throw new Error(`unrecognized operating system: ${props.os}`);
     }

@@ -7,6 +7,10 @@ export class Broker {
     this.tasks.set(task.id, task);
   }
 
+  public getTask(id: string): Task | undefined {
+    return this.tasks.get(id);
+  }
+
   public getTasks(): Task[] {
     return [...this.tasks.values()];
   }
