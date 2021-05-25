@@ -6,6 +6,6 @@ const broker = new Broker();
 const server = new Server({
   broker,
   createBisectTask: Task.createBisectTask,
-  port: Number.parseInt(process.env.BUGBOT_BROKER_PORT, 10) || 8088,
+  port: Number.parseInt(process.env.PORT, 10) || 9099,
 });
 server.listen();

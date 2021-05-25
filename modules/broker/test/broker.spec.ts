@@ -1,3 +1,4 @@
+import * as https from 'https';
 import fetch from 'node-fetch';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
@@ -8,7 +9,11 @@ import { Task } from '../src/task';
 describe('broker', () => {
   let broker: Broker;
   let server: Server;
-  const port = 8088;
+  const port = 9099;
+  const base_url = `https://localhost:${port}`;
+  const agent = new https.Agent({
+    rejectUnauthorized: false
+  });
 
   beforeEach(async () => {
     const { createBisectTask } = Task;
@@ -22,11 +27,10 @@ describe('broker', () => {
   });
 
   function postJob(body: any) {
-    return fetch(`http://localhost:${port}/api/jobs`, {
+    return fetch(`${base_url}/api/jobs`, {
+      agent,
       body: JSON.stringify(body),
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     });
   }
@@ -42,7 +46,7 @@ describe('broker', () => {
   }
 
   async function getJob(id: string) {
-    const response = await fetch(`http://localhost:${port}/api/jobs/${id}`);
+    const response = await fetch(`${base_url}/api/jobs/${id}`, { agent });
     let body;
     try {
       body = await response.json();
@@ -55,7 +59,7 @@ describe('broker', () => {
     for (const [key, val] of Object.entries(o)) {
       params.set(key, val);
     }
-    const response = await fetch(`http://localhost:${port}/api/jobs?${params}`);
+    const response = await fetch(`${base_url}/api/jobs?${params}`, { agent });
     const body = await response.json();
     return { body, response };
   }

@@ -1,8 +1,10 @@
 import express from 'express';
 
 import { inspect } from 'util';
-import * as path from 'path';
+import * as fs from 'fs';
 import * as http from 'http';
+import * as https from 'https';
+import * as path from 'path';
 
 import { Broker } from './broker';
 import { Task } from './task';
@@ -95,8 +97,13 @@ export class Server {
   }
 
   public listen(): Promise<void> {
+    const options = {
+      cert: fs.readFileSync(path.resolve(process.cwd(), 'server.cert')),
+      key: fs.readFileSync(path.resolve(process.cwd(), 'server.key')),
+    };
+    this.server = https.createServer(options, this.app);
     return new Promise((resolve) => {
-      this.server = this.app.listen(this.port, () => resolve());
+      this.server.listen(this.port, () => resolve());
     });
   }
 
