@@ -8,11 +8,14 @@
     "modules/runner"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "run-p build:bot build:broker build:runner",
+    "build:bot": "yarn workspace @electron/bugbot-bot build",
+    "build:broker": "yarn workspace @electron/bugbot-broker build",
+    "build:runner": "yarn workspace @electron/bugbot-runner build",
     "start:bot": "yarn workspace @electron/bugbot-bot start",
     "start:broker": "yarn workspace @electron/bugbot-broker start",
     "start:runner": "yarn workspace @electron/bugbot-runner start",
-    "test": "yarn test:broker test:runner test:shared",
+    "test": "run-s test:broker test:runner test:shared",
     "test:broker": "yarn workspace @electron/bugbot-broker test",
     "test:runner": "yarn workspace @electron/bugbot-runner test",
     "test:shared": "yarn workspace @electron/bugbot-shared test",
