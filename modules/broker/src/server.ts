@@ -13,33 +13,8 @@ const debug = Debug('broker:server');
 // eslint-disable-next-line no-unused-vars
 type TaskBuilder = (params: any) => Task;
 
-const TaskPublicFields = Object.freeze(
-  new Set([
-    'bisect_result',
-    'client_data',
-    'error',
-    'first',
-    'gist',
-    'id',
-    'last',
-    'log',
-    'os',
-    'runner',
-    'time_created',
-    'time_finished',
-    'time_started',
-    'type',
-  ]),
-);
-
-function publicFieldsOf(o: Record<string, any>) {
-  return Object.fromEntries(
-    Object.entries(o).filter(([key]) => TaskPublicFields.has(key)),
-  );
-}
-
 function getTaskBody(task: Task) {
-  const body = JSON.stringify(publicFieldsOf(task));
+  const body = JSON.stringify(task.publicSubset());
   const etag = create_etag(body);
   return { body, etag };
 }
@@ -161,11 +136,11 @@ export class Server {
   }
 
   private getJobs(req: express.Request, res: express.Response) {
-    let tasks = this.broker.getTasks().map(publicFieldsOf);
+    let tasks = this.broker.getTasks().map((task) => task.publicSubset());
     const includeUndefined = ['os'];
 
     const filters = Object.entries(req.query).filter(([key]) =>
-      TaskPublicFields.has(key),
+      Task.PublicFields.has(key),
     );
     for (const [key, value] of filters) {
       const noProp = (task) => !Object.prototype.hasOwnProperty.call(task, key);

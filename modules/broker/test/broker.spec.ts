@@ -89,6 +89,13 @@ describe('broker', () => {
       expect(body.includes(unknown));
     });
 
+    it('rejects unknown properties', async () => {
+      const unknown = 'potrzebie';
+      const { response, body } = await postNewBisectJob({ [unknown]: unknown });
+      expect(response.status).toBe(422);
+      expect(body.includes(unknown));
+    });
+
     async function rejectsNonSemver(name: string) {
       const unknown = 'Precise Pangolin';
       const { response, body } = await postNewBisectJob({ [name]: unknown });

@@ -1,20 +1,21 @@
 import * as semver from 'semver';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
-import { isKnownOS } from './utils';
-
-function isKnownType(type: string): boolean {
-  return ['bisect', 'test'].includes(type.toLowerCase());
-}
-
 export class Task {
   public readonly id: string;
   public readonly log: string;
-  public readonly time_created: Date;
   public readonly log_data: string[] = [];
+  public readonly time_created: Date;
+  public readonly type: string;
+  public bisect_result: string[] | undefined = undefined;
+  public client_data: string | undefined = undefined;
+  public error: string | undefined = undefined;
   public etag: string | undefined = undefined;
+  public first: string | undefined = undefined;
   public gist: string;
+  public last: string | undefined = undefined;
   public os: string;
+  public runner: string;
   public time_finished: Date | undefined = undefined;
   public time_started: Date | undefined = undefined;
 
@@ -29,30 +30,62 @@ export class Task {
     }
   }
 
+  public static PackageFields = Object.freeze(new Set(['etag', 'log_data']));
+
+  public static PublicFields = Object.freeze(
+    new Set([
+      'bisect_result',
+      'client_data',
+      'error',
+      'first',
+      'gist',
+      'id',
+      'last',
+      'log',
+      'os',
+      'runner',
+      'time_created',
+      'time_finished',
+      'time_started',
+      'type',
+    ]),
+  );
+
+  private static KnownProps = Object.freeze(
+    new Set([...Task.PackageFields.values(), ...Task.PublicFields.values()]),
+  );
+
+  public publicSubset(): Record<string, any> {
+    return Object.fromEntries(
+      Object.entries(this).filter(([key]) => Task.PublicFields.has(key)),
+    );
+  }
+
+  private static PropertyTests = Object.freeze({
+    first: (value: string) => semver.valid(value),
+    last: (value: string) => semver.valid(value),
+    os: (value: string) => ['linux', 'macos', 'windows'].includes(value),
+    type: (value: string) => ['bisect', 'test'].includes(value),
+  });
+
   public static createBisectTask(props: Record<string, string>): Task {
     const required_all = ['gist', 'type'];
     const required_type = new Map([['bisect', ['first', 'last']]]);
-
-    if (!isKnownType(props.type)) {
-      throw new Error(`unrecognized type: ${props.type}`);
-    }
-
     for (const name of [...required_all, ...required_type.get(props.type)]) {
       if (!props[name]) {
         throw new Error(`missing property: ${name}`);
       }
     }
 
-    const semverIfPresent = (name) => {
-      if (name in props && !semver.valid(props[name])) {
-        throw new Error(`non-semver '${name}' value: ${props[name]}`);
+    for (const [key, value] of Object.entries(props)) {
+      if (!Task.KnownProps.has(key)) {
+        throw new Error(`unknown property: '${key}'`);
       }
-    };
-    semverIfPresent('first');
-    semverIfPresent('last');
 
-    if (props.os && !isKnownOS(props.os)) {
-      throw new Error(`unrecognized operating system: ${props.os}`);
+      const test = Task.PropertyTests[key];
+      if (test && !test(value)) {
+        throw new Error(`invalid value for '${key}': '${value}'`);
+      }
     }
 
     return new Task(props);
