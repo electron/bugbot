@@ -136,14 +136,21 @@ export class Server {
 
   private getJobs(req: express.Request, res: express.Response) {
     let tasks = this.broker.getTasks().map(publicFieldsOf);
-    for (const [key, filter] of Object.entries(req.query)) {
-      switch (key) {
-        case 'os':
-          tasks = tasks.filter((task) => !task[key] || task[key] === filter);
-          break;
-        default:
-          tasks = tasks.filter((task) => task[key] === filter);
-          break;
+    const includeUndefined = ['os'];
+
+    const filters = Object.entries(req.query).filter(([key]) =>
+      TaskPublicFields.has(key),
+    );
+    for (const [key, value] of filters) {
+      const noProp = (task) => !Object.prototype.hasOwnProperty.call(task, key);
+      const matches = (task) => task[key] === value;
+
+      if (value === 'undefined') {
+        tasks = tasks.filter((task) => noProp(task));
+      } else if (includeUndefined.includes(key)) {
+        tasks = tasks.filter((task) => noProp(task) || matches(task));
+      } else {
+        tasks = tasks.filter((task) => matches(task));
       }
     }
     res.status(200).json(tasks.map((task) => task.id));

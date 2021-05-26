@@ -214,7 +214,14 @@ describe('broker', () => {
         expect(jobs).toContain(b);
       });
 
-      it.todo('runner=undefined');
+      it('filters on property-missing with "undefined" keyword', async () => {
+        const { body: no_runner_id } = await postNewBisectJob();
+        await postNewBisectJob({ runner: 'runner_1' });
+        await postNewBisectJob({ runner: 'runner_2' });
+
+        const { body: jobs } = await getJobs({ runner: 'undefined' });
+        expect(jobs).toStrictEqual([no_runner_id]);
+      });
     });
   });
 
