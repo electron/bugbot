@@ -52,7 +52,7 @@ export class Server {
       return;
     }
 
-    const body = task.log_data.join('\n');
+    const body = task.log.join('\n');
     res.status(200).send(body);
   }
 
@@ -64,7 +64,7 @@ export class Server {
       return;
     }
 
-    task.log_data.push(...req.body.split(/\/r?\n/));
+    task.log.push(...req.body.split(/\/r?\n/));
     res.status(200).end();
   }
 

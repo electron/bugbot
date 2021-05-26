@@ -3,8 +3,7 @@ import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 export class Task {
   public readonly id: string;
-  public readonly log: string;
-  public readonly log_data: string[] = [];
+  public readonly log: string[] = [];
   public readonly time_created: Date;
   public readonly type: string;
   public bisect_result: string[] | undefined = undefined;
@@ -22,7 +21,6 @@ export class Task {
   constructor(props: Record<string, string | number>) {
     // provide default values for any missing required properties
     if (!is_uuid(props.id)) props.id = mkuuid();
-    if (!props.log) props.log = `/log/${props.id}`;
     if (!props.time_created) props.time_created = Date.now();
 
     for (const [key, val] of Object.entries(props)) {
@@ -30,7 +28,7 @@ export class Task {
     }
   }
 
-  public static PackageFields = Object.freeze(new Set(['etag', 'log_data']));
+  public static PackageFields = Object.freeze(new Set(['etag', 'log']));
 
   public static PublicFields = Object.freeze(
     new Set([
@@ -41,7 +39,6 @@ export class Task {
       'gist',
       'id',
       'last',
-      'log',
       'os',
       'runner',
       'time_created',
@@ -79,8 +76,7 @@ export class Task {
   }
 
   public static canSet(key: string, value: any): boolean {
-    if (Task.ReadonlyProps.has(key)) return false;
-    return Task.canInit(key, value);
+    return Task.canInit(key, value) && !Task.ReadonlyProps.has(key);
   }
 
   public static createBisectTask(props: Record<string, string>): Task {

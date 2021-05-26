@@ -193,11 +193,6 @@ describe('broker', () => {
       expect(semver.valid(job.last)).toBeTruthy();
     });
 
-    it('includes a log url', async () => {
-      const { body: job } = await getJob(id);
-      expect(job.log).toBe(`/log/${id}`);
-    });
-
     it.todo('may include a result_bisect value');
     it.todo('may include a time_finished value');
     it.todo('may include a time_started value');
