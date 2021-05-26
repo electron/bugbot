@@ -6,7 +6,6 @@ function isKnownType(type: string): boolean {
   return ['bisect', 'test'].includes(type.toLowerCase());
 }
 
-// FIXME(@ckerr) could this just be a pojo?
 export class Task {
   public readonly id: string;
   public readonly log: string;
@@ -18,22 +17,18 @@ export class Task {
   public time_finished: Date | undefined = undefined;
   public time_started: Date | undefined = undefined;
 
-  constructor(props: Record<string, any>) {
-    // fill in default values for any missing required properties
-    props = {
-      id: mkuuid(),
-      time_created: Date.now(),
-      ...props,
-    };
-    props.log = `/log/${props.id}`;
+  constructor(props: Record<string, string | number>) {
+    // provide default values for any missing required properties
+    if (!props.id) props.id = mkuuid();
+    if (!props.log) props.log = `/log/${props.id}`;
+    if (!props.time_created) props.time_created = Date.now();
 
-    // FIXME(@ckerr) validate these properties
     for (const [key, val] of Object.entries(props)) {
       this[key] = val;
     }
   }
 
-  public static createBisectTask(props: Record<string, any>): Task {
+  public static createBisectTask(props: Record<string, string>): Task {
     const required_all = ['gist', 'type'];
     const required_type = new Map([['bisect', ['first', 'last']]]);
 

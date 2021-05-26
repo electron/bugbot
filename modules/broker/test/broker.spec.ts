@@ -381,8 +381,6 @@ describe('broker', () => {
       const response = await addLogMessages('unknown-job-id', 'text');
       expect(response.status).toBe(404);
     });
-
-    it.todo('accepts `transfer-encoding: chunked` requests');
   });
 
   it.todo('remembers state when restarted');
