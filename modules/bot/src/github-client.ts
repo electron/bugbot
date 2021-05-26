@@ -5,7 +5,7 @@ import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-p
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
 import {
   bisectFiddle,
-  checkComplete,
+  getCompleteJob,
   hasRunningTest,
   markAsComplete,
   stopTest,
@@ -33,7 +33,7 @@ async function commentBisectResult(result: FiddleBisectResult, context: any) {
  * Takes action based on a comment left on an issue
  * @param context Probot context object
  */
-export function parseManualCommand(context: any): void {
+export async function parseManualCommand(context: any): Promise<void> {
   const { payload } = context;
   const args = payload.comment.body.split(' ');
   const [command, action] = args;
@@ -48,17 +48,18 @@ export function parseManualCommand(context: any): void {
   if (action === actions.STOP && hasTest) {
     stopTest(id);
   } else if (action === actions.BISECT && !hasTest) {
-    // fire and forget
+    // Get issue input and fire a bisect job
     const input = parseIssueBody(body);
-    bisectFiddle(input);
+    await bisectFiddle(input);
 
     const INTERVAL = 5 * 1000;
 
-    const timer = setInterval(async () => {
-      const isComplete = checkComplete(id);
-      if (isComplete) {
+    // Poll every INTERVAL to see if the job is complete
+    const timer = setInterval(() => {
+      const jobResults = getCompleteJob(id);
+      if (jobResults) {
         // TODO(erickzhao): add logic here
-        await commentBisectResult(
+        commentBisectResult(
           {
             badVersion: 'v12.0.7',
             goodVersion: 'v12.0.9',

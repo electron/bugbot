@@ -73,9 +73,9 @@ export function startTest(): void {
   console.log('startTest');
 }
 
-export function checkComplete(issue: string): boolean {
-  console.log('checkComplete', { issue });
-  return true;
+export function getCompleteJob(issue: string): any {
+  console.log('getCompleteJob', { issue });
+  return {};
 }
 
 export function markAsComplete(): void {
