@@ -1,4 +1,5 @@
 import * as https from 'https';
+import * as semver from 'semver';
 import dayjs from 'dayjs';
 import fetch from 'node-fetch';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
@@ -41,7 +42,9 @@ describe('broker', () => {
   async function postNewBisectJob(params = {}) {
     // fill in defaults for any missing required values
     params = {
+      first: '10.0.0',
       gist: 'abbaabbaabbaabbaabbaabbaabbaabbaabbaabba',
+      last: '11.2.0',
       type: 'bisect',
       ...params,
     };
@@ -168,6 +171,12 @@ describe('broker', () => {
     it('may include a os value', async () => {
       const { body: job } = await getJob(id);
       expect(job.os).toBe(os);
+    });
+
+    it('may include a first and last bisect range', async () => {
+      const { body: job } = await getJob(id);
+      expect(semver.valid(job.first)).toBeTruthy();
+      expect(semver.valid(job.last)).toBeTruthy();
     });
 
     it.todo('includes a log url');

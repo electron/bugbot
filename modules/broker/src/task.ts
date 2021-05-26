@@ -31,15 +31,17 @@ export class Task {
   }
 
   public static createBisectTask(props: Record<string, any>): Task {
-    const required = ['gist', 'type'];
-    for (const name of required) {
-      if (!props[name]) {
-        throw new Error(`missing property: ${name}`);
-      }
-    }
+    const required_all = ['gist', 'type'];
+    const required_type = new Map([['bisect', ['first', 'last']]]);
 
     if (!isKnownType(props.type)) {
       throw new Error(`unrecognized type: ${props.type}`);
+    }
+
+    for (const name of [...required_all, ...required_type.get(props.type)]) {
+      if (!props[name]) {
+        throw new Error(`missing property: ${name}`);
+      }
     }
 
     if (props.os && !isKnownOS(props.os)) {
