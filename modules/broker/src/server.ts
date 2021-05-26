@@ -60,7 +60,6 @@ export class Server {
     this.port = appInit.port;
 
     this.app = express();
-    // this.app.use(express.json());
     this.app.get('/api/jobs/', this.getJobs.bind(this));
     this.app.get('/api/jobs/*', this.getJob.bind(this));
     this.app.get('/log/*', this.getLog.bind(this));
