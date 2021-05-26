@@ -1,10 +1,10 @@
-import express from 'express';
-
-import { inspect } from 'util';
+import create_etag from 'etag';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
+import express from 'express';
+import * as jsonpatch from 'fast-json-patch';
 
 import { Broker } from './broker';
 import { Task } from './task';
@@ -36,6 +36,12 @@ function publicFieldsOf(o: Record<string, any>) {
   );
 }
 
+function getTaskBody(task: Task) {
+  const body = JSON.stringify(publicFieldsOf(task));
+  const etag = create_etag(body);
+  return { body, etag };
+}
+
 export class Server {
   private readonly app: express.Application;
   private readonly createBisectTask: TaskBuilder;
@@ -54,12 +60,13 @@ export class Server {
 
     this.app = express();
     this.app.use(express.json());
-    this.app.post('/api/jobs', this.createJob.bind(this));
-    this.app.get('/api/jobs/*', this.getJob.bind(this));
     this.app.get('/api/jobs/', this.getJobs.bind(this));
+    this.app.get('/api/jobs/*', this.getJob.bind(this));
+    this.app.patch('/api/jobs/*', this.patchJob.bind(this));
+    this.app.post('/api/jobs', this.postJob.bind(this));
   }
 
-  private createJob(req: express.Request, res: express.Response) {
+  private postJob(req: express.Request, res: express.Response) {
     let task: Task;
     try {
       task = this.createBisectTask(req.body);
@@ -75,9 +82,51 @@ export class Server {
     const task = this.broker.getTask(id);
 
     if (task) {
-      res.status(200).json(publicFieldsOf(task));
+      const { body, etag } = getTaskBody(task);
+      task.etag = etag;
+      res.header('ETag', etag);
+      res.header('Content-Type', 'application/json');
+      res.status(200).send(body);
     } else {
       res.status(404).end();
+    }
+  }
+
+  private patchJob(req: express.Request, res: express.Response) {
+    const id = path.basename(req.url);
+    const task = this.broker.getTask(id);
+    if (!task) {
+      res.status(404).end();
+      return;
+    }
+
+    const if_header = 'If-Match';
+    const if_etag = req.header(if_header);
+    if (if_etag && if_etag !== task.etag) {
+      res.status(412).send(`Invalid ${if_header} header: ${if_etag}`);
+      return;
+    }
+
+    try {
+      console.debug('before patch', JSON.stringify(task));
+      jsonpatch.applyPatch(task, req.body, (op, index, tree, existingPath) => {
+        const readonlyPaths = ['/id', '/type'];
+        if (readonlyPaths.includes(existingPath)) {
+          throw new jsonpatch.JsonPatchError(
+            `readonly property ${existingPath}`,
+            'OPERATION_OP_INVALID',
+            index,
+            op,
+            tree,
+          );
+        }
+      });
+      console.debug('after patch', JSON.stringify(task));
+      const { etag } = getTaskBody(task);
+      res.header('ETag', etag);
+      res.status(200).end();
+    } catch (err) {
+      res.status(400).send(err);
     }
   }
 
@@ -93,7 +142,7 @@ export class Server {
           break;
       }
     }
-    res.status(200).json(tasks);
+    res.status(200).json(tasks.map((task) => task.id));
   }
 
   public listen(): Promise<void> {

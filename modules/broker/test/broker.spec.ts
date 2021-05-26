@@ -48,10 +48,12 @@ describe('broker', () => {
   async function getJob(id: string) {
     const response = await fetch(`${base_url}/api/jobs/${id}`, { agent });
     let body;
+    let etag;
     try {
+      etag = response.headers.get('ETag');
       body = await response.json();
     } catch (err) {}
-    return { body, response };
+    return { body, etag, response };
   }
 
   async function getJobs(o: Record<string, any> = {}) {
@@ -161,11 +163,10 @@ describe('broker', () => {
   });
 
   describe('/api/jobs? (GET)', () => {
-    it('returns objects identical to /api/jobs/$job_id', async () => {
+    it('returns task ids', async () => {
       const { body: id } = await postNewBisectJob();
-      const { body: job } = await getJob(id);
       const { body: jobs } = await getJobs();
-      expect(jobs).toContainEqual(job);
+      expect(jobs).toContainEqual(id);
     });
 
     it('returns 404 if no such job', async () => {
@@ -182,8 +183,8 @@ describe('broker', () => {
         const { body: jobs } = await getJobs({ os: 'linux' });
 
         expect(jobs.length).toBe(2);
-        expect(jobs).toContainEqual(expect.objectContaining({ id: id_os_lin }));
-        expect(jobs).toContainEqual(expect.objectContaining({ id: id_os_any }));
+        expect(jobs).toContain(id_os_lin);
+        expect(jobs).toContain(id_os_any);
       });
 
       it('gist', async () => {
@@ -194,8 +195,8 @@ describe('broker', () => {
         const { body: jobs } = await getJobs({ gist: 'foo' });
 
         expect(jobs.length).toBe(2);
-        expect(jobs).toContainEqual(expect.objectContaining({ id: a }));
-        expect(jobs).toContainEqual(expect.objectContaining({ id: b }));
+        expect(jobs).toContain(a);
+        expect(jobs).toContain(b);
       });
 
       it.todo('runner=undefined');
@@ -203,8 +204,108 @@ describe('broker', () => {
   });
 
   describe('/api/jobs/$job_id (PATCH)', () => {
-    it.todo('modifies a property');
-    it.todo('errors if the property has an unexpected value');
+    let etag: string;
+    let id: string;
+
+    beforeEach(async () => {
+      const { body: post_body } = await postNewBisectJob();
+      id = post_body;
+      ({ etag } = await getJob(id));
+    });
+
+    function patchJob(patchId: string, patchEtag: string, body: any) {
+      return fetch(`${base_url}/api/jobs/${patchId}`, {
+        agent,
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', 'If-Match': patchEtag },
+        method: 'PATCH',
+      });
+    }
+
+    it('adds properties', async () => {
+      const client_data = Math.random().toString();
+      const body = [{ op: 'add', path: '/client_data', value: client_data }];
+      const response = await patchJob(id, etag, body);
+      expect(response.status).toBe(200);
+
+      const { body: job } = await getJob(id);
+      expect(job.client_data).toBe(client_data);
+    });
+
+    it('replaces properties', async () => {
+      const new_gist = 'new_gist';
+      const body = [{ op: 'replace', path: '/gist', value: new_gist }];
+      const response = await patchJob(id, etag, body);
+      expect(response.status).toBe(200);
+      console.log('response.text', await response.text());
+
+      const { body: job } = await getJob(id);
+      expect(job.gist).toBe(new_gist);
+    });
+
+    it('removes properties', async () => {
+      // add a property
+      {
+        const client_data = Math.random().toString();
+        const body = [{ op: 'add', path: '/client_data', value: client_data }];
+        const response = await patchJob(id, etag, body);
+        expect(response.status).toBe(200);
+
+        let job;
+        ({ etag, body: job } = await getJob(id));
+        expect(job.client_data).toBe(client_data);
+      }
+
+      // remove it
+      {
+        const body = [{ op: 'remove', path: '/client_data' }];
+        const response = await patchJob(id, etag, body);
+        expect(response.status).toBe(200);
+        const { body: job } = await getJob(id);
+        expect(job).not.toHaveProperty('client_data');
+      }
+    });
+
+    describe('fails if', () => {
+      it('the job is not found', async () => {
+        const new_gist = 'new_gist';
+        const body = [{ op: 'replace', path: '/gist', value: new_gist }];
+        const response = await patchJob('unknown-job', etag, body);
+        expect(response.status).toBe(404);
+      });
+
+      it('the etag does not match', async () => {
+        const new_gist = 'new_gist';
+        const body = [{ op: 'replace', path: '/gist', value: new_gist }];
+        const response = await patchJob(id, 'unknown-etag', body);
+        expect(response.status).toBe(412);
+
+        const { body: job } = await getJob(id);
+        expect(job.gist).not.toBe(new_gist);
+      });
+
+      it('the patch is malformed', async () => {
+        const new_gist = 'new_gist';
+        const body = [{ op: '💩', path: '/gist', value: new_gist }];
+        const response = await patchJob(id, etag, body);
+        expect(response.status).toBe(400);
+
+        const { body: job } = await getJob(id);
+        expect(job.gist).not.toBe(new_gist);
+      });
+
+      it('the patch changes readonly properties', async () => {
+        const path = '/id';
+        const new_id = 'poop';
+        const body = [{ op: 'replace', path, value: new_id }];
+        const response = await patchJob(id, etag, body);
+        expect(response.status).toBe(400);
+        expect(await response.text()).toContain(path);
+
+        const { response: res } = await getJob(new_id);
+        expect(res.status).toBe(404);
+      });
+    });
   });
 
   describe('/api/jobs/$job_id/log (PUT)', () => {

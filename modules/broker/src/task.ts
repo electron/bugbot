@@ -14,6 +14,7 @@ function isKnownType(type: string): boolean {
 // With current requirements, this could probably just be a POJO
 export class Task {
   public readonly id: string;
+  public etag: string | undefined = undefined;
   public gist: string;
   public os: string;
   public time_created: Date;
