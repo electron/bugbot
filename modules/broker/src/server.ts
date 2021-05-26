@@ -1,6 +1,4 @@
-import * as fs from 'fs';
 import * as http from 'http';
-import * as https from 'https';
 import * as jsonpatch from 'fast-json-patch';
 import * as path from 'path';
 import Debug from 'debug';
@@ -185,11 +183,7 @@ export class Server {
   }
 
   public listen(): Promise<void> {
-    const options = {
-      cert: fs.readFileSync(path.resolve(process.cwd(), 'server.cert')),
-      key: fs.readFileSync(path.resolve(process.cwd(), 'server.key')),
-    };
-    this.server = https.createServer(options, this.app);
+    this.server = http.createServer({}, this.app);
     return new Promise((resolve) => {
       this.server.listen(this.port, () => resolve());
     });

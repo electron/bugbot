@@ -1,4 +1,3 @@
-import * as https from 'https';
 import * as semver from 'semver';
 import dayjs from 'dayjs';
 import fetch from 'node-fetch';
@@ -12,12 +11,7 @@ describe('broker', () => {
   let broker: Broker;
   let server: Server;
   const port = 9099; // arbitrary
-  const base_url = `https://localhost:${port}`;
-
-  // FIXME: Needed because Broker has a self-signed SSL certificate
-  const agent = new https.Agent({
-    rejectUnauthorized: false,
-  });
+  const base_url = `http://localhost:${port}`;
 
   beforeEach(async () => {
     const { createBisectTask } = Task;
@@ -32,7 +26,6 @@ describe('broker', () => {
 
   function postJob(body) {
     return fetch(`${base_url}/api/jobs`, {
-      agent,
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
@@ -55,7 +48,7 @@ describe('broker', () => {
   }
 
   async function getJob(id: string) {
-    const response = await fetch(`${base_url}/api/jobs/${id}`, { agent });
+    const response = await fetch(`${base_url}/api/jobs/${id}`);
     const etag = response.headers.get('ETag');
     let body;
     try {
@@ -71,7 +64,7 @@ describe('broker', () => {
     for (const [key, val] of Object.entries(filter)) {
       params.set(key, val.toString());
     }
-    const response = await fetch(`${base_url}/api/jobs?${params}`, { agent });
+    const response = await fetch(`${base_url}/api/jobs?${params}`);
     const body = await response.json();
     return { body, response };
   }
@@ -250,7 +243,6 @@ describe('broker', () => {
 
     function patchJob(patchId: string, patchEtag: string, body: any) {
       return fetch(`${base_url}/api/jobs/${patchId}`, {
-        agent,
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json', 'If-Match': patchEtag },
         method: 'PATCH',
@@ -343,7 +335,7 @@ describe('broker', () => {
   });
 
   async function getLog(job_id: string) {
-    const response = await fetch(`${base_url}/log/${job_id}`, { agent });
+    const response = await fetch(`${base_url}/log/${job_id}`);
     const text = await response.text();
     const lines = `${text}`.split(/\r?\n/);
     return { body: lines, response };
@@ -359,7 +351,6 @@ describe('broker', () => {
   describe('/api/jobs/$job_id/log (PUT)', () => {
     function addLogMessages(job_id: string, body = '') {
       return fetch(`${base_url}/api/jobs/${job_id}/log`, {
-        agent,
         body,
         method: 'PUT',
       });
