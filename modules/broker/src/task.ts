@@ -2,33 +2,29 @@ import { v4 as mkuuid } from 'uuid';
 
 import { isKnownOS } from './utils';
 
-function currentTimeT() {
-  return Math.floor(Date.now() / 1000);
-}
-
 function isKnownType(type: string): boolean {
   return ['bisect', 'test'].includes(type.toLowerCase());
 }
 
-// FIXME(@ckerr) still thinking this one through.
-// With current requirements, this could probably just be a POJO
+// FIXME(@ckerr) could this just be a pojo?
 export class Task {
   public readonly id: string;
+  public readonly time_created: Date;
   public etag: string | undefined = undefined;
   public gist: string;
   public os: string;
-  public time_created: Date;
   public time_finished: Date | undefined = undefined;
   public time_started: Date | undefined = undefined;
 
-  constructor(props) {
-    const defaultProps = {
+  constructor(props: Record<string, any>) {
+    // fill in default values for any missing required properties
+    props = {
       id: mkuuid(),
-      time_created: currentTimeT(),
+      time_created: Date.now(),
+      ...props,
     };
 
     // FIXME(@ckerr) validate these properties
-    props = { ...defaultProps, ...props };
     for (const [key, val] of Object.entries(props)) {
       this[key] = val;
     }
@@ -41,12 +37,15 @@ export class Task {
         throw new Error(`missing property: ${name}`);
       }
     }
+
     if (!isKnownType(props.type)) {
       throw new Error(`unrecognized type: ${props.type}`);
     }
+
     if (props.os && !isKnownOS(props.os)) {
       throw new Error(`unrecognized operating system: ${props.os}`);
     }
+
     return new Task(props);
   }
 }

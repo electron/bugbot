@@ -1,4 +1,5 @@
 import * as https from 'https';
+import dayjs from 'dayjs';
 import fetch from 'node-fetch';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
@@ -9,10 +10,12 @@ import { Task } from '../src/task';
 describe('broker', () => {
   let broker: Broker;
   let server: Server;
-  const port = 9099;
+  const port = 9099; // arbitrary
   const base_url = `https://localhost:${port}`;
+
+  // FIXME: Needed because Broker has a self-signed SSL certificate
   const agent = new https.Agent({
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
   });
 
   beforeEach(async () => {
@@ -26,7 +29,7 @@ describe('broker', () => {
     server.close();
   });
 
-  function postJob(body: any) {
+  function postJob(body) {
     return fetch(`${base_url}/api/jobs`, {
       agent,
       body: JSON.stringify(body),
@@ -36,30 +39,34 @@ describe('broker', () => {
   }
 
   async function postNewBisectJob(params = {}) {
-    // default values
-    const gist = 'abbaabbaabbaabbaabbaabbaabbaabbaabbaabba';
-    const type = 'bisect';
+    // fill in defaults for any missing required values
+    params = {
+      gist: 'abbaabbaabbaabbaabbaabbaabbaabbaabbaabba',
+      type: 'bisect',
+      ...params,
+    };
 
-    const response = await postJob({ gist, type, ...params });
+    const response = await postJob(params);
     const body = await response.text();
     return { body, response };
   }
 
   async function getJob(id: string) {
     const response = await fetch(`${base_url}/api/jobs/${id}`, { agent });
+    const etag = response.headers.get('ETag');
     let body;
-    let etag;
     try {
-      etag = response.headers.get('ETag');
       body = await response.json();
-    } catch (err) {}
+    } catch (err) {
+      // empty
+    }
     return { body, etag, response };
   }
 
-  async function getJobs(o: Record<string, any> = {}) {
+  async function getJobs(filter = {}) {
     const params = new URLSearchParams();
-    for (const [key, val] of Object.entries(o)) {
-      params.set(key, val);
+    for (const [key, val] of Object.entries(filter)) {
+      params.set(key, val.toString());
     }
     const response = await fetch(`${base_url}/api/jobs?${params}`, { agent });
     const body = await response.json();
@@ -67,12 +74,6 @@ describe('broker', () => {
   }
 
   describe('/api/jobs (POST)', () => {
-    const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
-    const type = 'bisect';
-    // const headers = { 'Content-Type': 'application/json' };
-    // const method = 'POST';
-    const os = 'linux';
-
     it('creates a bisect job', async () => {
       const { response } = await postNewBisectJob();
       expect(response.status).toBe(201);
@@ -93,7 +94,11 @@ describe('broker', () => {
     });
 
     it('checks for required parameters', async () => {
+      const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
+      const os = 'linux';
       const required = ['gist', 'type'];
+      const type = 'bisect';
+
       for (const name of required) {
         const body = { gist, os, type };
         delete body[name];
@@ -114,7 +119,7 @@ describe('broker', () => {
 
   describe('/api/jobs/$job_id (GET)', () => {
     const client_data = Math.random().toString();
-    const gist = 'bedfacedbedfacedbedfacedbedfacedbedfaced';
+    const gist = 'gist';
     const os = 'linux';
     const type = 'bisect';
     let id: string;
@@ -140,9 +145,19 @@ describe('broker', () => {
     });
 
     it('includes a time_created number', async () => {
+      // confirm the property exists
       const { body: job } = await getJob(id);
       expect(job.time_created).toBeTruthy();
-      expect(Number.parseInt(job.time_created, 10)).not.toBeNaN();
+
+      // confirm it can be parsed
+      const time_created_msec = Number.parseInt(job.time_created, 10);
+      expect(time_created_msec).not.toBeNaN();
+
+      // confirm the job was created less than a minute ago
+      // (in the beforeEach() before this test)
+      const time_created = dayjs(time_created_msec);
+      const now = dayjs();
+      expect(now.diff(time_created, 'minute')).toBe(0);
     });
 
     it('may include a client_data value', async () => {
@@ -190,7 +205,7 @@ describe('broker', () => {
       it('gist', async () => {
         const { body: a } = await postNewBisectJob({ gist: 'foo' });
         const { body: b } = await postNewBisectJob({ gist: 'foo' });
-        await postNewBisectJob();
+        await postNewBisectJob({ gist: 'bar' });
 
         const { body: jobs } = await getJobs({ gist: 'foo' });
 
@@ -237,7 +252,6 @@ describe('broker', () => {
       const body = [{ op: 'replace', path: '/gist', value: new_gist }];
       const response = await patchJob(id, etag, body);
       expect(response.status).toBe(200);
-      console.log('response.text', await response.text());
 
       const { body: job } = await getJob(id);
       expect(job.gist).toBe(new_gist);

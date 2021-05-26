@@ -1,13 +1,16 @@
-import create_etag from 'etag';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
-import * as path from 'path';
-import express from 'express';
 import * as jsonpatch from 'fast-json-patch';
+import * as path from 'path';
+import Debug from 'debug';
+import create_etag from 'etag';
+import express from 'express';
 
 import { Broker } from './broker';
 import { Task } from './task';
+
+const debug = Debug('broker:server');
 
 type TaskBuilder = (params: any) => Task;
 
@@ -108,7 +111,7 @@ export class Server {
     }
 
     try {
-      console.debug('before patch', JSON.stringify(task));
+      debug('before patch', JSON.stringify(task));
       jsonpatch.applyPatch(task, req.body, (op, index, tree, existingPath) => {
         const readonlyPaths = ['/id', '/type'];
         if (readonlyPaths.includes(existingPath)) {
@@ -121,11 +124,12 @@ export class Server {
           );
         }
       });
-      console.debug('after patch', JSON.stringify(task));
+      debug('after patch', JSON.stringify(task));
       const { etag } = getTaskBody(task);
       res.header('ETag', etag);
       res.status(200).end();
     } catch (err) {
+      debug(err);
       res.status(400).send(err);
     }
   }
