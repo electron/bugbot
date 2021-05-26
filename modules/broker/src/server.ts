@@ -111,19 +111,22 @@ export class Server {
 
     try {
       debug('before patch', JSON.stringify(task));
-      jsonpatch.applyPatch(task, req.body, (op, index, tree, existingPath) => {
-        const readonlyProps = ['id', 'log', 'time_created', 'type'];
-        const readonlyPaths = readonlyProps.map((prop) => `/${prop}`);
-
-        if (readonlyPaths.includes(existingPath)) {
-          throw new jsonpatch.JsonPatchError(
-            `readonly property ${existingPath}`,
-            'OPERATION_OP_INVALID',
-            index,
-            op,
-            tree,
-          );
+      jsonpatch.applyPatch(task, req.body, (op, index, tree) => {
+        if (!['add', 'copy', 'move', 'remove', 'replace'].includes(op.op)) {
+          return;
         }
+        const prop = op.path.slice(1);
+        const value = (op as any).value || undefined;
+        if (Task.canSet(prop, value)) {
+          return;
+        }
+        throw new jsonpatch.JsonPatchError(
+          `unable to patch ${prop} on task ${task.id}`,
+          'OPERATION_OP_INVALID',
+          index,
+          op,
+          tree,
+        );
       });
       debug('after patch', JSON.stringify(task));
       const { etag } = getTaskBody(task);

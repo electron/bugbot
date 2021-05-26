@@ -51,6 +51,10 @@ export class Task {
     ]),
   );
 
+  private static ReadonlyProps = Object.freeze(
+    new Set(['id', 'log', 'time_created', 'type']),
+  );
+
   private static KnownProps = Object.freeze(
     new Set([...Task.PackageFields.values(), ...Task.PublicFields.values()]),
   );
@@ -68,6 +72,17 @@ export class Task {
     type: (value: string) => ['bisect', 'test'].includes(value),
   });
 
+  public static canInit(key: string, value: any): boolean {
+    if (!Task.KnownProps.has(key)) return false;
+    const test = Task.PropertyTests[key];
+    return !test || test(value);
+  }
+
+  public static canSet(key: string, value: any): boolean {
+    if (Task.ReadonlyProps.has(key)) return false;
+    return Task.canInit(key, value);
+  }
+
   public static createBisectTask(props: Record<string, string>): Task {
     const required_all = ['gist', 'type'];
     const required_type = new Map([['bisect', ['first', 'last']]]);
@@ -78,13 +93,8 @@ export class Task {
     }
 
     for (const [key, value] of Object.entries(props)) {
-      if (!Task.KnownProps.has(key)) {
-        throw new Error(`unknown property: '${key}'`);
-      }
-
-      const test = Task.PropertyTests[key];
-      if (test && !test(value)) {
-        throw new Error(`invalid value for '${key}': '${value}'`);
+      if (!Task.canInit(key, value)) {
+        throw new Error(`invalid property: '${key}', '${value}'`);
       }
     }
 
