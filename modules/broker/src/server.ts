@@ -115,7 +115,7 @@ export class Server {
         if (!['add', 'copy', 'move', 'remove', 'replace'].includes(op.op)) {
           return;
         }
-        const prop = op.path.slice(1);
+        const prop = op.path.slice(1); // '/client_data' -> 'client_data'
         const value = (op as any).value || undefined;
         if (Task.canSet(prop, value)) {
           return;
@@ -146,15 +146,12 @@ export class Server {
       Task.PublicFields.has(key),
     );
     for (const [key, value] of filters) {
-      const noProp = (task) => !Object.prototype.hasOwnProperty.call(task, key);
-      const matches = (task) => task[key] === value;
-
       if (value === 'undefined') {
-        tasks = tasks.filter((task) => noProp(task));
+        tasks = tasks.filter((task) => !(key in task));
       } else if (includeUndefined.includes(key)) {
-        tasks = tasks.filter((task) => noProp(task) || matches(task));
+        tasks = tasks.filter((task) => !(key in task) || task[key] === value);
       } else {
-        tasks = tasks.filter((task) => matches(task));
+        tasks = tasks.filter((task) => task[key] === value);
       }
     }
     res.status(200).json(tasks.map((task) => task.id));
