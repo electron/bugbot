@@ -89,6 +89,20 @@ describe('broker', () => {
       expect(body.includes(unknown));
     });
 
+    async function rejectsNonSemver(name: string) {
+      const unknown = 'Precise Pangolin';
+      const { response, body } = await postNewBisectJob({ [name]: unknown });
+      expect(response.status).toBe(422);
+      expect(body.includes(unknown));
+    }
+
+    it(`rejects non-semver 'first'`, async () => {
+      await rejectsNonSemver('first');
+    });
+    it(`rejects non-semver 'last'`, async () => {
+      await rejectsNonSemver('last');
+    });
+
     it('checks for required parameters', async () => {
       const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
       const os = 'linux';

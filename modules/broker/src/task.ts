@@ -1,3 +1,4 @@
+import * as semver from 'semver';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { isKnownOS } from './utils';
@@ -41,6 +42,14 @@ export class Task {
         throw new Error(`missing property: ${name}`);
       }
     }
+
+    const semverIfPresent = (name) => {
+      if (name in props && !semver.valid(props[name])) {
+        throw new Error(`non-semver '${name}' value: ${props[name]}`);
+      }
+    };
+    semverIfPresent('first');
+    semverIfPresent('last');
 
     if (props.os && !isKnownOS(props.os)) {
       throw new Error(`unrecognized operating system: ${props.os}`);
