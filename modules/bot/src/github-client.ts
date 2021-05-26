@@ -16,7 +16,12 @@ const actions = {
   STOP: 'stop',
 };
 
-async function commentResults(result: FiddleBisectResult, context: any) {
+/**
+ * Comments on the issue once a bisect operation is completed
+ * @param result The result from a Fiddle bisection
+ * @param context Probot context object
+ */
+async function commentBisectResult(result: FiddleBisectResult, context: any) {
   const resultComment = context.issue({
     body: `🤖 Results from bisecting: \n ${JSON.stringify(result, null, 2)}`,
   });
@@ -24,8 +29,11 @@ async function commentResults(result: FiddleBisectResult, context: any) {
   await context.octokit.issues.createComment(resultComment);
 }
 
-// TODO: figure out how to properly import this type
-function parseComment(context: any) {
+/**
+ * Takes action based on a comment left on an issue
+ * @param context Probot context object
+ */
+export function parseManualCommand(context: any): void {
   const { payload } = context;
   const args = payload.comment.body.split(' ');
   const [command, action] = args;
@@ -34,18 +42,23 @@ function parseComment(context: any) {
     return;
   }
 
-  const issueId = payload.issue.id;
-  const hasTest = hasRunningTest(issueId);
+  const { id, body } = payload.issue;
+  const hasTest = hasRunningTest(id);
 
   if (action === actions.STOP && hasTest) {
-    stopTest(issueId);
+    stopTest(id);
   } else if (action === actions.BISECT && !hasTest) {
+    // fire and forget
+    const input = parseIssueBody(body);
+    bisectFiddle(input);
+
     const INTERVAL = 5 * 1000;
 
     const timer = setInterval(async () => {
-      const isComplete = checkComplete(issueId);
+      const isComplete = checkComplete(id);
       if (isComplete) {
-        await commentResults(
+        // TODO(erickzhao): add logic here
+        await commentBisectResult(
           {
             badVersion: 'v12.0.7',
             goodVersion: 'v12.0.9',
@@ -60,39 +73,18 @@ function parseComment(context: any) {
   }
 }
 
-export = (robot: Probot): void => {
+export default (robot: Probot): void => {
   const d = debug('github-client:probot');
   d('hello world');
 
-  // robot.onAny((context) => {
-  //   d('any', inspect(context.payload));
-  // });
-  // robot.on('issue_comment', (context) => {
-  //   d('issue_comment', inspect(context.payload));
-  // });
-  robot.on('issues.opened', async (context) => {
-    // TODO: refactor this into its own function
-    try {
-      const fiddleInput = parseIssueBody(context.payload.issue.body);
-
-      const result = await bisectFiddle(fiddleInput);
-      // TODO: take action based on this
-
-      const botResponse = result.success
-        ? [
-            '🤖 The bisect ✅ succeeded!',
-            `* **Good version**: ${result.goodVersion}`,
-            `* **Bad version**: ${result.badVersion}`,
-            `Diff URL: https://github.com/electron/electron/compare/${result.goodVersion}..${result.badVersion}`,
-          ].join('\n')
-        : '🤖 The bisect ❌ failed. This Fiddle did not narrow down to two versions in the specified range.';
-      const resultComment = context.issue({
-        body: botResponse,
-      });
-      await context.octokit.issues.createComment(resultComment);
-    } catch (e) {
-      d('error', inspect(e));
-    }
+  robot.onAny((context) => {
+    d('any', inspect(context.payload));
+  });
+  robot.on('issue_comment', (context) => {
+    d('issue_comment', inspect(context.payload));
+  });
+  robot.on('issues.opened', (context) => {
+    d('issues.opened', inspect(context.payload));
   });
   robot.on('issues.labeled', (context) => {
     d('issues.labeled', inspect(context.payload));
@@ -111,10 +103,10 @@ export = (robot: Probot): void => {
       context.payload.comment.user.id === context.payload.sender.id &&
       isMaintainer
     ) {
-      parseComment(context);
+      parseManualCommand(context);
     }
   });
   robot.on('issue_comment.edited', (context) => {
-    d('issue_comment.deleted', inspect(context.payload));
+    d('issue_comment.edited', inspect(context.payload));
   });
 };

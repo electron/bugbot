@@ -29,8 +29,13 @@ export class RunnerError extends Error {
  */
 export async function bisectFiddle(
   fiddle: FiddleInput,
-): Promise<FiddleBisectResult> {
+): Promise<FiddleBisectResult | null> {
   // Determine the url to send the request to
+
+  if (!FIDDLE_RUNNER_BASE_URL) {
+    return null;
+  }
+
   const url = new URL('fiddle/bisect', FIDDLE_RUNNER_BASE_URL);
 
   return await fetch(url.toString(), {

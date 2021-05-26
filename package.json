@@ -13,6 +13,7 @@
     "start:broker": "yarn workspace @electron/bugbot-broker start",
     "start:runner": "yarn workspace @electron/bugbot-runner start",
     "test": "run-p test:runner test:shared",
+    "test:bot": "yarn workspace @electron/bugbot-bot test",
     "test:runner": "yarn workspace @electron/bugbot-runner test",
     "test:shared": "yarn workspace @electron/bugbot-shared test",
     "lint": "run-p lint:eslint lint:prettier",
