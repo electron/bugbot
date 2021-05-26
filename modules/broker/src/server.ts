@@ -10,6 +10,7 @@ import { Task } from './task';
 
 const debug = Debug('broker:server');
 
+// eslint-disable-next-line no-unused-vars
 type TaskBuilder = (params: any) => Task;
 
 const TaskPublicFields = Object.freeze(
