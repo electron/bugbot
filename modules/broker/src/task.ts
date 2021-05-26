@@ -1,4 +1,4 @@
-import { v4 as mkuuid } from 'uuid';
+import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { isKnownOS } from './utils';
 
@@ -19,7 +19,7 @@ export class Task {
 
   constructor(props: Record<string, string | number>) {
     // provide default values for any missing required properties
-    if (!props.id) props.id = mkuuid();
+    if (!is_uuid(props.id)) props.id = mkuuid();
     if (!props.log) props.log = `/log/${props.id}`;
     if (!props.time_created) props.time_created = Date.now();
 
