@@ -179,7 +179,11 @@ describe('broker', () => {
       expect(semver.valid(job.last)).toBeTruthy();
     });
 
-    it.todo('includes a log url');
+    it('includes a log url', async () => {
+      const { body: job } = await getJob(id);
+      expect(job.log).toBe(`/log/${id}`);
+    });
+
     it.todo('may include a result_bisect value');
     it.todo('may include a time_finished value');
     it.todo('may include a time_started value');
@@ -338,8 +342,46 @@ describe('broker', () => {
     });
   });
 
+  async function getLog(job_id: string) {
+    const response = await fetch(`${base_url}/log/${job_id}`, { agent });
+    const text = await response.text();
+    const lines = `${text}`.split(/\r?\n/);
+    return { body: lines, response };
+  }
+
+  describe('/log/$job_id (GET)', () => {
+    it('errors if the task is unknown', async () => {
+      const { response } = await getLog('unknown-job-id');
+      expect(response.status).toBe(404);
+    });
+  });
+
   describe('/api/jobs/$job_id/log (PUT)', () => {
-    it.todo('appends messages viewable in the job.log URL');
+    function addLogMessages(job_id: string, body = '') {
+      return fetch(`${base_url}/api/jobs/${job_id}/log`, {
+        agent,
+        body,
+        method: 'PUT',
+      });
+    }
+
+    it('appends messages viewable in the job.log URL', async () => {
+      const { body: job_id } = await postNewBisectJob();
+
+      const lines = ['line 1', 'line 2', 'line 3'];
+      for (const line of lines) {
+        await addLogMessages(job_id, line);
+      }
+
+      const { body: log } = await getLog(job_id);
+      expect(log).toStrictEqual(lines);
+    });
+
+    it('errors if the task is unknown', async () => {
+      const response = await addLogMessages('unknown-job-id', 'text');
+      expect(response.status).toBe(404);
+    });
+
     it.todo('accepts `transfer-encoding: chunked` requests');
   });
 

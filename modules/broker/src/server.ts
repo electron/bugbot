@@ -62,11 +62,37 @@ export class Server {
     this.port = appInit.port;
 
     this.app = express();
-    this.app.use(express.json());
+    // this.app.use(express.json());
     this.app.get('/api/jobs/', this.getJobs.bind(this));
     this.app.get('/api/jobs/*', this.getJob.bind(this));
-    this.app.patch('/api/jobs/*', this.patchJob.bind(this));
-    this.app.post('/api/jobs', this.postJob.bind(this));
+    this.app.get('/log/*', this.getLog.bind(this));
+    this.app.patch('/api/jobs/*', express.json(), this.patchJob.bind(this));
+    this.app.post('/api/jobs', express.json(), this.postJob.bind(this));
+    this.app.put('/api/jobs/*/log', express.text(), this.putLog.bind(this));
+  }
+
+  private getLog(req: express.Request, res: express.Response) {
+    const id = path.basename(req.url);
+    const task = this.broker.getTask(id);
+    if (!task) {
+      res.status(404).send(`Unknown job '${id}'`);
+      return;
+    }
+
+    const body = task.log_data.join('\n');
+    res.status(200).send(body);
+  }
+
+  private putLog(req: express.Request, res: express.Response) {
+    const [, id] = /\/api\/jobs\/(.*)\/log/.exec(req.url);
+    const task = this.broker.getTask(id);
+    if (!task) {
+      res.status(404).send(`Unknown job '${id}'`);
+      return;
+    }
+
+    task.log_data.push(...req.body.split(/\/r?\n/));
+    res.status(200).end();
   }
 
   private postJob(req: express.Request, res: express.Response) {
@@ -83,23 +109,23 @@ export class Server {
   private getJob(req: express.Request, res: express.Response) {
     const id = path.basename(req.url);
     const task = this.broker.getTask(id);
-
-    if (task) {
-      const { body, etag } = getTaskBody(task);
-      task.etag = etag;
-      res.header('ETag', etag);
-      res.header('Content-Type', 'application/json');
-      res.status(200).send(body);
-    } else {
-      res.status(404).end();
+    if (!task) {
+      res.status(404).send(`Unknown job '${id}'`);
+      return;
     }
+
+    const { body, etag } = getTaskBody(task);
+    task.etag = etag;
+    res.header('ETag', etag);
+    res.header('Content-Type', 'application/json');
+    res.status(200).send(body);
   }
 
   private patchJob(req: express.Request, res: express.Response) {
     const id = path.basename(req.url);
     const task = this.broker.getTask(id);
     if (!task) {
-      res.status(404).end();
+      res.status(404).send(`Unknown job '${id}'`);
       return;
     }
 
@@ -113,7 +139,9 @@ export class Server {
     try {
       debug('before patch', JSON.stringify(task));
       jsonpatch.applyPatch(task, req.body, (op, index, tree, existingPath) => {
-        const readonlyPaths = ['/id', '/type'];
+        const readonlyProps = ['id', 'log', 'time_created', 'type'];
+        const readonlyPaths = readonlyProps.map((prop) => `/${prop}`);
+
         if (readonlyPaths.includes(existingPath)) {
           throw new jsonpatch.JsonPatchError(
             `readonly property ${existingPath}`,

@@ -9,7 +9,9 @@ function isKnownType(type: string): boolean {
 // FIXME(@ckerr) could this just be a pojo?
 export class Task {
   public readonly id: string;
+  public readonly log: string;
   public readonly time_created: Date;
+  public readonly log_data: string[] = [];
   public etag: string | undefined = undefined;
   public gist: string;
   public os: string;
@@ -23,6 +25,7 @@ export class Task {
       time_created: Date.now(),
       ...props,
     };
+    props.log = `/log/${props.id}`;
 
     // FIXME(@ckerr) validate these properties
     for (const [key, val] of Object.entries(props)) {
