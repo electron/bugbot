@@ -1,4 +1,6 @@
+import * as fs from 'fs';
 import * as http from 'http';
+import * as https from 'https';
 import * as jsonpatch from 'fast-json-patch';
 import * as path from 'path';
 import Debug from 'debug';
@@ -24,16 +26,21 @@ export class Server {
   private readonly createBisectTask: TaskBuilder;
   private readonly broker: Broker;
   private readonly port: number;
-  private server: http.Server;
+  private readonly sport: number;
+  private readonly key: string | undefined = undefined;
+  private readonly cert: string | undefined = undefined;
+  private servers: http.Server[] = [];
 
-  constructor(appInit: {
-    broker: Broker;
-    createBisectTask: TaskBuilder;
-    port: number;
-  }) {
-    this.broker = appInit.broker;
-    this.createBisectTask = appInit.createBisectTask;
-    this.port = appInit.port;
+  constructor(appInit: Record<string, any>) {
+    const {
+      broker,
+      cert,
+      createBisectTask,
+      key,
+      port = 8080,
+      sport = 8443,
+    } = appInit;
+    Object.assign(this, { broker, cert, createBisectTask, key, port, sport });
 
     this.app = express();
     this.app.get('/api/jobs/', this.getJobs.bind(this));
@@ -157,15 +164,46 @@ export class Server {
     res.status(200).json(tasks.map((task) => task.id));
   }
 
-  public listen(): Promise<void> {
-    this.server = http.createServer({}, this.app);
-    return new Promise((resolve) => {
-      this.server.listen(this.port, () => resolve());
-    });
+  public listen(): Promise<any> {
+    const listen = (server: http.Server, port: number) => {
+      return new Promise<void>((resolve, reject) => {
+        server.listen(port, () => {
+          debug(`listening on port ${port}`);
+          resolve();
+        });
+        server.once('error', (err) => reject(err));
+      });
+    };
+
+    const promises: Promise<any>[] = [];
+
+    {
+      const server = http.createServer({}, this.app);
+      this.servers.push(server);
+      promises.push(listen(server, this.port));
+    }
+
+    if (!this.cert || !this.key) {
+      debug('to enable ssl, set broker.server.cert and .key variables');
+    } else {
+      debug(`using ssl cert: ${this.cert}`);
+      debug(`using ssl key: ${this.key}`);
+      const server = https.createServer(
+        {
+          cert: fs.readFileSync(this.cert),
+          key: fs.readFileSync(this.key),
+        },
+        this.app,
+      );
+      this.servers.push(server);
+      promises.push(listen(server, this.sport));
+    }
+
+    return Promise.all(promises);
   }
 
   public close(): void {
-    this.server.close();
-    this.server = undefined;
+    this.servers.forEach((server) => server.close());
+    this.servers.splice(0, this.servers.length);
   }
 }
