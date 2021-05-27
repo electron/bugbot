@@ -1,108 +1,288 @@
-import express = require('express');
 import { execFile } from 'child_process';
-import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
-import * as SemVer from 'semver';
+import debug from 'debug';
+import got from 'got';
+import { URL } from 'url';
+import { v4 as uuidv4 } from 'uuid';
+import { env } from '@electron/bugbot-shared/lib/env-vars';
+import {
+  FiddleBisectResult,
+  parseFiddleBisectOutput,
+} from './fiddle-bisect-parser';
 
-/**
- * This is the path to the fiddle executable. This is read from the environment
- * variable named `FIDDLE_EXEC_PATH`.
- */
-const { FIDDLE_EXEC_PATH } = process.env;
-if (!FIDDLE_EXEC_PATH) {
-  // Just to make it more visible
-  console.error('`FIDDLE_EXEC_PATH` env variable is unset!');
+const d = debug('runner');
+
+interface BaseJob {
+  client_data?: string;
+  gist: string;
+  id: string;
+  os?: 'linux' | 'windows' | 'mac';
+  error?: string;
+  runner?: string;
+  time_created: number;
+  time_started?: number;
+  time_finished?: number;
 }
 
-/**
- * The same as `Object.prototype.hasOwnProperty`.
- */
-function objHasOwnKey(target: any, key: keyof any): boolean {
-  return Object.prototype.hasOwnProperty.call(target, key);
+interface BisectJob extends BaseJob {
+  type: 'bisect';
+  first: string;
+  last: string;
+  result_bisect?: [string, string];
 }
 
-const app = express();
+interface TestJob extends BaseJob {
+  type: 'test';
+  version: string;
+}
 
-app.use(express.json());
+type AnyJob = BisectJob | TestJob;
 
-app.post('/fiddle/bisect', (req, res) => {
-  // Ensure an object-like body was parsed for this request
-  if (!req.body || typeof req.body !== 'object') {
-    res.status(400).end('missing request body');
-    return;
+type JsonPatch = unknown;
+
+/**
+ * Returns a promise that resolves after the specified timeout.
+ */
+function timeout(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), ms);
+  });
+}
+
+class Runner {
+  private readonly uuid: string;
+  private readonly fiddleExecPath: string;
+  private readonly brokerUrl: string;
+  private readonly osFilter: string;
+  private readonly pollTimeoutMs: number;
+
+  /**
+   * Creates and initializes the runner from environment variables and default
+   * values, then starts the runner's execution loop.
+   */
+  static start(): Promise<never> {
+    // Determine the OS filter from the current running platform
+    let osFilter = '';
+    switch (process.platform) {
+      case 'darwin':
+        osFilter = 'mac';
+        break;
+      case 'linux':
+        osFilter = 'linux';
+        break;
+      case 'win32':
+        osFilter = 'windows';
+        break;
+      default:
+        d('Cannot detect the current operating system, exiting.');
+        return null;
+    }
+
+    // Create the runner
+    const runner: Runner = Object.create(Runner.prototype, {
+      brokerUrl: {
+        value: env('BUGBOT_BROKER_URL'),
+      },
+      fiddleExecPath: {
+        value: env('FIDDLE_EXEC_PATH'),
+      },
+      osFilter: {
+        value: osFilter,
+      },
+      pollTimeoutMs: {
+        value: 20 * 1000, // 20 seconds
+      },
+      uuid: {
+        value: uuidv4(),
+      },
+    });
+
+    // Begin running the poll loop
+    return runner.pollLoop();
   }
 
-  // Duck-type the request body to make sure it looks like a fiddle request
-  if (
-    !objHasOwnKey(req.body, 'goodVersion') ||
-    typeof req.body.goodVersion !== 'string'
-  ) {
-    res.status(400).end('missing or incorrect parameter "goodVersion"');
-    return;
-  }
-  if (
-    !objHasOwnKey(req.body, 'badVersion') ||
-    typeof req.body.badVersion !== 'string'
-  ) {
-    res.status(400).end('missing or incorrect parameter "badVersion"');
-    return;
-  }
-  if (
-    !objHasOwnKey(req.body, 'gistId') ||
-    typeof req.body.gistId !== 'string'
-  ) {
-    res.status(400).end('missing or incorrect parameter "gistId"');
-    return;
-  }
+  async pollLoop(): Promise<never> {
+    // Wrap the loop in a try-catch to log errors and make the runner resilient
+    try {
+      // Check for any claimable jobs
+      const claimableJobs = await this.fetchUnclaimedJobs();
 
-  // Ensure that the versions are valid semver and that they were passed as
-  // valid versions too
-  const goodVersion = SemVer.valid(req.body.goodVersion);
-  if (goodVersion !== req.body.goodVersion) {
-    res.status(400).end('invalid goodVersion');
-    return;
-  }
-
-  const badVersion = SemVer.valid(req.body.badVersion);
-  if (badVersion !== req.body.badVersion) {
-    res.status(400).end('invalid badVersion');
-    return;
-  }
-
-  // The gist ID is expected to just be the ID
-  const { gistId } = req.body;
-  if (gistId.length !== 32 || !/^[0-9a-f]{32}$/i.test(gistId)) {
-    res.status(400).end('invalid gist ID');
-    return;
-  }
-
-  // Run fiddle with the given parameters an pipe the response back to the
-  // request
-  execFile(
-    FIDDLE_EXEC_PATH as string,
-    ['bisect', goodVersion, badVersion, '--fiddle', gistId] as string[],
-    (err, stdout, stderr) => {
-      if (err !== null) {
-        console.log('failed fiddle stdout:\n', stdout);
-        console.log('failed fiddle stderr:\n', stderr);
-        res.status(400).end('fiddle failed to run');
-        return;
+      // If there are no unclaimed jobs then sleep and try again
+      if (claimableJobs.length === 0) {
+        await timeout(this.pollTimeoutMs);
+        return this.pollLoop();
       }
 
+      // Otherwise, claim the first job available
+      const [jobId] = claimableJobs;
+      // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
+      // help reduce any possible contention?
+      let etag = '';
+      const [job, initalEtag] = await this.fetchJobAndEtag(jobId);
+      etag = initalEtag;
+
+      // Claim the job
+      etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+        {
+          op: 'add',
+          path: '/runner',
+          value: this.uuid,
+        },
+        {
+          op: 'add',
+          path: '/time_started',
+          value: Date.now(),
+        },
+      ]);
+
+      // Another layer of catching errors to also unclaim the job if we error
       try {
-        // Parse fiddle's output and pass it back to the request
-        const result = parseFiddleBisectOutput(stdout);
-        res
-          .status(200)
-          .header('Content-Type', 'application/json')
-          .end(JSON.stringify(result));
-      } catch (_err) {
-        res.status(500).end('server error: could not parse bisect result');
-      }
-    },
-  );
-});
+        // Then determine how to run the job and return results
+        if (job.type === 'bisect') {
+          // Run the bisect
+          const result = await this.runBisect(job.first, job.last, job.gist);
 
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`listening for requests on port ${PORT}`);
+          // Report the result back to the job
+          if (result.success) {
+            etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+              {
+                op: 'add',
+                path: '/time_finished',
+                value: Date.now(),
+              },
+              {
+                op: 'add',
+                path: '/result_bisect',
+                value: [result.goodVersion, result.badVersion],
+              },
+            ]);
+          } else {
+            etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+              {
+                op: 'add',
+                path: '/time_finished',
+                value: Date.now(),
+              },
+              {
+                op: 'add',
+                path: '/error',
+                value: 'Failed to narrow test down to two versions',
+                // TODO(clavin): ^ better wording
+              },
+            ]);
+          }
+
+          // } else if (job.type === 'test') {
+          // TODO
+        } else {
+          throw new Error(`unexpected job type: "${(job as AnyJob).type}"`);
+        }
+      } catch (err) {
+        // Unclaim the job and rethrow
+        await this.patchJobAndUpdateEtag(job.id, etag, [
+          {
+            op: 'remove',
+            path: '/runner',
+            value: this.uuid,
+          },
+          {
+            op: 'remove',
+            path: '/time_started',
+            value: Date.now(),
+          },
+        ]);
+        throw err;
+      }
+    } catch (err) {
+      d('error while polling broker: %O', err);
+    }
+
+    // Sleep and then try again
+    await timeout(this.pollTimeoutMs);
+    return this.pollLoop();
+  }
+
+  /**
+   * Polls the broker for a list of unclaimed job IDs.
+   */
+  private async fetchUnclaimedJobs(): Promise<string[]> {
+    // Craft the url to the broker
+    const jobs_url = new URL('api/jobs', this.brokerUrl);
+    jobs_url.searchParams.append('os', this.fiddleExecPath);
+    jobs_url.searchParams.append('runner', 'undefined');
+
+    // Make the request and return its response
+    return await got(jobs_url).json();
+  }
+
+  private async fetchJobAndEtag(id: string): Promise<[AnyJob, string]> {
+    const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
+    const resp = await got(job_url);
+
+    // Extract the etag header & make sure it was defined
+    const { etag } = resp.headers;
+    if (!etag) {
+      throw new Error('missing etag in broker job response');
+    }
+
+    return [JSON.parse(resp.body), etag];
+  }
+
+  private async patchJobAndUpdateEtag(
+    id: string,
+    etag: string,
+    patches: JsonPatch[],
+  ): Promise<string> {
+    // Send the patch
+    const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
+    const resp = await got(job_url, {
+      headers: { etag },
+      json: patches,
+      method: 'PATCH',
+    });
+
+    // Extract the etag header & make sure it was defined
+    const newEtag = resp.headers.etag;
+    if (!newEtag) {
+      throw new Error('missing etag in broker job response');
+    }
+
+    return newEtag;
+  }
+
+  private runBisect(
+    goodVersion: string,
+    badVersion: string,
+    gistId: string,
+  ): Promise<FiddleBisectResult> {
+    // Call fiddle and instruct it to bisect with the supplied parameters
+    return new Promise((resolve, reject) => {
+      execFile(
+        this.fiddleExecPath,
+        ['bisect', goodVersion, badVersion, '--fiddle', gistId] as string[],
+        (err, stdout, stderr) => {
+          // Ensure there was no error
+          if (err === null) {
+            try {
+              // Try to parse the output as well
+              resolve(parseFiddleBisectOutput(stdout));
+            } catch (parseErr) {
+              d('fiddle bisect parse error: %O', parseErr);
+              reject(parseErr);
+            }
+          } else {
+            d(`failed fiddle bisect stdout:\n${stdout}`);
+            d(`failed fiddle bisect stderr:\n${stderr}`);
+            reject(err);
+          }
+        },
+      );
+    });
+  }
+}
+
+// Start the runner and catch any errors that bubble up
+Runner.start().catch((err) => {
+  d('encountered an error: %O', err);
+  console.error('execution stopped due to a critical error');
+  process.exit(1);
 });
