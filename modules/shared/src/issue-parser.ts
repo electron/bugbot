@@ -28,7 +28,7 @@ function getHeadingContent(tree: Node, test: string) {
 }
 
 // copied from Fiddle code
-function getGistId(input: string): string | null {
+export function getGistId(input: string): string | null {
   let id: string | undefined = input;
   if (input.startsWith('https://gist.github.com')) {
     if (input.endsWith('/')) {

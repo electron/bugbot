@@ -29,8 +29,13 @@ export class RunnerError extends Error {
  */
 export async function bisectFiddle(
   fiddle: FiddleInput,
-): Promise<FiddleBisectResult> {
+): Promise<FiddleBisectResult | null> {
   // Determine the url to send the request to
+
+  if (!FIDDLE_RUNNER_BASE_URL) {
+    return null;
+  }
+
   const url = new URL('fiddle/bisect', FIDDLE_RUNNER_BASE_URL);
 
   return await fetch(url.toString(), {
@@ -49,4 +54,30 @@ export async function bisectFiddle(
       return res;
     })
     .then((res) => res.json());
+}
+
+/**
+ * Checks if the runner already has a test running for this issue
+ * @returns If the current issue already has a test running
+ */
+export function hasRunningTest(issue: string): boolean {
+  console.log('hasRunningTest', { issue });
+  return false;
+}
+
+export function stopTest(issue: string): void {
+  console.log('stopTest', { issue });
+}
+
+export function startTest(): void {
+  console.log('startTest');
+}
+
+export function getCompleteJob(issue: string): any {
+  console.log('getCompleteJob', { issue });
+  return {};
+}
+
+export function markAsComplete(): void {
+  console.log('markAsComplete');
 }

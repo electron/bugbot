@@ -1,10 +1,80 @@
 import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
+import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
-import { bisectFiddle } from './runner-api';
+import {
+  bisectFiddle,
+  getCompleteJob,
+  hasRunningTest,
+  markAsComplete,
+  stopTest,
+} from './runner-api';
 
-export = (robot: Probot): void => {
+const actions = {
+  BISECT: 'bisect',
+  STOP: 'stop',
+};
+
+/**
+ * Comments on the issue once a bisect operation is completed
+ * @param result The result from a Fiddle bisection
+ * @param context Probot context object
+ */
+async function commentBisectResult(result: FiddleBisectResult, context: any) {
+  const resultComment = context.issue({
+    body: `🤖 Results from bisecting: \n ${JSON.stringify(result, null, 2)}`,
+  });
+
+  await context.octokit.issues.createComment(resultComment);
+}
+
+/**
+ * Takes action based on a comment left on an issue
+ * @param context Probot context object
+ */
+export async function parseManualCommand(context: any): Promise<void> {
+  const { payload } = context;
+  const args = payload.comment.body.split(' ');
+  const [command, action] = args;
+
+  if (command !== '/test') {
+    return;
+  }
+
+  const { id, body } = payload.issue;
+  const hasTest = hasRunningTest(id);
+
+  if (action === actions.STOP && hasTest) {
+    stopTest(id);
+  } else if (action === actions.BISECT && !hasTest) {
+    // Get issue input and fire a bisect job
+    const input = parseIssueBody(body);
+    await bisectFiddle(input);
+
+    const INTERVAL = 5 * 1000;
+
+    // Poll every INTERVAL to see if the job is complete
+    const timer = setInterval(() => {
+      const jobResults = getCompleteJob(id);
+      if (jobResults) {
+        // TODO(erickzhao): add logic here
+        commentBisectResult(
+          {
+            badVersion: 'v12.0.7',
+            goodVersion: 'v12.0.9',
+            success: true,
+          },
+          context,
+        );
+        markAsComplete();
+        clearInterval(timer);
+      }
+    }, INTERVAL);
+  }
+}
+
+export default (robot: Probot): void => {
   const d = debug('github-client:probot');
   d('hello world');
 
@@ -14,39 +84,8 @@ export = (robot: Probot): void => {
   robot.on('issue_comment', (context) => {
     d('issue_comment', inspect(context.payload));
   });
-  robot.on('issues.opened', async (context) => {
-    // TODO: refactor this into its own function
-    try {
-      const fiddleInput = parseIssueBody(context.payload.issue.body);
-
-      // this comment is for debugging purposes to make sure the input was passed in properly
-      const debugComment = context.issue({
-        body: `🤖 I've detected that you want to bisect a Fiddle with the following input:\n ${JSON.stringify(
-          fiddleInput,
-          null,
-          2,
-        )}`,
-      });
-      await context.octokit.issues.createComment(debugComment);
-
-      const result = await bisectFiddle(fiddleInput);
-      // TODO: take action based on this
-
-      const botResponse = result.success
-        ? [
-            '🤖 The bisect ✅ succeeded!',
-            `* **Good version**: ${result.goodVersion}`,
-            `* **Bad version**: ${result.badVersion}`,
-            // TODO: diff url?
-          ].join('\n')
-        : '🤖 The bisect ❌ failed. This Fiddle did not narrow down to two versions in the specified range.';
-      const resultComment = context.issue({
-        body: botResponse,
-      });
-      await context.octokit.issues.createComment(resultComment);
-    } catch (e) {
-      d('error', inspect(e));
-    }
+  robot.on('issues.opened', (context) => {
+    d('issues.opened', inspect(context.payload));
   });
   robot.on('issues.labeled', (context) => {
     d('issues.labeled', inspect(context.payload));
@@ -58,9 +97,17 @@ export = (robot: Probot): void => {
     d('issues.edited', inspect(context.payload));
   });
   robot.on('issue_comment.created', (context) => {
-    d('issue_comment.created', inspect(context.payload));
+    // TODO: add allowlist here
+    const isMaintainer = true;
+
+    if (
+      context.payload.comment.user.id === context.payload.sender.id &&
+      isMaintainer
+    ) {
+      parseManualCommand(context);
+    }
   });
   robot.on('issue_comment.edited', (context) => {
-    d('issue_comment.deleted', inspect(context.payload));
+    d('issue_comment.edited', inspect(context.payload));
   });
 };
