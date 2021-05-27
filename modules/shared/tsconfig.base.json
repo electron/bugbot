@@ -12,5 +12,6 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "esModuleInterop": true,
+    "types": ["jest", "node"]
   }
 }

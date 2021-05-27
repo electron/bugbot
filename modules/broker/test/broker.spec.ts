@@ -2,6 +2,7 @@ import * as semver from 'semver';
 import dayjs from 'dayjs';
 import fetch from 'node-fetch';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
+import { URLSearchParams } from 'url';
 
 import { Broker } from '../src/broker';
 import { Server } from '../src/server';
