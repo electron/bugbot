@@ -18,7 +18,7 @@ export class Task {
   public time_finished: Date | undefined = undefined;
   public time_started: Date | undefined = undefined;
 
-  constructor(props: Record<string, string | number>) {
+  constructor(props: Record<string, any>) {
     // provide default values for any missing required properties
     if (!is_uuid(props.id)) props.id = mkuuid();
     if (!props.time_created) props.time_created = Date.now();
@@ -79,7 +79,7 @@ export class Task {
     return Task.canInit(key, value) && !Task.ReadonlyProps.has(key);
   }
 
-  public static createBisectTask(props: Record<string, string>): Task {
+  public static createBisectTask(props: Record<string, any>): Task {
     const required_all = ['gist', 'type'];
     const required_type = new Map([['bisect', ['first', 'last']]]);
     for (const name of [...required_all, ...required_type.get(props.type)]) {
