@@ -308,6 +308,20 @@ describe('broker', () => {
       }
     });
 
+    it('sets result_bisect as two versions', async () => {
+      const goodbad = ['10.0.0', '10.0.1'];
+      const response = await patchJob(id, etag, [
+        { op: 'add', path: '/result_bisect', value: goodbad },
+        { op: 'add', path: '/time_finished', value: Date.now() },
+      ]);
+        const text = await response.text();
+        console.log('text', text);
+      expect(response.status).toBe(200);
+
+      const { body: job } = await getJob(id);
+      expect(job.result_bisect).toStrictEqual(goodbad);
+    });
+
     describe('fails if', () => {
       it('the job is not found', async () => {
         const new_gist = 'new_gist';

@@ -32,7 +32,6 @@ export class Task {
 
   public static PublicFields = Object.freeze(
     new Set([
-      'bisect_result',
       'client_data',
       'error',
       'first',
@@ -40,6 +39,7 @@ export class Task {
       'id',
       'last',
       'os',
+      'result_bisect',
       'runner',
       'time_created',
       'time_finished',
