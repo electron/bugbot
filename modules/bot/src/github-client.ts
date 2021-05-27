@@ -9,7 +9,7 @@ import {
   hasRunningTest,
   markAsComplete,
   stopTest,
-} from './runner-api';
+} from './api-client';
 
 const actions = {
   BISECT: 'bisect',

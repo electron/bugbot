@@ -4,18 +4,17 @@ import { URL } from 'url';
 import { FiddleInput } from '@electron/bugbot-shared/lib/issue-parser';
 
 /**
- * This is the base URL where the runner is hosted. The API will then ping the /fiddle/bisect path.
- * This is read from the environment variable named `FIDDLE_RUNNER_BASE_URL`.
+ * This is the base URL where the bot interacts with the broker API
+ * This is read from the environment variable named `API_BASE_URL`.
  */
-const { FIDDLE_RUNNER_BASE_URL } = process.env;
-if (!FIDDLE_RUNNER_BASE_URL) {
+const { API_BASE_URL } = process.env;
+
+if (!API_BASE_URL) {
   // Just to make it more visible
-  console.error(
-    '[!!!] WARNING: `FIDDLE_RUNNER_BASE_URL` env variable is not set!',
-  );
+  console.error('[!!!] WARNING: `API_BASE_URL` env variable is not set!');
 }
 
-export class RunnerError extends Error {
+export class APIError extends Error {
   public res: Response;
 
   constructor(res: Response, message: string) {
@@ -32,11 +31,11 @@ export async function bisectFiddle(
 ): Promise<FiddleBisectResult | null> {
   // Determine the url to send the request to
 
-  if (!FIDDLE_RUNNER_BASE_URL) {
+  if (!API_BASE_URL) {
     return null;
   }
 
-  const url = new URL('fiddle/bisect', FIDDLE_RUNNER_BASE_URL);
+  const url = new URL('fiddle/bisect', API_BASE_URL);
 
   return await fetch(url.toString(), {
     body: JSON.stringify(fiddle),
@@ -48,7 +47,7 @@ export async function bisectFiddle(
     .then((res) => {
       // Ensure that we got a successful response
       if (!res.ok) {
-        throw new RunnerError(res, 'failed to bisect fiddle');
+        throw new APIError(res, 'failed to bisect fiddle');
       }
 
       return res;
