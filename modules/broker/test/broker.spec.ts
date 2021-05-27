@@ -193,7 +193,6 @@ describe('broker', () => {
       expect(semver.valid(job.last)).toBeTruthy();
     });
 
-    it.todo('may include a result_bisect value');
     it.todo('may include a time_finished value');
     it.todo('may include a time_started value');
     it.todo('may include an error value');
@@ -314,8 +313,6 @@ describe('broker', () => {
         { op: 'add', path: '/result_bisect', value: goodbad },
         { op: 'add', path: '/time_finished', value: Date.now() },
       ]);
-        const text = await response.text();
-        console.log('text', text);
       expect(response.status).toBe(200);
 
       const { body: job } = await getJob(id);
