@@ -2,24 +2,22 @@
   "private": true,
   "//": "NOTE: this list should be synced with the 'references' field in the root `tsconfig.json` file",
   "workspaces": [
-    "modules/shared",
-    "modules/bot",
-    "modules/broker",
-    "modules/runner"
+    "modules/*"
   ],
   "scripts": {
-    "build": "run-p build:bot build:broker build:runner",
+    "build": "yarn workspaces run build",
     "build:bot": "yarn workspace @electron/bugbot-bot build",
     "build:broker": "yarn workspace @electron/bugbot-broker build",
     "build:runner": "yarn workspace @electron/bugbot-runner build",
     "start:bot": "yarn workspace @electron/bugbot-bot start",
     "start:broker": "yarn workspace @electron/bugbot-broker start",
     "start:runner": "yarn workspace @electron/bugbot-runner start",
-    "test": "run-s test:bot test:broker test:runner test:shared",
+    "test": "yarn workspaces run test",
     "test:bot": "yarn workspace @electron/bugbot-bot test",
     "test:broker": "yarn workspace @electron/bugbot-broker test",
     "test:runner": "yarn workspace @electron/bugbot-runner test",
     "test:shared": "yarn workspace @electron/bugbot-shared test",
+    "test:integration": "yarn workspace @electron/bugbot-shared test",
     "lint": "run-p lint:eslint lint:prettier",
     "lint:fix": "run-p lint:eslint:fix lint:prettier:fix",
     "lint:eslint": "eslint modules/*/src/**/*.ts",
