@@ -215,7 +215,7 @@ describe('broker', () => {
       it('os', async () => {
         const { body: id_os_any } = await postNewBisectJob();
         const { body: id_os_lin } = await postNewBisectJob({ os: 'linux' });
-        await postNewBisectJob({ os: 'windows' });
+        await postNewBisectJob({ os: 'win32' });
 
         const { body: jobs } = await getJobs({ os: 'linux' });
 
