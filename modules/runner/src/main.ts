@@ -15,7 +15,7 @@ interface BaseJob {
   client_data?: string;
   gist: string;
   id: string;
-  os?: 'linux' | 'windows' | 'mac';
+  os?: 'darwin' | 'linux' | 'win32';
   error?: string;
   runner?: string;
   time_created: number;
@@ -52,7 +52,7 @@ class Runner {
   private readonly uuid: string;
   private readonly fiddleExecPath: string;
   private readonly brokerUrl: string;
-  private readonly osFilter: string;
+  private readonly platform: string;
   private readonly pollTimeoutMs: number;
 
   /**
@@ -61,20 +61,10 @@ class Runner {
    */
   static start(): Promise<never> {
     // Determine the OS filter from the current running platform
-    let osFilter = '';
-    switch (process.platform) {
-      case 'darwin':
-        osFilter = 'mac';
-        break;
-      case 'linux':
-        osFilter = 'linux';
-        break;
-      case 'win32':
-        osFilter = 'windows';
-        break;
-      default:
-        d('Cannot detect the current operating system, exiting.');
-        return null;
+    const { platform } = process;
+    if (!['darwin', 'linux', 'win32'].includes(platform)) {
+      d(`Unsupported platform '${platform}'; exiting.`);
+      return null;
     }
 
     // Create the runner
@@ -85,8 +75,8 @@ class Runner {
       fiddleExecPath: {
         value: env('FIDDLE_EXEC_PATH'),
       },
-      osFilter: {
-        value: osFilter,
+      platform: {
+        value: platform,
       },
       pollTimeoutMs: {
         value: 20 * 1000, // 20 seconds
@@ -207,7 +197,7 @@ class Runner {
   private async fetchUnclaimedJobs(): Promise<string[]> {
     // Craft the url to the broker
     const jobs_url = new URL('api/jobs', this.brokerUrl);
-    jobs_url.searchParams.append('os', this.fiddleExecPath);
+    jobs_url.searchParams.append('os', this.platform);
     jobs_url.searchParams.append('runner', 'undefined');
 
     // Make the request and return its response

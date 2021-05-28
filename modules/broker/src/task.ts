@@ -65,7 +65,7 @@ export class Task {
   private static PropertyTests = Object.freeze({
     first: (value: string) => semver.valid(value),
     last: (value: string) => semver.valid(value),
-    os: (value: string) => ['linux', 'mac', 'windows'].includes(value),
+    os: (value: string) => ['darwin', 'linux', 'win32'].includes(value),
     type: (value: string) => ['bisect', 'test'].includes(value),
   });
 
