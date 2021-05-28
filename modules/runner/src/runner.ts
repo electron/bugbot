@@ -1,9 +1,9 @@
-import { execFile } from 'child_process';
 import debug from 'debug';
 import got from 'got';
 import { URL } from 'url';
+import { execFile } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
-import { env } from '@electron/bugbot-shared/lib/env-vars';
+
 import {
   FiddleBisectResult,
   parseFiddleBisectOutput,
@@ -39,156 +39,147 @@ type AnyJob = BisectJob | TestJob;
 
 type JsonPatch = unknown;
 
-/**
- * Returns a promise that resolves after the specified timeout.
- */
-function timeout(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(), ms);
-  });
-}
+export class Runner {
+  public readonly platform: string;
+  public readonly uuid: string;
 
-class Runner {
-  private readonly uuid: string;
-  private readonly fiddleExecPath: string;
   private readonly brokerUrl: string;
-  private readonly platform: string;
+  private readonly fiddleExecPath: string;
   private readonly pollTimeoutMs: number;
+  private interval: ReturnType<typeof setInterval> | undefined = undefined;
 
   /**
    * Creates and initializes the runner from environment variables and default
    * values, then starts the runner's execution loop.
    */
-  static start(): Promise<never> {
-    // Determine the OS filter from the current running platform
-    const { platform } = process;
-    if (!['darwin', 'linux', 'win32'].includes(platform)) {
-      d(`Unsupported platform '${platform}'; exiting.`);
-      return null;
-    }
-
-    // Create the runner
-    const runner: Runner = Object.create(Runner.prototype, {
-      brokerUrl: {
-        value: env('BUGBOT_BROKER_URL'),
-      },
-      fiddleExecPath: {
-        value: env('FIDDLE_EXEC_PATH'),
-      },
-      platform: {
-        value: platform,
-      },
-      pollTimeoutMs: {
-        value: 20 * 1000, // 20 seconds
-      },
-      uuid: {
-        value: uuidv4(),
-      },
+  constructor(opts: Record<string, any> = {}) {
+    const {
+      brokerUrl = process.env.BUGBOT_BROKER_URL,
+      fiddleExecPath = process.env.FIDDLE_EXEC_PATH,
+      platform = process.platform,
+      pollTimeoutMs = 20 * 1000, // 20 seconds
+      uuid = uuidv4(),
+    } = opts;
+    Object.assign(this, {
+      brokerUrl,
+      fiddleExecPath,
+      platform,
+      pollTimeoutMs,
+      uuid,
     });
 
-    // Begin running the poll loop
-    return runner.pollLoop();
+    for (const name of ['brokerUrl', 'fiddleExecPath']) {
+      if (!this[name]) throw new Error(`missing option: 'Runner.${name}'`);
+    }
   }
 
-  async pollLoop(): Promise<never> {
-    // Wrap the loop in a try-catch to log errors and make the runner resilient
+  public start(): void {
+    if (!this.interval) {
+      this.interval = setInterval(
+        this.pollSafely.bind(this),
+        this.pollTimeoutMs,
+      );
+    }
+  }
+
+  public stop(): void {
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = undefined;
+    }
+  }
+
+  private pollSafely(): void {
+    this.poll().catch((err) => d('error while polling broker: %O', err));
+  }
+
+  public async poll(): Promise<void> {
+    // Check for any claimable jobs
+    const claimableJobs = await this.fetchUnclaimedJobs();
+    if (claimableJobs.length === 0) {
+      return;
+    }
+
+    // claim the first job available
+    const [jobId] = claimableJobs;
+    // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
+    // help reduce any possible contention?
+    let etag = '';
+    const [job, initalEtag] = await this.fetchJobAndEtag(jobId);
+    etag = initalEtag;
+
+    // Claim the job
+    etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+      {
+        op: 'add',
+        path: '/runner',
+        value: this.uuid,
+      },
+      {
+        op: 'add',
+        path: '/time_started',
+        value: Date.now(),
+      },
+    ]);
+
+    // Another layer of catching errors to also unclaim the job if we error
     try {
-      // Check for any claimable jobs
-      const claimableJobs = await this.fetchUnclaimedJobs();
+      // Then determine how to run the job and return results
+      if (job.type === 'bisect') {
+        // Run the bisect
+        const result = await this.runBisect(job.first, job.last, job.gist);
 
-      // If there are no unclaimed jobs then sleep and try again
-      if (claimableJobs.length === 0) {
-        await timeout(this.pollTimeoutMs);
-        return this.pollLoop();
+        // Report the result back to the job
+        if (result.success) {
+          etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+            {
+              op: 'add',
+              path: '/time_finished',
+              value: Date.now(),
+            },
+            {
+              op: 'add',
+              path: '/result_bisect',
+              value: [result.goodVersion, result.badVersion],
+            },
+          ]);
+        } else {
+          etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+            {
+              op: 'add',
+              path: '/time_finished',
+              value: Date.now(),
+            },
+            {
+              op: 'add',
+              path: '/error',
+              value: 'Failed to narrow test down to two versions',
+              // TODO(clavin): ^ better wording
+            },
+          ]);
+        }
+
+        // } else if (job.type === 'test') {
+        // TODO
+      } else {
+        throw new Error(`unexpected job type: "${(job as AnyJob).type}"`);
       }
-
-      // Otherwise, claim the first job available
-      const [jobId] = claimableJobs;
-      // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
-      // help reduce any possible contention?
-      let etag = '';
-      const [job, initalEtag] = await this.fetchJobAndEtag(jobId);
-      etag = initalEtag;
-
-      // Claim the job
-      etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+    } catch (err) {
+      // Unclaim the job and rethrow
+      await this.patchJobAndUpdateEtag(job.id, etag, [
         {
-          op: 'add',
+          op: 'remove',
           path: '/runner',
           value: this.uuid,
         },
         {
-          op: 'add',
+          op: 'remove',
           path: '/time_started',
           value: Date.now(),
         },
       ]);
-
-      // Another layer of catching errors to also unclaim the job if we error
-      try {
-        // Then determine how to run the job and return results
-        if (job.type === 'bisect') {
-          // Run the bisect
-          const result = await this.runBisect(job.first, job.last, job.gist);
-
-          // Report the result back to the job
-          if (result.success) {
-            etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-              {
-                op: 'add',
-                path: '/time_finished',
-                value: Date.now(),
-              },
-              {
-                op: 'add',
-                path: '/result_bisect',
-                value: [result.goodVersion, result.badVersion],
-              },
-            ]);
-          } else {
-            etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-              {
-                op: 'add',
-                path: '/time_finished',
-                value: Date.now(),
-              },
-              {
-                op: 'add',
-                path: '/error',
-                value: 'Failed to narrow test down to two versions',
-                // TODO(clavin): ^ better wording
-              },
-            ]);
-          }
-
-          // } else if (job.type === 'test') {
-          // TODO
-        } else {
-          throw new Error(`unexpected job type: "${(job as AnyJob).type}"`);
-        }
-      } catch (err) {
-        // Unclaim the job and rethrow
-        await this.patchJobAndUpdateEtag(job.id, etag, [
-          {
-            op: 'remove',
-            path: '/runner',
-            value: this.uuid,
-          },
-          {
-            op: 'remove',
-            path: '/time_started',
-            value: Date.now(),
-          },
-        ]);
-        throw err;
-      }
-    } catch (err) {
-      d('error while polling broker: %O', err);
+      throw err;
     }
-
-    // Sleep and then try again
-    await timeout(this.pollTimeoutMs);
-    return this.pollLoop();
   }
 
   /**
@@ -269,10 +260,3 @@ class Runner {
     });
   }
 }
-
-// Start the runner and catch any errors that bubble up
-Runner.start().catch((err) => {
-  d('encountered an error: %O', err);
-  console.error('execution stopped due to a critical error');
-  process.exit(1);
-});
