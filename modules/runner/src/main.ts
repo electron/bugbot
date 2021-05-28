@@ -1,5 +1,4 @@
 import debug from 'debug';
-
 import { Runner } from './runner';
 
 const d = debug('runner');
