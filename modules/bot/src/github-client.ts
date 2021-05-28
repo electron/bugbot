@@ -3,13 +3,13 @@ import { Probot } from 'probot';
 import { inspect } from 'util';
 import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
-import {
-  bisectFiddle,
-  getCompleteJob,
-  hasRunningTest,
-  markAsComplete,
-  stopTest,
-} from './api-client';
+import { BrokerAPI } from './api-client';
+
+const api = new BrokerAPI({
+  baseURL: 'http://localhost:9099',
+});
+
+// const map = new Map<string, string>();
 
 const actions = {
   BISECT: 'bisect',
@@ -34,6 +34,7 @@ async function commentBisectResult(result: FiddleBisectResult, context: any) {
  * @param context Probot context object
  */
 export async function parseManualCommand(context: any): Promise<void> {
+  const d = debug('github-client:parseManualCommand');
   const { payload } = context;
   const args = payload.comment.body.split(' ');
   const [command, action] = args;
@@ -42,33 +43,44 @@ export async function parseManualCommand(context: any): Promise<void> {
     return;
   }
 
-  const { id, body } = payload.issue;
-  const hasTest = hasRunningTest(id);
+  const { body } = payload.issue;
+  const id = 'some-guid';
 
-  if (action === actions.STOP && hasTest) {
-    stopTest(id);
-  } else if (action === actions.BISECT && !hasTest) {
-    // Get issue input and fire a bisect job
+  let currentJob;
+
+  try {
+    currentJob = await api.getJob(id);
+  } catch (e) {
+    // no-op
+  }
+
+  if (action === actions.STOP && currentJob && !currentJob.time_finished) {
+    api.stopJob(id);
+  } else if (action === actions.BISECT && !currentJob) {
+    d('Running /test bisect');
+    // // Get issue input and fire a bisect job
     const input = parseIssueBody(body);
-    await bisectFiddle(input);
-
-    const INTERVAL = 5 * 1000;
-
+    const jobId = await api.queueBisectJob(input);
+    d(`Queued bisect job ${jobId}`);
+    const INTERVAL = 10 * 1000;
     // Poll every INTERVAL to see if the job is complete
-    const timer = setInterval(() => {
-      const jobResults = getCompleteJob(id);
-      if (jobResults) {
-        // TODO(erickzhao): add logic here
-        commentBisectResult(
+    const timer = setInterval(async () => {
+      d(`polling job ${jobId}...`);
+      const job = await api.getJob(jobId);
+      if (job.time_finished) {
+        d(`job ${jobId} complete`);
+        clearInterval(timer);
+        await commentBisectResult(
           {
-            badVersion: 'v12.0.7',
-            goodVersion: 'v12.0.9',
+            badVersion: job.result_bisect.last,
+            goodVersion: job.result_bisect.first,
             success: true,
           },
           context,
         );
-        markAsComplete();
-        clearInterval(timer);
+        await api.completeJob(jobId);
+      } else {
+        d('job still pending...', { job });
       }
     }, INTERVAL);
   }
@@ -97,7 +109,7 @@ export default (robot: Probot): void => {
     d('issues.edited', inspect(context.payload));
   });
   robot.on('issue_comment.created', (context) => {
-    // TODO: add allowlist here
+    // TODO(erickzhao): add allowlist here
     const isMaintainer = true;
 
     if (
