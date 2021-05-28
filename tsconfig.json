@@ -10,6 +10,7 @@
     { "path": "./modules/bot" },
     { "path": "./modules/broker" },
     { "path": "./modules/runner" },
+    { "path": "./integration-tests" }
   ],
   "files": []
 }

@@ -1,0 +1,11 @@
+{
+  "name": "@electron/bugbot-runner-integration-tests",
+  "private": true,
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "@types/jest": "^26.0.23",
+    "jest": "^26.6.3"
+  }
+}
