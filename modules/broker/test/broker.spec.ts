@@ -18,11 +18,11 @@ describe('broker', () => {
     const { createBisectTask } = Task;
     broker = new Broker();
     server = new Server({ broker, createBisectTask, port });
-    await server.listen();
+    await server.start();
   });
 
   afterEach(() => {
-    server.close();
+    server.stop();
   });
 
   function postJob(body) {

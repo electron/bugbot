@@ -34,9 +34,9 @@ export class Server {
 
   constructor(appInit: Record<string, any>) {
     const {
-      broker,
+      broker = new Broker(),
       cert,
-      createBisectTask,
+      createBisectTask = Task.createBisectTask,
       key,
       port = 8080,
       sport = 8443,
@@ -165,7 +165,7 @@ export class Server {
     res.status(200).json(tasks.map((task) => task.id));
   }
 
-  public listen(): Promise<any> {
+  public start(): Promise<any> {
     const listen = (server: http.Server, port: number) => {
       return new Promise<void>((resolve, reject) => {
         server.listen(port, () => {
@@ -203,7 +203,7 @@ export class Server {
     return Promise.all(promises);
   }
 
-  public close(): void {
+  public stop(): void {
     this.servers.forEach((server) => server.close());
     this.servers.splice(0, this.servers.length);
   }
