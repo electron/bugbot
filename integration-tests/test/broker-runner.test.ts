@@ -1,18 +1,31 @@
 import { Server as Broker } from '../../modules/broker/src/server';
-import { createServer as createBroker } from '../../modules/broker/src/main';
+import { Runner } from '../../modules/runner/src/runner';
 
 describe('IntegrationTests', () => {
   let broker: Broker;
+  let runner: Runner;
+  const port = 9999;
+  const platform = 'linux';
 
   beforeEach(() => {
-    broker = createBroker();
-    broker.listen();
-    expect(broker.port).toBeGreaterThan(0);
+    broker = new Broker({ port });
+    broker.start();
+
+    runner = new Runner({
+      brokerUrl: `http://localhost:${broker.port}`,
+      fiddleExecPath: '/fixme/path/to/fiddle/fixture',
+      platform,
+    });
+    runner.start();
   });
 
   afterEach(() => {
-    broker.close();
+    runner.stop();
+    broker.stop();
   });
 
-  it.todo('starts');
+  it('starts', () => {
+    expect(broker.port).toBe(port);
+    expect(runner.platform).toBe(platform);
+  });
 });
