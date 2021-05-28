@@ -22,10 +22,11 @@ function getTaskBody(task: Task) {
 }
 
 export class Server {
+  public readonly port: number;
+
   private readonly app: express.Application;
   private readonly createBisectTask: TaskBuilder;
   private readonly broker: Broker;
-  private readonly port: number;
   private readonly sport: number;
   private readonly key: string | undefined = undefined;
   private readonly cert: string | undefined = undefined;

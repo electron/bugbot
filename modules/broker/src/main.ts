@@ -7,17 +7,22 @@ import { Task } from './task';
 
 const debug = Debug('broker:server');
 
-// load settings from a broker config file
-const searchResult = cosmiconfigSync('broker').search();
-if (!searchResult) throw new Error('broker config not found');
-debug(`using broker config file '${searchResult.filepath}'`);
-const { config } = searchResult;
+export function createServer(): Server {
+  // load settings from a broker config file
+  const searchResult = cosmiconfigSync('broker').search();
+  if (!searchResult) throw new Error('broker config not found');
+  debug(`using broker config file '${searchResult.filepath}'`);
+  const { config } = searchResult;
 
-// start the web server
-const broker = new Broker();
-const server = new Server({
-  ...(config?.server || {}),
-  broker,
-  createBisectTask: Task.createBisectTask,
-});
-server.listen();
+  // create the webserver
+  const broker = new Broker();
+  return new Server({
+    ...(config?.server || {}),
+    broker,
+    createBisectTask: Task.createBisectTask,
+  });
+}
+
+if (require.main === module) {
+  createServer().listen();
+}
