@@ -43,6 +43,7 @@ export class Runner {
   public readonly platform: string;
   public readonly uuid: string;
 
+  private readonly bisectTimeoutMs: number;
   private readonly brokerUrl: string;
   private readonly fiddleExecPath: string;
   private readonly pollTimeoutMs: number;
@@ -54,6 +55,7 @@ export class Runner {
    */
   constructor(opts: Record<string, any> = {}) {
     const {
+      bisectTimeoutMs = 5 * 60 * 1000, // 5 minutes
       brokerUrl = process.env.BUGBOT_BROKER_URL,
       fiddleExecPath = process.env.FIDDLE_EXEC_PATH,
       platform = process.platform,
@@ -61,6 +63,7 @@ export class Runner {
       uuid = uuidv4(),
     } = opts;
     Object.assign(this, {
+      bisectTimeoutMs,
       brokerUrl,
       fiddleExecPath,
       platform,
@@ -234,6 +237,7 @@ export class Runner {
       execFile(
         this.fiddleExecPath,
         ['bisect', goodVersion, badVersion, '--fiddle', gistId] as string[],
+        { timeout: this.bisectTimeoutMs },
         (err, stdout, stderr) => {
           // Ensure there was no error
           if (err === null) {
