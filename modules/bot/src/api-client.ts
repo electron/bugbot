@@ -12,7 +12,7 @@ export class APIError extends Error {
   }
 }
 
-export class BrokerAPI {
+export default class BrokerAPI {
   baseURL: string;
 
   constructor(props: { baseURL: string }) {

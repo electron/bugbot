@@ -1,25 +1,18 @@
 import { parseManualCommand } from '../src/github-client';
-import {
-  bisectFiddle,
-  getCompleteJob,
-  hasRunningTest,
-  markAsComplete,
-  stopTest,
-} from '../src/runner-api';
+import BrokerAPI from '../src/api-client';
 
-jest.mock('../src/runner-api', () => ({
-  bisectFiddle: jest.fn(),
-  getCompleteJob: jest.fn(),
-  hasRunningTest: jest.fn(),
-  markAsComplete: jest.fn(),
-  stopTest: jest.fn(),
-}));
+jest.mock('../src/api-client');
 
 jest.mock('../../shared/lib/issue-parser', () => ({
   parseIssueBody: jest.fn(),
 }));
 
 describe('github-client', () => {
+  beforeEach(() => {
+    // Clear all instances and calls to constructor and all methods:
+    (BrokerAPI as jest.Mock).mockClear();
+  });
+
   describe('parseManualCommand()', () => {
     it('does nothing without a test command', () => {
       parseManualCommand({
@@ -30,123 +23,14 @@ describe('github-client', () => {
         },
       });
 
-      expect(bisectFiddle).not.toHaveBeenCalled();
+      const [apiInstance] = (BrokerAPI as jest.Mock).mock.instances;
+
+      expect(apiInstance.getJob).not.toHaveBeenCalled();
     });
 
-    it('stops a test job if one is running', () => {
-      (hasRunningTest as jest.Mock).mockReturnValueOnce(true);
-
-      parseManualCommand({
-        payload: {
-          comment: {
-            body: '/test stop',
-          },
-          issue: {
-            body: 'Test issue',
-            id: 1234,
-          },
-        },
-      });
-
-      expect(stopTest).toHaveBeenCalled();
-    });
-
-    it('starts a bisect job if no tests are running for the issue', async () => {
-      jest.useFakeTimers();
-      (hasRunningTest as jest.Mock).mockReturnValueOnce(false);
-      (getCompleteJob as jest.Mock).mockReturnValueOnce({});
-      const createFakeComment = jest.fn();
-
-      await parseManualCommand({
-        issue: jest.fn(),
-        octokit: {
-          issues: {
-            createComment: createFakeComment,
-          },
-        },
-        payload: {
-          comment: {
-            body: '/test bisect',
-          },
-          issue: {
-            body: 'Test Issue',
-            id: 1234,
-          },
-        },
-      });
-
-      jest.runOnlyPendingTimers();
-      expect(setInterval).toHaveBeenCalledTimes(1);
-      expect(createFakeComment).toHaveBeenCalledTimes(1);
-      expect(markAsComplete).toHaveBeenCalledTimes(1);
-      expect(clearInterval).toHaveBeenCalledTimes(1);
-    });
-
-    it('starts a bisect job if no tests are running for the issue', async () => {
-      jest.useFakeTimers();
-      (hasRunningTest as jest.Mock).mockReturnValueOnce(false);
-      (getCompleteJob as jest.Mock).mockReturnValueOnce({});
-      const createFakeComment = jest.fn();
-
-      await parseManualCommand({
-        issue: jest.fn(),
-        octokit: {
-          issues: {
-            createComment: createFakeComment,
-          },
-        },
-        payload: {
-          comment: {
-            body: '/test bisect',
-          },
-          issue: {
-            body: 'Test Issue',
-            id: 1234,
-          },
-        },
-      });
-
-      jest.runOnlyPendingTimers();
-      expect(setInterval).toHaveBeenCalledTimes(1);
-      expect(getCompleteJob).toHaveBeenCalledTimes(1);
-      expect(createFakeComment).toHaveBeenCalledTimes(1);
-      expect(markAsComplete).toHaveBeenCalledTimes(1);
-      expect(clearInterval).toHaveBeenCalledTimes(1);
-    });
-
-    it('continuously polls the bisect job until completion', async () => {
-      jest.useFakeTimers();
-      (hasRunningTest as jest.Mock).mockReturnValue(false);
-      (getCompleteJob as jest.Mock)
-        .mockReturnValueOnce(null)
-        .mockReturnValueOnce({});
-      const createFakeComment = jest.fn();
-
-      await parseManualCommand({
-        issue: jest.fn(),
-        octokit: {
-          issues: {
-            createComment: createFakeComment,
-          },
-        },
-        payload: {
-          comment: {
-            body: '/test bisect',
-          },
-          issue: {
-            body: 'Test Issue',
-            id: 1234,
-          },
-        },
-      });
-
-      jest.runOnlyPendingTimers();
-      jest.runOnlyPendingTimers();
-      expect(setInterval).toHaveBeenCalledTimes(1);
-      expect(getCompleteJob).toHaveBeenCalledTimes(2);
-      expect(clearInterval).toHaveBeenCalledTimes(1);
-    });
-
+    it.todo('stops a test job if one is running');
+    it.todo('starts a bisect job if no tests are running for the issue');
+    it.todo('continuously polls the bisect job until completion');
     it.todo('fails gracefully if the issue body cannot be parsed');
   });
 });

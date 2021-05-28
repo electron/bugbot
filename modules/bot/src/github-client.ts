@@ -3,13 +3,7 @@ import { Probot } from 'probot';
 import { inspect } from 'util';
 import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
-import { BrokerAPI } from './api-client';
-
-const api = new BrokerAPI({
-  baseURL: 'http://localhost:9099',
-});
-
-// const map = new Map<string, string>();
+import BrokerAPI from './api-client';
 
 const actions = {
   BISECT: 'bisect',
@@ -35,6 +29,10 @@ async function commentBisectResult(result: FiddleBisectResult, context: any) {
  */
 export async function parseManualCommand(context: any): Promise<void> {
   const d = debug('github-client:parseManualCommand');
+  const api = new BrokerAPI({
+    baseURL: 'http://localhost:9099',
+  });
+
   const { payload } = context;
   const args = payload.comment.body.split(' ');
   const [command, action] = args;
@@ -58,10 +56,12 @@ export async function parseManualCommand(context: any): Promise<void> {
     api.stopJob(id);
   } else if (action === actions.BISECT && !currentJob) {
     d('Running /test bisect');
+
     // // Get issue input and fire a bisect job
     const input = parseIssueBody(body);
     const jobId = await api.queueBisectJob(input);
     d(`Queued bisect job ${jobId}`);
+
     const INTERVAL = 10 * 1000;
     // Poll every INTERVAL to see if the job is complete
     const timer = setInterval(async () => {
