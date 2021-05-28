@@ -74,19 +74,13 @@ export class Runner {
   }
 
   public start(): void {
-    if (!this.interval) {
-      this.interval = setInterval(
-        this.pollSafely.bind(this),
-        this.pollTimeoutMs,
-      );
-    }
+    this.stop();
+    this.interval = setInterval(this.pollSafely.bind(this), this.pollTimeoutMs);
   }
 
   public stop(): void {
-    if (this.interval) {
-      clearInterval(this.interval);
-      this.interval = undefined;
-    }
+    clearInterval(this.interval);
+    this.interval = undefined;
   }
 
   private pollSafely(): void {
