@@ -1,5 +1,6 @@
 import debug from 'debug';
 import got from 'got';
+import which from 'which';
 import { URL } from 'url';
 import { execFile } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
@@ -57,7 +58,7 @@ export class Runner {
     const {
       bisectTimeoutMs = 5 * 60 * 1000, // 5 minutes
       brokerUrl = process.env.BUGBOT_BROKER_URL,
-      fiddleExecPath = process.env.FIDDLE_EXEC_PATH,
+      fiddleExecPath = process.env.FIDDLE_EXEC_PATH || which.sync('electron-fiddle'),
       platform = process.platform,
       pollTimeoutMs = 20 * 1000, // 20 seconds
       uuid = uuidv4(),
@@ -164,16 +165,9 @@ export class Runner {
     } catch (err) {
       // Unclaim the job and rethrow
       await this.patchJobAndUpdateEtag(job.id, etag, [
-        {
-          op: 'remove',
-          path: '/runner',
-          value: this.uuid,
-        },
-        {
-          op: 'remove',
-          path: '/time_started',
-          value: Date.now(),
-        },
+        { op: 'remove', path: '/runner' },
+        { op: 'remove', path: '/time_started' },
+        { op: 'replace', path: '/error', value: err.toString() },
       ]);
       throw err;
     }
@@ -185,7 +179,7 @@ export class Runner {
   private async fetchUnclaimedJobs(): Promise<string[]> {
     // Craft the url to the broker
     const jobs_url = new URL('api/jobs', this.brokerUrl);
-    jobs_url.searchParams.append('os', this.platform);
+    jobs_url.searchParams.append('platform', this.platform);
     jobs_url.searchParams.append('runner', 'undefined');
 
     // Make the request and return its response
@@ -234,9 +228,21 @@ export class Runner {
   ): Promise<FiddleBisectResult> {
     // Call fiddle and instruct it to bisect with the supplied parameters
     return new Promise((resolve, reject) => {
+      const args = [
+        'bisect',
+        goodVersion,
+        badVersion,
+        '--nightlies',
+        '--betas',
+        '--obsolete',
+        '--fiddle',
+        gistId,
+      ] as const;
+
+      d(`running [${this.fiddleExecPath} ${args.join(' ')}]`);
       execFile(
         this.fiddleExecPath,
-        ['bisect', goodVersion, badVersion, '--fiddle', gistId] as string[],
+        args,
         { timeout: this.bisectTimeoutMs },
         (err, stdout, stderr) => {
           // Ensure there was no error

@@ -14,6 +14,7 @@ export class Task {
   public gist: string;
   public last: string | undefined = undefined;
   public os: string;
+  public result_bisect: string[] | undefined = undefined;
   public runner: string;
   public time_finished: Date | undefined = undefined;
   public time_started: Date | undefined = undefined;
@@ -38,7 +39,7 @@ export class Task {
       'gist',
       'id',
       'last',
-      'os',
+      'platform',
       'result_bisect',
       'runner',
       'time_created',

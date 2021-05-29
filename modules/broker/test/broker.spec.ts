@@ -113,12 +113,12 @@ describe('broker', () => {
 
     it('checks for required parameters', async () => {
       const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
-      const os = 'linux';
+      const platform = 'linux';
       const required = ['gist', 'type'];
       const type = 'bisect';
 
       for (const name of required) {
-        const body = { gist, os, type };
+        const body = { gist, platform, type };
         delete body[name];
         const response = await postJob(body);
         expect(response.status).toBe(422);
@@ -138,12 +138,17 @@ describe('broker', () => {
   describe('/api/jobs/$job_id (GET)', () => {
     const client_data = Math.random().toString();
     const gist = 'gist';
-    const os = 'linux';
+    const platform = 'linux';
     const type = 'bisect';
     let id: string;
 
     beforeEach(async () => {
-      const { body } = await postNewBisectJob({ client_data, gist, os, type });
+      const { body } = await postNewBisectJob({
+        client_data,
+        gist,
+        platform,
+        type,
+      });
       id = body;
     });
 
@@ -185,7 +190,7 @@ describe('broker', () => {
 
     it('may include a os value', async () => {
       const { body: job } = await getJob(id);
-      expect(job.os).toBe(os);
+      expect(job.platform).toBe(platform);
     });
 
     it('may include a first and last bisect range', async () => {
@@ -212,12 +217,14 @@ describe('broker', () => {
     });
 
     describe('filters by job properties in query parameters', () => {
-      it('os', async () => {
+      it('platform', async () => {
         const { body: id_os_any } = await postNewBisectJob();
-        const { body: id_os_lin } = await postNewBisectJob({ os: 'linux' });
-        await postNewBisectJob({ os: 'win32' });
+        const { body: id_os_lin } = await postNewBisectJob({
+          platform: 'linux',
+        });
+        await postNewBisectJob({ platform: 'win32' });
 
-        const { body: jobs } = await getJobs({ os: 'linux' });
+        const { body: jobs } = await getJobs({ platform: 'linux' });
 
         expect(jobs.length).toBe(2);
         expect(jobs).toContain(id_os_lin);

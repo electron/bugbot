@@ -148,7 +148,7 @@ export class Server {
 
   private getJobs(req: express.Request, res: express.Response) {
     let tasks = this.broker.getTasks().map((task) => task.publicSubset());
-    const includeUndefined = ['os'];
+    const includeUndefined = ['platform'];
 
     const filters = Object.entries(req.query).filter(([key]) =>
       Task.PublicFields.has(key),

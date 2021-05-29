@@ -12,7 +12,8 @@
     "@electron/bugbot-shared": "*",
     "debug": "^4.3.1",
     "got": "^11.8.2",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "which": "^2.0.2"
   },
   "devDependencies": {
     "@types/debug": "^4.1.5",
