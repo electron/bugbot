@@ -199,7 +199,7 @@ describe('broker', () => {
       expect(semver.valid(job.last)).toBeTruthy();
     });
 
-    it.todo('may include a time_finished value');
+    it.todo('may include a time_done value');
     it.todo('may include a time_started value');
     it.todo('may include an error value');
   });
@@ -319,7 +319,7 @@ describe('broker', () => {
       const goodbad = ['10.0.0', '10.0.1'];
       const response = await patchJob(id, etag, [
         { op: 'add', path: '/result_bisect', value: goodbad },
-        { op: 'add', path: '/time_finished', value: Date.now() },
+        { op: 'add', path: '/time_done', value: Date.now() },
       ]);
       expect(response.status).toBe(200);
 

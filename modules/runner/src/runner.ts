@@ -20,8 +20,8 @@ interface BaseJob {
   error?: string;
   runner?: string;
   time_created: number;
+  time_done?: number;
   time_started?: number;
-  time_finished?: number;
 }
 
 interface BisectJob extends BaseJob {
@@ -132,7 +132,7 @@ export class Runner {
           etag = await this.patchJobAndUpdateEtag(job.id, etag, [
             {
               op: 'add',
-              path: '/time_finished',
+              path: '/time_done',
               value: Date.now(),
             },
             {
@@ -145,7 +145,7 @@ export class Runner {
           etag = await this.patchJobAndUpdateEtag(job.id, etag, [
             {
               op: 'add',
-              path: '/time_finished',
+              path: '/time_done',
               value: Date.now(),
             },
             {
@@ -181,6 +181,7 @@ export class Runner {
     const jobs_url = new URL('api/jobs', this.brokerUrl);
     jobs_url.searchParams.append('platform', this.platform);
     jobs_url.searchParams.append('runner', 'undefined');
+    jobs_url.searchParams.append('time_done', 'undefined');
 
     // Make the request and return its response
     return await got(jobs_url).json();

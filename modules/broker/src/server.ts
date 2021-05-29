@@ -3,14 +3,14 @@ import * as http from 'http';
 import * as https from 'https';
 import * as jsonpatch from 'fast-json-patch';
 import * as path from 'path';
-import Debug from 'debug';
+import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
 
 import { Broker } from './broker';
 import { Task } from './task';
 
-const debug = Debug('broker:server');
+const d = debug('broker:server');
 
 // eslint-disable-next-line no-unused-vars
 type TaskBuilder = (params: any) => Task;
@@ -118,7 +118,7 @@ export class Server {
     }
 
     try {
-      debug('before patch', JSON.stringify(task));
+      d('before patch', JSON.stringify(task));
       jsonpatch.applyPatch(task, req.body, (op, index, tree) => {
         if (!['add', 'copy', 'move', 'remove', 'replace'].includes(op.op)) {
           return;
@@ -136,40 +136,44 @@ export class Server {
           tree,
         );
       });
-      debug('after patch', JSON.stringify(task));
+      d('after patch', JSON.stringify(task));
       const { etag } = getTaskBody(task);
       res.header('ETag', etag);
       res.status(200).end();
     } catch (err) {
-      debug(err);
+      d(err);
       res.status(400).send(err);
     }
   }
 
   private getJobs(req: express.Request, res: express.Response) {
+    d(`getJobs: query: ${req.query.toString()}`);
     let tasks = this.broker.getTasks().map((task) => task.publicSubset());
     const includeUndefined = ['platform'];
 
     const filters = Object.entries(req.query).filter(([key]) =>
-      Task.PublicFields.has(key),
+      Task.PublicFields.includes(key),
     );
     for (const [key, value] of filters) {
       if (value === 'undefined') {
-        tasks = tasks.filter((task) => !(key in task));
+        tasks = tasks.filter((task) => task[key] === undefined);
       } else if (includeUndefined.includes(key)) {
-        tasks = tasks.filter((task) => !(key in task) || task[key] === value);
+        tasks = tasks.filter((task) => task[key] === undefined || task[key] === value);
       } else {
         tasks = tasks.filter((task) => task[key] === value);
       }
     }
-    res.status(200).json(tasks.map((task) => task.id));
+
+    const ids = tasks.map((task) => task.id);
+    d(`getJobs: tasks: [${ids.join(', ')}]`);
+    res.status(200).json(ids);
   }
 
   public start(): Promise<any> {
     const listen = (server: http.Server, port: number) => {
       return new Promise<void>((resolve, reject) => {
         server.listen(port, () => {
-          debug(`listening on port ${port}`);
+          d(`listening on port ${port}`);
           resolve();
         });
         server.once('error', (err) => reject(err));
@@ -185,10 +189,10 @@ export class Server {
     }
 
     if (!this.cert || !this.key) {
-      debug('to enable ssl, set broker.server.cert and .key variables');
+      d('to enable ssl, set broker.server.cert and .key variables');
     } else {
-      debug(`using ssl cert: ${this.cert}`);
-      debug(`using ssl key: ${this.key}`);
+      d(`using ssl cert: ${this.cert}`);
+      d(`using ssl key: ${this.key}`);
       const server = https.createServer(
         {
           cert: fs.readFileSync(this.cert),

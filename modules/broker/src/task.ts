@@ -6,18 +6,18 @@ export class Task {
   public readonly log: string[] = [];
   public readonly time_created: Date;
   public readonly type: string;
-  public bisect_result: string[] | undefined = undefined;
-  public client_data: string | undefined = undefined;
-  public error: string | undefined = undefined;
-  public etag: string | undefined = undefined;
-  public first: string | undefined = undefined;
+  public bisect_result: string[];
+  public client_data: string;
+  public error: string;
+  public etag: string;
+  public first: string;
   public gist: string;
-  public last: string | undefined = undefined;
+  public last: string;
   public os: string;
-  public result_bisect: string[] | undefined = undefined;
+  public result_bisect: string[];
   public runner: string;
-  public time_finished: Date | undefined = undefined;
-  public time_started: Date | undefined = undefined;
+  public time_done: Date;
+  public time_started: Date;
 
   constructor(props: Record<string, any>) {
     // provide default values for any missing required properties
@@ -29,37 +29,39 @@ export class Task {
     }
   }
 
-  public static PackageFields = Object.freeze(new Set(['etag', 'log']));
+  public static PackageFields: ReadonlyArray<string> = ['etag', 'log'] as const;
 
-  public static PublicFields = Object.freeze(
-    new Set([
-      'client_data',
-      'error',
-      'first',
-      'gist',
-      'id',
-      'last',
-      'platform',
-      'result_bisect',
-      'runner',
-      'time_created',
-      'time_finished',
-      'time_started',
-      'type',
-    ]),
-  );
+  public static PublicFields: ReadonlyArray<string> = [
+    'client_data',
+    'error',
+    'first',
+    'gist',
+    'id',
+    'last',
+    'platform',
+    'result_bisect',
+    'runner',
+    'time_created',
+    'time_done',
+    'time_started',
+    'type',
+  ] as const;
 
-  private static ReadonlyProps = Object.freeze(
-    new Set(['id', 'log', 'time_created', 'type']),
-  );
+  public static KnownFields: ReadonlyArray<string> = [
+    ...Task.PackageFields,
+    ...Task.PublicFields,
+  ] as const;
 
-  private static KnownProps = Object.freeze(
-    new Set([...Task.PackageFields.values(), ...Task.PublicFields.values()]),
-  );
+  public static ReadonlyFields: ReadonlyArray<string> = [
+    'id',
+    'log',
+    'time_created',
+    'type',
+  ] as const;
 
   public publicSubset(): Record<string, any> {
     return Object.fromEntries(
-      Object.entries(this).filter(([key]) => Task.PublicFields.has(key)),
+      Object.entries(this).filter(([key]) => Task.PublicFields.includes(key)),
     );
   }
 
@@ -71,13 +73,13 @@ export class Task {
   });
 
   public static canInit(key: string, value: any): boolean {
-    if (!Task.KnownProps.has(key)) return false;
+    if (!Task.KnownFields.includes(key)) return false;
     const test = Task.PropertyTests[key];
     return !test || test(value);
   }
 
   public static canSet(key: string, value: any): boolean {
-    return Task.canInit(key, value) && !Task.ReadonlyProps.has(key);
+    return Task.canInit(key, value) && !Task.ReadonlyFields.includes(key);
   }
 
   public static createBisectTask(props: Record<string, any>): Task {
