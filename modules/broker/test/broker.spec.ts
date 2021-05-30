@@ -161,20 +161,20 @@ describe('broker', () => {
       expect(job.id).toBe(id);
     });
 
-    it('includes job.time_created', async () => {
+    it('includes job.time_added', async () => {
       // confirm the property exists
       const { body: job } = await getJob(id);
-      expect(job.time_created).toBeTruthy();
+      expect(job.time_added).toBeTruthy();
 
       // confirm it can be parsed
-      const time_created_msec = Number.parseInt(job.time_created, 10);
-      expect(time_created_msec).not.toBeNaN();
+      const time_added_msec = Number.parseInt(job.time_added, 10);
+      expect(time_added_msec).not.toBeNaN();
 
       // confirm the job was created less than a minute ago
       // (in the beforeEach() before this test)
-      const time_created = dayjs(time_created_msec);
+      const time_added = dayjs(time_added_msec);
       const now = dayjs();
-      expect(now.diff(time_created, 'minute')).toBe(0);
+      expect(now.diff(time_added, 'minute')).toBe(0);
     });
 
     it('includes job.type', async () => {
@@ -200,9 +200,8 @@ describe('broker', () => {
       expect(job.platform).toBe(platform);
     });
 
-    it.todo('may include job.time_done');
-    it.todo('may include job.time_started');
-    it.todo('may include job.error');
+    it.todo('may include job.current');
+    it.todo('may include job.last');
   });
 
   describe('/api/jobs? (GET)', () => {
@@ -383,16 +382,21 @@ describe('broker', () => {
       }
     });
 
-    it('sets result_bisect as two versions', async () => {
-      const goodbad = ['10.0.0', '10.0.1'];
+    it('patches object types', async () => {
+      const result = {
+        bisect_range: ['10.0.0', '10.0.1'],
+        runner: mkuuid(),
+        status: 'success',
+        time_ended: Date.now(),
+        time_begun: Date.now(),
+      } as const;
       const response = await patchJob(id, etag, [
-        { op: 'add', path: '/result_bisect', value: goodbad },
-        { op: 'add', path: '/time_done', value: Date.now() },
+        { op: 'add', path: '/last', value: result },
       ]);
       expect(response.status).toBe(200);
 
       const { body: job } = await getJob(id);
-      expect(job.result_bisect).toStrictEqual(goodbad);
+      expect(job.last).toStrictEqual(result);
     });
 
     describe('fails if', () => {
