@@ -25,8 +25,7 @@ interface BaseJob {
 
 interface BisectJob extends BaseJob {
   type: 'bisect';
-  first: string;
-  last: string;
+  range: string[],
   result_bisect?: [string, string];
 }
 
@@ -129,7 +128,7 @@ class Runner {
         // Then determine how to run the job and return results
         if (job.type === 'bisect') {
           // Run the bisect
-          const result = await this.runBisect(job.first, job.last, job.gist);
+          const result = await this.runBisect(job.range, job.gist);
 
           // Report the result back to the job
           if (result.success) {
@@ -240,10 +239,10 @@ class Runner {
   }
 
   private runBisect(
-    goodVersion: string,
-    badVersion: string,
+    range: string[],
     gistId: string,
   ): Promise<FiddleBisectResult> {
+    const [goodVersion, badVersion] = range;
     // Call fiddle and instruct it to bisect with the supplied parameters
     return new Promise((resolve, reject) => {
       execFile(

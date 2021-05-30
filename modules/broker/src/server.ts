@@ -3,14 +3,14 @@ import * as http from 'http';
 import * as https from 'https';
 import * as jsonpatch from 'fast-json-patch';
 import * as path from 'path';
-import Debug from 'debug';
+import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
 
 import { Broker } from './broker';
 import { Task } from './task';
 
-const debug = Debug('broker:server');
+const d = debug('broker:server');
 
 // eslint-disable-next-line no-unused-vars
 type TaskBuilder = (params: any) => Task;
@@ -22,10 +22,11 @@ function getTaskBody(task: Task) {
 }
 
 export class Server {
+  public readonly port: number;
+
   private readonly app: express.Application;
   private readonly createBisectTask: TaskBuilder;
   private readonly broker: Broker;
-  private readonly port: number;
   private readonly sport: number;
   private readonly key: string | undefined = undefined;
   private readonly cert: string | undefined = undefined;
@@ -33,9 +34,9 @@ export class Server {
 
   constructor(appInit: Record<string, any>) {
     const {
-      broker,
+      broker = new Broker(),
       cert,
-      createBisectTask,
+      createBisectTask = Task.createBisectTask,
       key,
       port = 8080,
       sport = 8443,
@@ -117,12 +118,12 @@ export class Server {
     }
 
     try {
-      debug('before patch', JSON.stringify(task));
+      d('before patch', JSON.stringify(task));
       jsonpatch.applyPatch(task, req.body, (op, index, tree) => {
         if (!['add', 'copy', 'move', 'remove', 'replace'].includes(op.op)) {
           return;
         }
-        const prop = op.path.slice(1); // '/client_data' -> 'client_data'
+        const [, prop] = op.path.split('/'); // '/bot_client_data/foo' -> 'bot_client_data'
         const value = (op as any).value || undefined;
         if (Task.canSet(prop, value)) {
           return;
@@ -135,40 +136,29 @@ export class Server {
           tree,
         );
       });
-      debug('after patch', JSON.stringify(task));
+      d('after patch', JSON.stringify(task));
       const { etag } = getTaskBody(task);
       res.header('ETag', etag);
       res.status(200).end();
     } catch (err) {
-      debug(err);
+      d(err);
       res.status(400).send(err);
     }
   }
 
   private getJobs(req: express.Request, res: express.Response) {
-    let tasks = this.broker.getTasks().map((task) => task.publicSubset());
-    const includeUndefined = ['os'];
-
-    const filters = Object.entries(req.query).filter(([key]) =>
-      Task.PublicFields.has(key),
-    );
-    for (const [key, value] of filters) {
-      if (value === 'undefined') {
-        tasks = tasks.filter((task) => !(key in task));
-      } else if (includeUndefined.includes(key)) {
-        tasks = tasks.filter((task) => !(key in task) || task[key] === value);
-      } else {
-        tasks = tasks.filter((task) => task[key] === value);
-      }
-    }
-    res.status(200).json(tasks.map((task) => task.id));
+    d(`getJobs: query: ${req.query.toString()}`);
+    const tasks = this.broker.getTasks().map((task) => task.publicSubset());
+    const ids = Server.filter(tasks, req.query as any).map((task) => task.id);
+    d(`getJobs: tasks: [${ids.join(', ')}]`);
+    res.status(200).json(ids);
   }
 
-  public listen(): Promise<any> {
+  public start(): Promise<any> {
     const listen = (server: http.Server, port: number) => {
       return new Promise<void>((resolve, reject) => {
         server.listen(port, () => {
-          debug(`listening on port ${port}`);
+          d(`listening on port ${port}`);
           resolve();
         });
         server.once('error', (err) => reject(err));
@@ -184,10 +174,10 @@ export class Server {
     }
 
     if (!this.cert || !this.key) {
-      debug('to enable ssl, set broker.server.cert and .key variables');
+      d('to enable ssl, set broker.server.cert and .key variables');
     } else {
-      debug(`using ssl cert: ${this.cert}`);
-      debug(`using ssl key: ${this.key}`);
+      d(`using ssl cert: ${this.cert}`);
+      d(`using ssl key: ${this.key}`);
       const server = https.createServer(
         {
           cert: fs.readFileSync(this.cert),
@@ -202,8 +192,61 @@ export class Server {
     return Promise.all(promises);
   }
 
-  public close(): void {
+  public stop(): void {
     this.servers.forEach((server) => server.close());
     this.servers.splice(0, this.servers.length);
+  }
+
+  /**
+   * Conventions:
+   * - `.` characters in the key delimit an object subtree
+   * - `,` characters in the value delimit multiple values
+   * - a value of `undefined` matches undefined values
+   * - a key ending in `!` negates the filter
+   *
+   * Examples:
+   * - `foo=bar`          - `o[foo] == bar`
+   * - `foo!=bar`         - `o[foo] != bar`
+   * - `foo=undefined`    - `o[foo] === undefined`
+   * - `foo=bar,baz`      - `o[foo] == bar || o[foo] == baz`
+   * - `foo.bar=baz`      - `o[foo][bar] == baz`
+   * - `foo!=undefined`   - `o[foo] != undefined`
+   * - `foo!=bar,baz`     - `o[foo] != bar && o[foo] != baz`
+   * - `foo.bar=baz,qux`  - `o[foo][bar] == baz || o[foo][bar] == qux`
+   * - `foo.bar!=baz,qux` - `o[foo][bar] != baz && o[foo][bar] != qux`
+   */
+  public static filter(
+    beginning_set: any[],
+    query: Record<string, string>,
+  ): any[] {
+    let filtered = [...beginning_set];
+    const arrayFormatSeparator = ',';
+
+    for (const entry of Object.entries(query)) {
+      // get the key
+      let negate = false;
+      let [key] = entry;
+      if (key.endsWith('!')) {
+        negate = true;
+        key = key.slice(0, -1);
+      }
+      const names = key.split('.');
+
+      // get the array of matching values
+      const values = entry[1]
+        .split(arrayFormatSeparator)
+        .filter((v) => Boolean(v));
+
+      filtered = filtered.filter((value: any) => {
+        // walk the object tree to the right value
+        for (const walk of names) value = value?.[walk];
+        value = value === undefined ? 'undefined' : value;
+        // eslint-disable-next-line eqeqeq
+        const matched = values.findIndex((v) => v == value) !== -1;
+        return negate ? !matched : matched;
+      });
+    }
+
+    return filtered;
   }
 }

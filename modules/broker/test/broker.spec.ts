@@ -18,11 +18,11 @@ describe('broker', () => {
     const { createBisectTask } = Task;
     broker = new Broker();
     server = new Server({ broker, createBisectTask, port });
-    await server.listen();
+    await server.start();
   });
 
   afterEach(() => {
-    server.close();
+    server.stop();
   });
 
   function postJob(body) {
@@ -36,9 +36,8 @@ describe('broker', () => {
   async function postNewBisectJob(params = {}) {
     // fill in defaults for any missing required values
     params = {
-      first: '10.0.0',
+      bisect_range: ['10.0.0', '11.2.0'],
       gist: 'abbaabbaabbaabbaabbaabbaabbaabbaabbaabba',
-      last: '11.2.0',
       type: 'bisect',
       ...params,
     };
@@ -76,49 +75,55 @@ describe('broker', () => {
       expect(response.status).toBe(201);
     });
 
-    it('rejects unknown operating systems', async () => {
+    it('returns a job uuid', async () => {
+      const { body: id, response } = await postNewBisectJob();
+      expect(response.status).toBe(201);
+      expect(is_uuid(id)).toBe(true);
+    });
+
+    it(`rejects invalid job.bisect_range values`, async () => {
+      let bisect_range = ['10.0.0', 'Precise Pangolin'];
+      let body;
+      let response;
+      ({ response, body } = await postNewBisectJob({ bisect_range }));
+      expect(response.status).toBe(422);
+      expect(body.includes('bisect_range'));
+
+      bisect_range = ['Precise Pangolin', '10.0.0'];
+      ({ response, body } = await postNewBisectJob({ bisect_range }));
+      expect(response.status).toBe(422);
+      expect(body.includes('bisect_range'));
+    });
+
+    it('rejects invalid job.platform values', async () => {
       const unknown = 'android';
-      const { response, body } = await postNewBisectJob({ os: unknown });
+      const { response, body } = await postNewBisectJob({ platform: unknown });
       expect(response.status).toBe(422);
       expect(body.includes(unknown));
     });
 
-    it('rejects unknown types', async () => {
+    it('rejects invalid job.type values', async () => {
       const unknown = 'gromify';
       const { response, body } = await postNewBisectJob({ type: unknown });
       expect(response.status).toBe(422);
       expect(body.includes(unknown));
     });
 
-    it('rejects unknown properties', async () => {
+    it('rejects properties that are unknown', async () => {
       const unknown = 'potrzebie';
       const { response, body } = await postNewBisectJob({ [unknown]: unknown });
       expect(response.status).toBe(422);
       expect(body.includes(unknown));
     });
 
-    async function rejectsNonSemver(name: string) {
-      const unknown = 'Precise Pangolin';
-      const { response, body } = await postNewBisectJob({ [name]: unknown });
-      expect(response.status).toBe(422);
-      expect(body.includes(unknown));
-    }
-
-    it(`rejects non-semver 'first'`, async () => {
-      await rejectsNonSemver('first');
-    });
-    it(`rejects non-semver 'last'`, async () => {
-      await rejectsNonSemver('last');
-    });
-
-    it('checks for required parameters', async () => {
+    it('rejects properties that are required but missing', async () => {
       const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
-      const os = 'linux';
+      const platform = 'linux';
       const required = ['gist', 'type'];
       const type = 'bisect';
 
       for (const name of required) {
-        const body = { gist, os, type };
+        const body = { gist, platform, type };
         delete body[name];
         const response = await postJob(body);
         expect(response.status).toBe(422);
@@ -127,42 +132,36 @@ describe('broker', () => {
         expect(data.includes(name));
       }
     });
-
-    it('returns a job uuid', async () => {
-      const { body: id, response } = await postNewBisectJob();
-      expect(response.status).toBe(201);
-      expect(is_uuid(id)).toBe(true);
-    });
   });
 
   describe('/api/jobs/$job_id (GET)', () => {
-    const client_data = Math.random().toString();
+    const bot_client_data = Math.random().toString();
     const gist = 'gist';
-    const os = 'linux';
+    const platform = 'linux';
     const type = 'bisect';
     let id: string;
 
     beforeEach(async () => {
-      const { body } = await postNewBisectJob({ client_data, gist, os, type });
+      const { body } = await postNewBisectJob({
+        bot_client_data,
+        gist,
+        platform,
+        type,
+      });
       id = body;
     });
 
-    it('includes a gist', async () => {
+    it('includes job.gist', async () => {
       const { body: job } = await getJob(id);
       expect(job.gist).toBe(gist);
     });
 
-    it('includes a type', async () => {
-      const { body: job } = await getJob(id);
-      expect(job.type).toBe(type);
-    });
-
-    it('includes a job id', async () => {
+    it('includes job.id', async () => {
       const { body: job } = await getJob(id);
       expect(job.id).toBe(id);
     });
 
-    it('includes a time_created number', async () => {
+    it('includes job.time_created', async () => {
       // confirm the property exists
       const { body: job } = await getJob(id);
       expect(job.time_created).toBeTruthy();
@@ -178,25 +177,32 @@ describe('broker', () => {
       expect(now.diff(time_created, 'minute')).toBe(0);
     });
 
-    it('may include a client_data value', async () => {
+    it('includes job.type', async () => {
       const { body: job } = await getJob(id);
-      expect(job.client_data).toBe(client_data);
+      expect(job.type).toBe(type);
     });
 
-    it('may include a os value', async () => {
+    it('may include job.bisect_range', async () => {
       const { body: job } = await getJob(id);
-      expect(job.os).toBe(os);
+      expect(Array.isArray(job.bisect_range)).toBe(true);
+      expect(job.bisect_range.length).toEqual(2);
+      expect(semver.valid(job.bisect_range[0])).toBeTruthy();
+      expect(semver.valid(job.bisect_range[1])).toBeTruthy();
     });
 
-    it('may include a first and last bisect range', async () => {
+    it('may include job.bot_client_data', async () => {
       const { body: job } = await getJob(id);
-      expect(semver.valid(job.first)).toBeTruthy();
-      expect(semver.valid(job.last)).toBeTruthy();
+      expect(job.bot_client_data).toBe(bot_client_data);
     });
 
-    it.todo('may include a time_finished value');
-    it.todo('may include a time_started value');
-    it.todo('may include an error value');
+    it('may include job.platform', async () => {
+      const { body: job } = await getJob(id);
+      expect(job.platform).toBe(platform);
+    });
+
+    it.todo('may include job.time_done');
+    it.todo('may include job.time_started');
+    it.todo('may include job.error');
   });
 
   describe('/api/jobs? (GET)', () => {
@@ -206,43 +212,100 @@ describe('broker', () => {
       expect(jobs).toContainEqual(id);
     });
 
-    it('returns 404 if no such job', async () => {
-      const { response } = await getJob(mkuuid());
-      expect(response.status).toBe(404);
-    });
+    describe('filters', () => {
+      let id_undefined;
+      let id_darwin;
+      let id_linux;
+      let id_win32;
 
-    describe('filters by job properties in query parameters', () => {
-      it('os', async () => {
-        const { body: id_os_any } = await postNewBisectJob();
-        const { body: id_os_lin } = await postNewBisectJob({ os: 'linux' });
-        await postNewBisectJob({ os: 'win32' });
+      async function initPlatformJobs() {
+        const responses = await Promise.all([
+          postNewBisectJob(),
+          postNewBisectJob({ platform: 'darwin' }),
+          postNewBisectJob({ platform: 'linux' }),
+          postNewBisectJob({ platform: 'win32' }),
+        ]);
+        [id_undefined, id_darwin, id_linux, id_win32] = responses.map(
+          (response) => response.body,
+        );
+      }
 
-        const { body: jobs } = await getJobs({ os: 'linux' });
+      async function testQuery(platform: string[], expected: string[]) {
+        const { body: jobs } = await getJobs({ platform: platform.join(',') });
+        expect(jobs.sort()).toStrictEqual(expected.sort());
+      }
 
-        expect(jobs.length).toBe(2);
-        expect(jobs).toContain(id_os_lin);
-        expect(jobs).toContain(id_os_any);
+      it('on single values', async () => {
+        await initPlatformJobs();
+        await testQuery(['linux'], [id_linux]);
       });
 
-      it('gist', async () => {
-        const { body: a } = await postNewBisectJob({ gist: 'foo' });
-        const { body: b } = await postNewBisectJob({ gist: 'foo' });
-        await postNewBisectJob({ gist: 'bar' });
-
-        const { body: jobs } = await getJobs({ gist: 'foo' });
-
-        expect(jobs.length).toBe(2);
-        expect(jobs).toContain(a);
-        expect(jobs).toContain(b);
+      it('on a set', async () => {
+        await initPlatformJobs();
+        await testQuery(
+          ['darwin', 'linux', 'win32'],
+          [id_darwin, id_linux, id_win32],
+        );
       });
 
-      it('filters on property-missing with "undefined" keyword', async () => {
-        const { body: no_runner_id } = await postNewBisectJob();
-        await postNewBisectJob({ runner: 'runner_1' });
-        await postNewBisectJob({ runner: 'runner_2' });
+      it('on a negated single value', async () => {
+        await initPlatformJobs();
+        const platform = ['linux'];
+        const expected = [id_undefined, id_win32, id_darwin].sort();
+        const { body: jobs } = await getJobs({
+          'platform!': platform.join(','),
+        });
+        expect(jobs.sort()).toStrictEqual(expected.sort());
+      });
 
-        const { body: jobs } = await getJobs({ runner: 'undefined' });
-        expect(jobs).toStrictEqual([no_runner_id]);
+      it('on a negated set', async () => {
+        await initPlatformJobs();
+        const platform = ['linux', 'win32'];
+        const expected = [id_undefined, id_darwin].sort();
+        const { body: jobs } = await getJobs({
+          'platform!': platform.join(','),
+        });
+        expect(jobs.sort()).toStrictEqual(expected.sort());
+      });
+
+      it('on undefined', async () => {
+        await initPlatformJobs();
+        await testQuery(['undefined'], [id_undefined]);
+      });
+
+      it('on an object path', async () => {
+        const { body: world_1 } = await postNewBisectJob({
+          bot_client_data: { hello: { world: 1 } },
+        });
+        // shouldn't match: 'world' has different value
+        await postNewBisectJob({
+          bot_client_data: { hello: { world: 2 } },
+        });
+        // shouldn't match: 'world' is missing
+        await postNewBisectJob({
+          bot_client_data: { hello: 3 },
+        });
+        const { body: jobs } = await getJobs({
+          'bot_client_data.hello.world': 1,
+        });
+        expect(jobs).toStrictEqual([world_1]);
+      });
+
+      it('on an object path and a negated set', async () => {
+        await postNewBisectJob({
+          bot_client_data: { hello: { world: 1 } },
+        });
+        const { body: id1 } = await postNewBisectJob({
+          bot_client_data: { hello: { world: 2 } },
+        });
+        // shouldn't match: 'world' is missing
+        const { body: id2 } = await postNewBisectJob({
+          bot_client_data: { hello: 3 },
+        });
+        const { body: jobs } = await getJobs({
+          'bot_client_data.hello.world!': 1,
+        });
+        expect(jobs.sort()).toStrictEqual([id1, id2].sort());
       });
     });
   });
@@ -266,13 +329,19 @@ describe('broker', () => {
     }
 
     it('adds properties', async () => {
-      const client_data = Math.random().toString();
-      const body = [{ op: 'add', path: '/client_data', value: client_data }];
+      const bot_client_data = Math.random().toString();
+      const body = [
+        {
+          op: 'add',
+          path: '/bot_client_data',
+          value: bot_client_data,
+        },
+      ];
       const response = await patchJob(id, etag, body);
       expect(response.status).toBe(200);
 
       const { body: job } = await getJob(id);
-      expect(job.client_data).toBe(client_data);
+      expect(job.bot_client_data).toBe(bot_client_data);
     });
 
     it('replaces properties', async () => {
@@ -288,19 +357,25 @@ describe('broker', () => {
     it('removes properties', async () => {
       // add a property
       {
-        const client_data = Math.random().toString();
-        const body = [{ op: 'add', path: '/client_data', value: client_data }];
+        const bot_client_data = Math.random().toString();
+        const body = [
+          {
+            op: 'add',
+            path: '/bot_client_data',
+            value: bot_client_data,
+          },
+        ];
         const response = await patchJob(id, etag, body);
         expect(response.status).toBe(200);
 
         let job;
         ({ etag, body: job } = await getJob(id));
-        expect(job.client_data).toBe(client_data);
+        expect(job.bot_client_data).toBe(bot_client_data);
       }
 
       // remove it
       {
-        const body = [{ op: 'remove', path: '/client_data' }];
+        const body = [{ op: 'remove', path: '/bot_client_data' }];
         const response = await patchJob(id, etag, body);
         expect(response.status).toBe(200);
         const { body: job } = await getJob(id);
@@ -312,7 +387,7 @@ describe('broker', () => {
       const goodbad = ['10.0.0', '10.0.1'];
       const response = await patchJob(id, etag, [
         { op: 'add', path: '/result_bisect', value: goodbad },
-        { op: 'add', path: '/time_finished', value: Date.now() },
+        { op: 'add', path: '/time_done', value: Date.now() },
       ]);
       expect(response.status).toBe(200);
 
