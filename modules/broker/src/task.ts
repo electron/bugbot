@@ -1,21 +1,41 @@
 import * as semver from 'semver';
 import { v4 as mkuuid } from 'uuid';
 
+const enum Status {
+  'failure',
+  'success',
+  'system_error',
+  'test_error',
+}
+
+interface Result {
+  bisect_range?: [string, string];
+  error?: string;
+  runner: string;
+  status: 'failure' | 'success' | 'system_error' | 'test_error';
+  time_begun: number;
+  time_ended: number;
+}
+
+interface Current {
+  runner: string;
+  time_begun: number;
+}
+
 export class Task {
+  public readonly history: Result[] = [];
   public readonly id = mkuuid();
   public readonly log: string[] = [];
-  public readonly time_created = Date.now();
+  public readonly time_added = Date.now();
   public readonly type: string;
-  public bisect_range: string[];
+  public bisect_range: [string, string];
   public client_data: string;
+  public current: Current;
   public error: string;
   public etag: string;
   public gist: string;
+  public last: any;
   public platform: string;
-  public result_bisect: string[];
-  public runner: string;
-  public time_done: Date;
-  public time_started: Date;
 
   constructor(props: Record<string, any>) {
     for (const [key, val] of Object.entries(props)) {
@@ -28,15 +48,14 @@ export class Task {
   public static PublicFields: ReadonlyArray<string> = [
     'bisect_range',
     'bot_client_data',
+    'current',
     'error',
     'gist',
+    'history',
     'id',
+    'last',
     'platform',
-    'result_bisect',
-    'runner',
-    'time_created',
-    'time_done',
-    'time_started',
+    'time_added',
     'type',
   ] as const;
 
@@ -48,7 +67,7 @@ export class Task {
   public static ReadonlyFields: ReadonlyArray<string> = [
     'id',
     'log',
-    'time_created',
+    'time_added',
     'type',
   ] as const;
 
@@ -79,8 +98,14 @@ export class Task {
 
   public static createBisectTask(props: Record<string, any>): Task {
     const required_all = ['gist', 'type'];
-    const required_type = new Map([['bisect', ['bisect_range']]]);
-    for (const name of [...required_all, ...required_type.get(props.type)]) {
+    const required_per_type = new Map([
+      ['bisect', ['bisect_range']],
+      ['test', ['version']],
+    ]);
+    for (const name of [
+      ...required_all,
+      ...required_per_type.get(props.type),
+    ]) {
       if (!props[name]) {
         throw new Error(`missing property: ${name}`);
       }

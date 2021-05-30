@@ -17,16 +17,21 @@ interface BaseJob {
   id: string;
   os?: 'darwin' | 'linux' | 'win32';
   error?: string;
-  runner?: string;
-  time_created: number;
-  time_started?: number;
-  time_finished?: number;
+  time_added: number;
+}
+
+interface Result {
+  bisect_range?: [string, string];
+  error?: string;
+  runner: string;
+  status: 'failure' | 'success' | 'system_error' | 'test_error';
+  time_begun: number;
+  time_ended: number;
 }
 
 interface BisectJob extends BaseJob {
   type: 'bisect';
-  range: string[],
-  result_bisect?: [string, string];
+  range: [string, string];
 }
 
 interface TestJob extends BaseJob {
@@ -53,6 +58,7 @@ class Runner {
   private readonly brokerUrl: string;
   private readonly platform: string;
   private readonly pollTimeoutMs: number;
+  private time_begun: number;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -110,16 +116,16 @@ class Runner {
       etag = initalEtag;
 
       // Claim the job
+      this.time_begun = Date.now();
+      const current = {
+        runner: this.uuid,
+        time_begun: this.time_begun,
+      };
       etag = await this.patchJobAndUpdateEtag(job.id, etag, [
         {
-          op: 'add',
-          path: '/runner',
-          value: this.uuid,
-        },
-        {
-          op: 'add',
-          path: '/time_started',
-          value: Date.now(),
+          op: 'replace',
+          path: '/current',
+          value: current,
         },
       ]);
 
@@ -128,37 +134,46 @@ class Runner {
         // Then determine how to run the job and return results
         if (job.type === 'bisect') {
           // Run the bisect
-          const result = await this.runBisect(job.range, job.gist);
+          const res = await this.runBisect(job.range, job.gist);
 
           // Report the result back to the job
-          if (result.success) {
-            etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-              {
-                op: 'add',
-                path: '/time_finished',
-                value: Date.now(),
-              },
-              {
-                op: 'add',
-                path: '/result_bisect',
-                value: [result.goodVersion, result.badVersion],
-              },
-            ]);
+          const result: Result = {
+            runner: this.uuid,
+            status: 'success',
+            time_begun: this.time_begun,
+            time_ended: Date.now(),
+          };
+
+          if (res.success) {
+            result.bisect_range = [res.goodVersion, res.badVersion];
           } else {
-            etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-              {
-                op: 'add',
-                path: '/time_finished',
-                value: Date.now(),
-              },
-              {
-                op: 'add',
-                path: '/error',
-                value: 'Failed to narrow test down to two versions',
-                // TODO(clavin): ^ better wording
-              },
-            ]);
+            // TODO: distinguish between system_error (need maintainer attn)
+            // and test_error (implies user should revise test code).
+            // Examples:
+            // - child_process timeout: test_error
+            // - invalid gist id: test_error
+            // - failure to launch electron-fiddle: system error
+            result.status = 'system_error';
+            // TODO(clavin): ^ better wording
+            result.error = 'Failed to narrow test down to two versions';
           }
+
+          etag = await this.patchJobAndUpdateEtag(job.id, etag, [
+            {
+              op: 'add',
+              path: '/history/-',
+              result,
+            },
+            {
+              op: 'replace',
+              path: '/last',
+              result,
+            },
+            {
+              op: 'remove',
+              path: '/current',
+            },
+          ]);
 
           // } else if (job.type === 'test') {
           // TODO
@@ -167,15 +182,12 @@ class Runner {
         }
       } catch (err) {
         // Unclaim the job and rethrow
+        // FIXME: should append to history here and set
+        // system_error or test_error based on err type
         await this.patchJobAndUpdateEtag(job.id, etag, [
           {
             op: 'remove',
-            path: '/runner',
-            value: this.uuid,
-          },
-          {
-            op: 'remove',
-            path: '/time_started',
+            path: '/current',
             value: Date.now(),
           },
         ]);
@@ -196,8 +208,12 @@ class Runner {
   private async fetchUnclaimedJobs(): Promise<string[]> {
     // Craft the url to the broker
     const jobs_url = new URL('api/jobs', this.brokerUrl);
-    jobs_url.searchParams.append('os', this.platform);
-    jobs_url.searchParams.append('runner', 'undefined');
+    // find jobs compatible with this runner...
+    jobs_url.searchParams.append('platform', `${this.platform}|undefined`);
+    // ...is not currently claimed
+    jobs_url.searchParams.append('current.runner', 'undefined');
+    // ...and which have never been run
+    jobs_url.searchParams.append('last.status', 'undefined');
 
     // Make the request and return its response
     return await got(jobs_url).json();
