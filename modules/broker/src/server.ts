@@ -119,6 +119,7 @@ export class Server {
 
     try {
       d('before patch', JSON.stringify(task));
+      d('patch body', req.body);
       jsonpatch.applyPatch(task, req.body, (op, index, tree) => {
         if (!['add', 'copy', 'move', 'remove', 'replace'].includes(op.op)) {
           return;
@@ -147,7 +148,7 @@ export class Server {
   }
 
   private getJobs(req: express.Request, res: express.Response) {
-    d(`getJobs: query: ${req.query.toString()}`);
+    d(`getJobs: query: ${JSON.stringify(req.query)}`);
     const tasks = this.broker.getTasks().map((task) => task.publicSubset());
     const ids = Server.filter(tasks, req.query as any).map((task) => task.id);
     d(`getJobs: tasks: [${ids.join(', ')}]`);

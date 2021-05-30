@@ -1,26 +1,7 @@
 import * as semver from 'semver';
 import { v4 as mkuuid } from 'uuid';
 
-const enum Status {
-  'failure',
-  'success',
-  'system_error',
-  'test_error',
-}
-
-interface Result {
-  bisect_range?: [string, string];
-  error?: string;
-  runner: string;
-  status: 'failure' | 'success' | 'system_error' | 'test_error';
-  time_begun: number;
-  time_ended: number;
-}
-
-interface Current {
-  runner: string;
-  time_begun: number;
-}
+import { Current, Result } from '@electron/bugbot-shared/lib/interfaces';
 
 export class Task {
   public readonly history: Result[] = [];

@@ -5,6 +5,8 @@ import { URL } from 'url';
 import { execFile } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 
+import { Result } from '@electron/bugbot-shared/lib/interfaces';
+
 import {
   FiddleBisectResult,
   parseFiddleBisectOutput,
@@ -13,26 +15,16 @@ import {
 const d = debug('runner');
 
 interface BaseJob {
-  client_data?: string;
+  bot_client_data?: string;
   gist: string;
   id: string;
-  os?: 'darwin' | 'linux' | 'win32';
-  error?: string;
+  platform?: 'darwin' | 'linux' | 'win32';
   time_added: number;
-}
-
-interface Result {
-  bisect_range?: [string, string];
-  error?: string;
-  runner: string;
-  status: 'failure' | 'success' | 'system_error' | 'test_error';
-  time_begun: number;
-  time_ended: number;
 }
 
 interface BisectJob extends BaseJob {
   type: 'bisect';
-  range: [string, string];
+  bisect_range: [string, string];
 }
 
 interface TestJob extends BaseJob {
@@ -111,7 +103,6 @@ export class Runner {
 
     // If there are no unclaimed jobs then sleep and try again
     if (claimableJobs.length === 0) {
-      await timeout(this.pollTimeoutMs);
       return;
     }
 
@@ -142,7 +133,7 @@ export class Runner {
       // Then determine how to run the job and return results
       if (job.type === 'bisect') {
         // Run the bisect
-        const res = await this.runBisect(job.range, job.gist);
+        const res = await this.runBisect(job.bisect_range, job.gist);
 
         // Report the result back to the job
         const result: Result = {
@@ -170,12 +161,12 @@ export class Runner {
           {
             op: 'add',
             path: '/history/-',
-            result,
+            value: result,
           },
           {
             op: 'replace',
             path: '/last',
-            result,
+            value: result,
           },
           {
             op: 'remove',
@@ -210,7 +201,7 @@ export class Runner {
     // Craft the url to the broker
     const jobs_url = new URL('api/jobs', this.brokerUrl);
     // find jobs compatible with this runner...
-    jobs_url.searchParams.append('platform', `${this.platform}|undefined`);
+    jobs_url.searchParams.append('platform', `${this.platform},undefined`);
     // ...is not currently claimed
     jobs_url.searchParams.append('current.runner', 'undefined');
     // ...and which have never been run
