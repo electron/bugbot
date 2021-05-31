@@ -4,7 +4,10 @@ import { inspect } from 'util';
 
 import { env } from '@electron/bugbot-shared/lib/env-vars';
 import { Result } from '@electron/bugbot-shared/lib/interfaces';
-import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
+import {
+  FiddleInput,
+  parseIssueBody,
+} from '@electron/bugbot-shared/lib/issue-parser';
 
 import BrokerAPI from './api-client';
 import { Labels } from './github-labels';
@@ -86,7 +89,6 @@ export async function parseManualCommand(context: any): Promise<void> {
     return;
   }
 
-  const { body } = payload.issue;
   const id = 'some-guid';
 
   let currentJob;
@@ -101,10 +103,19 @@ export async function parseManualCommand(context: any): Promise<void> {
     api.stopJob(id);
   } else if (action === actions.BISECT && !currentJob) {
     d('Running /test bisect');
-
     // Get issue input and fire a bisect job
-    const input = parseIssueBody(body);
+    const { body } = payload.issue;
+    let input: FiddleInput;
+
+    try {
+      input = parseIssueBody(body);
+    } catch (e) {
+      d('Unable to parse issue body for bisect', e);
+      return;
+    }
+
     const jobId = await api.queueBisectJob(input);
+
     d(`Queued bisect job ${jobId}`);
 
     // Poll every INTERVAL to see if the job is complete
@@ -119,6 +130,7 @@ export async function parseManualCommand(context: any): Promise<void> {
       d(`job ${jobId} complete`);
       clearInterval(timer);
       await commentBisectResult(job.last, context);
+      await api.completeJob(jobId);
     }, INTERVAL);
   }
 }
