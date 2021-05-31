@@ -3,7 +3,6 @@ import { Probot } from 'probot';
 import { inspect } from 'util';
 
 import { env } from '@electron/bugbot-shared/lib/env-vars';
-import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { Result } from '@electron/bugbot-shared/lib/interfaces';
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
 
@@ -52,7 +51,7 @@ async function commentBisectResult(result: Result, context: any) {
         // Maybe we'll need to keep bugbot.electronjs.org around.
         // FIXME(any): add the link here.
         `${AppName} was unable to complete this bisection. Check the table’s links for more information.`,
-        'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.'
+        'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.',
       );
       add_labels.add(Labels.BugBot.MaintainerNeeded);
       break;
