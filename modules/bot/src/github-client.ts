@@ -1,6 +1,7 @@
 import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
+import { env } from '@electron/bugbot-shared/lib/env-vars';
 import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
 import BrokerAPI from './api-client';
@@ -9,6 +10,9 @@ const actions = {
   BISECT: 'bisect',
   STOP: 'stop',
 };
+
+// eg: http://localhost:9099
+const brokerBaseURL = env('BROKER_BASE_URL');
 
 /**
  * Comments on the issue once a bisect operation is completed
@@ -29,9 +33,7 @@ async function commentBisectResult(result: FiddleBisectResult, context: any) {
  */
 export async function parseManualCommand(context: any): Promise<void> {
   const d = debug('github-client:parseManualCommand');
-  const api = new BrokerAPI({
-    baseURL: 'http://localhost:9099',
-  });
+  const api = new BrokerAPI({ baseURL: brokerBaseURL });
 
   const { payload } = context;
   const args = payload.comment.body.split(' ');
