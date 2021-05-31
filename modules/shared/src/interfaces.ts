@@ -36,7 +36,7 @@ export interface BisectJob extends BaseJob {
   bisect_range: BisectRange;
 }
 
-interface TestJob extends BaseJob {
+export interface TestJob extends BaseJob {
   type: 'test';
   version: string;
 }
