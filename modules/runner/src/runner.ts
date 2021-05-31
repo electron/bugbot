@@ -23,8 +23,6 @@ import {
 
 const d = debug('runner');
 
-type JsonPatch = unknown;
-
 export class Runner {
   public readonly platform: Platform;
   public readonly uuid: RunnerId;

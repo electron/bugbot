@@ -7,7 +7,7 @@ export type Platform = 'darwin' | 'linux' | 'win32';
 export type RunnerId = string;
 
 export interface Result {
-  bisect_range?: [string, string];
+  bisect_range?: BisectRange;
   error?: string;
   runner: string;
   status: 'failure' | 'success' | 'system_error' | 'test_error';

@@ -6,13 +6,18 @@ import { Task } from '../../modules/broker/src/task';
 import { Server as BrokerServer } from '../../modules/broker/src/server';
 import { Runner } from '../../modules/runner/src/runner';
 
-import { Current, Result } from '@electron/bugbot-shared/lib/interfaces';
+import {
+  BisectRange,
+  Current,
+  Platform,
+  Result,
+} from '@electron/bugbot-shared/lib/interfaces';
 
 jest.setTimeout(60 * 1000);
 
 describe('runner', () => {
   const port = 9999 as const;
-  const platform = 'linux' as const;
+  const platform: Platform = 'linux';
 
   let broker: Broker;
   let brokerServer: BrokerServer;
@@ -53,7 +58,7 @@ describe('runner', () => {
   }
 
   function createBisectTask(opts: Record<string, any> = {}) {
-    const bisect_range = ['10.0.0', '11.2.0'] as const;
+    const bisect_range: Readonly<BisectRange> = ['10.0.0', '11.2.0'];
     const gist = '8c5fc0c6a5153d49b5a4a56d3ed9da8f' as const;
     const type = 'bisect' as const;
     const defaults = { bisect_range, gist, platform, type } as const;
@@ -113,11 +118,13 @@ describe('runner', () => {
         status: 'success',
       } as const;
       expect(task.last.bisect_range).toStrictEqual(expected.bisect_range);
-      expect(task.last.runner).toStrictEqual(expected.runner);
-      expect(task.last.status).toStrictEqual(expected.status);
+      expect(task.last.runner).toBe(expected.runner);
+      expect(task.last.status).toBe(expected.status);
+
       const time_begun = Number.parseInt(task.last.time_begun, 10);
       expect(time_begun).not.toBeNaN();
       expect(time_begun).toBeGreaterThan(0);
+
       const time_ended = Number.parseInt(task.last.time_begun, 10);
       expect(time_ended).not.toBeNaN();
       expect(time_ended).toBeGreaterThanOrEqual(time_begun);
