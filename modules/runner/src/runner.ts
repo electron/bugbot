@@ -4,12 +4,16 @@ import which from 'which';
 import { URL } from 'url';
 import { execFile } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
+import { Operation as PatchOp } from 'fast-json-patch';
 
 import {
   AnyJob,
   BisectRange,
+  Current,
   JobId,
+  Platform,
   Result,
+  RunnerId,
 } from '@electron/bugbot-shared/lib/interfaces';
 
 import {
@@ -19,11 +23,9 @@ import {
 
 const d = debug('runner');
 
-type JsonPatch = unknown;
-
 export class Runner {
-  public readonly platform: string;
-  public readonly uuid: string;
+  public readonly platform: Platform;
+  public readonly uuid: RunnerId;
 
   private readonly fiddleExecPath: string;
   private readonly brokerUrl: string;
@@ -88,16 +90,12 @@ export class Runner {
 
     // Claim the job
     this.time_begun = Date.now();
-    const current = {
+    const current: Current = {
       runner: this.uuid,
       time_begun: this.time_begun,
     };
     etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-      {
-        op: 'replace',
-        path: '/current',
-        value: current,
-      },
+      { op: 'replace', path: '/current', value: current },
     ]);
 
     // Another layer of catching errors to also unclaim the job if we error
@@ -130,20 +128,9 @@ export class Runner {
         }
 
         etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-          {
-            op: 'add',
-            path: '/history/-',
-            value: result,
-          },
-          {
-            op: 'replace',
-            path: '/last',
-            value: result,
-          },
-          {
-            op: 'remove',
-            path: '/current',
-          },
+          { op: 'add', path: '/history/-', value: result },
+          { op: 'replace', path: '/last', value: result },
+          { op: 'remove', path: '/current' },
         ]);
 
         // } else if (job.type === 'test') {
@@ -156,11 +143,7 @@ export class Runner {
       // FIXME: should append to history here and set
       // system_error or test_error based on err type
       await this.patchJobAndUpdateEtag(job.id, etag, [
-        {
-          op: 'remove',
-          path: '/current',
-          value: Date.now(),
-        },
+        { op: 'remove', path: '/current' },
       ]);
       throw err;
     }
@@ -199,7 +182,7 @@ export class Runner {
   private async patchJobAndUpdateEtag(
     id: JobId,
     etag: string,
-    patches: JsonPatch[],
+    patches: Readonly<PatchOp>[],
   ): Promise<string> {
     // Send the patch
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
