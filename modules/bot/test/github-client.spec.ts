@@ -1,3 +1,5 @@
+process.env.BROKER_BASE_URL = 'http://localhost:9099';
+
 import { parseManualCommand } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
 
