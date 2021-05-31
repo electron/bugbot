@@ -57,30 +57,39 @@ export async function parseManualCommand(context: any): Promise<void> {
   } else if (action === actions.BISECT && !currentJob) {
     d('Running /test bisect');
 
-    // // Get issue input and fire a bisect job
+    // Get issue input and fire a bisect job
     const input = parseIssueBody(body);
     const jobId = await api.queueBisectJob(input);
     d(`Queued bisect job ${jobId}`);
 
-    const INTERVAL = 10 * 1000;
     // Poll every INTERVAL to see if the job is complete
+    const INTERVAL = 10 * 1000;
     const timer = setInterval(async () => {
       d(`polling job ${jobId}...`);
       const job = await api.getJob(jobId);
-      if (job.time_finished) {
-        d(`job ${jobId} complete`);
-        clearInterval(timer);
-        await commentBisectResult(
-          {
-            badVersion: job.result_bisect.last,
-            goodVersion: job.result_bisect.first,
-            success: true,
-          },
-          context,
-        );
-        await api.completeJob(jobId);
-      } else {
+      if (!job.last) {
         d('job still pending...', { job });
+        return;
+      }
+      d(`job ${jobId} complete`);
+      clearInterval(timer);
+      switch (job.last.status) {
+        case 'success':
+          await commentBisectResult(
+            {
+              badVersion: job.last.bisect_range[0],
+              goodVersion: job.last.bisect_range[1],
+              success: true,
+            },
+            context,
+          );
+          await api.completeJob(jobId);
+          break;
+
+        default: {
+          //FIXME: handle error results
+          d(`unhandled status: ${job.last.status}`);
+        }
       }
     }, INTERVAL);
   }

@@ -6,10 +6,27 @@ export type Platform = 'darwin' | 'linux' | 'win32';
 
 export type RunnerId = string;
 
+export interface Result {
+  bisect_range?: BisectRange;
+  error?: string;
+  runner: string;
+  status: 'failure' | 'success' | 'system_error' | 'test_error';
+  time_begun: number;
+  time_ended: number;
+}
+
+export interface Current {
+  runner: string;
+  time_begun: number;
+}
+
 export interface BaseJob {
-  bot_client_data?: string;
+  bot_client_data?: any;
+  current?: Current;
   gist: string;
+  history: Result[];
   id: JobId;
+  last?: Result;
   platform?: Platform;
   time_added: number;
 }
@@ -25,17 +42,3 @@ export interface TestJob extends BaseJob {
 }
 
 export type AnyJob = BisectJob | TestJob;
-
-export interface Result {
-  bisect_range?: BisectRange;
-  error?: string;
-  runner: string;
-  status: 'failure' | 'success' | 'system_error' | 'test_error';
-  time_begun: number;
-  time_ended: number;
-}
-
-export interface Current {
-  runner: string;
-  time_begun: number;
-}

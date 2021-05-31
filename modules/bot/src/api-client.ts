@@ -1,7 +1,14 @@
 import fetch, { Response } from 'node-fetch';
-// import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { URL } from 'url';
+import { v4 as mkuuid } from 'uuid';
+
+// import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
 import { FiddleInput } from '@electron/bugbot-shared/lib/issue-parser';
+import {
+  AnyJob,
+  BisectJob,
+  JobId,
+} from '@electron/bugbot-shared/lib/interfaces';
 
 export class APIError extends Error {
   public res: Response;
@@ -19,17 +26,20 @@ export default class BrokerAPI {
     this.baseURL = props.baseURL;
   }
 
-  async queueBisectJob(fiddle: FiddleInput): Promise<string> {
+  public async queueBisectJob(fiddle: FiddleInput): Promise<string> {
     const url = new URL('/api/jobs', this.baseURL);
 
+    const bisectJob: BisectJob = {
+      bisect_range: [fiddle.goodVersion, fiddle.badVersion],
+      gist: fiddle.gistId,
+      history: [],
+      id: mkuuid(),
+      time_added: Date.now(),
+      type: 'bisect',
+    };
+
     const res = await fetch(url.toString(), {
-      body: JSON.stringify({
-        client_data: '',
-        first: fiddle.goodVersion,
-        gist: fiddle.gistId,
-        last: fiddle.badVersion,
-        type: 'bisect',
-      }),
+      body: JSON.stringify(bisectJob),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -39,24 +49,22 @@ export default class BrokerAPI {
     return await res.text();
   }
 
-  stopJob(jobId: string): void {
+  public stopJob(jobId: JobId): void {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     console.log('stopping job', { url });
   }
 
-  async getJob(jobId: string): Promise<any> {
+  public async getJob(jobId: JobId): Promise<AnyJob> {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-
     const res = await fetch(url.toString());
-    const json = await res.json();
-    return json;
+    return res.json();
   }
 
-  async completeJob(jobId: string): Promise<any> {
+  public async completeJob(jobId: JobId): Promise<any> {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     await fetch(url.toString(), {
       body: JSON.stringify([
-        { op: 'replace', path: '/client_data', value: 'complete' },
+        { op: 'replace', path: '/bot_client_data', value: 'complete' },
       ]),
       headers: {
         'Content-Type': 'application/json',
