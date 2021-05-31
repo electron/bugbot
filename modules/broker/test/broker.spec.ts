@@ -1,8 +1,11 @@
 import * as semver from 'semver';
 import dayjs from 'dayjs';
 import fetch from 'node-fetch';
-import { v4 as mkuuid, validate as is_uuid } from 'uuid';
+import { Operation as PatchOp } from 'fast-json-patch';
 import { URLSearchParams } from 'url';
+import { v4 as mkuuid, validate as is_uuid } from 'uuid';
+
+import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
 
 import { Broker } from '../src/broker';
 import { Server } from '../src/server';
@@ -212,10 +215,10 @@ describe('broker', () => {
     });
 
     describe('filters', () => {
-      let id_undefined;
-      let id_darwin;
-      let id_linux;
-      let id_win32;
+      let id_undefined: JobId;
+      let id_darwin: JobId;
+      let id_linux: JobId;
+      let id_win32: JobId;
 
       async function initPlatformJobs() {
         const responses = await Promise.all([
@@ -319,7 +322,11 @@ describe('broker', () => {
       ({ etag } = await getJob(id));
     });
 
-    function patchJob(patchId: string, patchEtag: string, body: any) {
+    function patchJob(
+      patchId: string,
+      patchEtag: string,
+      body: Readonly<PatchOp>[],
+    ) {
       return fetch(`${base_url}/api/jobs/${patchId}`, {
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json', 'If-Match': patchEtag },
@@ -329,14 +336,9 @@ describe('broker', () => {
 
     it('adds properties', async () => {
       const bot_client_data = Math.random().toString();
-      const body = [
-        {
-          op: 'add',
-          path: '/bot_client_data',
-          value: bot_client_data,
-        },
-      ];
-      const response = await patchJob(id, etag, body);
+      const response = await patchJob(id, etag, [
+        { op: 'add', path: '/bot_client_data', value: bot_client_data },
+      ]);
       expect(response.status).toBe(200);
 
       const { body: job } = await getJob(id);
@@ -345,8 +347,9 @@ describe('broker', () => {
 
     it('replaces properties', async () => {
       const new_gist = 'new_gist';
-      const body = [{ op: 'replace', path: '/gist', value: new_gist }];
-      const response = await patchJob(id, etag, body);
+      const response = await patchJob(id, etag, [
+        { op: 'replace', path: '/gist', value: new_gist },
+      ]);
       expect(response.status).toBe(200);
 
       const { body: job } = await getJob(id);
@@ -357,14 +360,9 @@ describe('broker', () => {
       // add a property
       {
         const bot_client_data = Math.random().toString();
-        const body = [
-          {
-            op: 'add',
-            path: '/bot_client_data',
-            value: bot_client_data,
-          },
-        ];
-        const response = await patchJob(id, etag, body);
+        const response = await patchJob(id, etag, [
+          { op: 'add', path: '/bot_client_data', value: bot_client_data },
+        ]);
         expect(response.status).toBe(200);
 
         let job;
@@ -374,8 +372,9 @@ describe('broker', () => {
 
       // remove it
       {
-        const body = [{ op: 'remove', path: '/bot_client_data' }];
-        const response = await patchJob(id, etag, body);
+        const response = await patchJob(id, etag, [
+          { op: 'remove', path: '/bot_client_data' },
+        ]);
         expect(response.status).toBe(200);
         const { body: job } = await getJob(id);
         expect(job).not.toHaveProperty('client_data');
@@ -383,13 +382,13 @@ describe('broker', () => {
     });
 
     it('patches object types', async () => {
-      const result = {
+      const result: Result = {
         bisect_range: ['10.0.0', '10.0.1'],
         runner: mkuuid(),
         status: 'success',
-        time_ended: Date.now(),
         time_begun: Date.now(),
-      } as const;
+        time_ended: Date.now(),
+      };
       const response = await patchJob(id, etag, [
         { op: 'add', path: '/last', value: result },
       ]);
@@ -402,15 +401,17 @@ describe('broker', () => {
     describe('fails if', () => {
       it('the job is not found', async () => {
         const new_gist = 'new_gist';
-        const body = [{ op: 'replace', path: '/gist', value: new_gist }];
-        const response = await patchJob('unknown-job', etag, body);
+        const response = await patchJob('unknown-job', etag, [
+          { op: 'replace', path: '/gist', value: new_gist },
+        ]);
         expect(response.status).toBe(404);
       });
 
       it('the etag does not match', async () => {
         const new_gist = 'new_gist';
-        const body = [{ op: 'replace', path: '/gist', value: new_gist }];
-        const response = await patchJob(id, 'unknown-etag', body);
+        const response = await patchJob(id, 'unknown-etag', [
+          { op: 'replace', path: '/gist', value: new_gist },
+        ]);
         expect(response.status).toBe(412);
 
         const { body: job } = await getJob(id);
@@ -420,7 +421,7 @@ describe('broker', () => {
       it('the patch is malformed', async () => {
         const new_gist = 'new_gist';
         const body = [{ op: '💩', path: '/gist', value: new_gist }];
-        const response = await patchJob(id, etag, body);
+        const response = await patchJob(id, etag, body as any);
         expect(response.status).toBe(400);
 
         const { body: job } = await getJob(id);
@@ -430,8 +431,9 @@ describe('broker', () => {
       it('the patch changes readonly properties', async () => {
         const path = '/id';
         const new_id = 'poop';
-        const body = [{ op: 'replace', path, value: new_id }];
-        const response = await patchJob(id, etag, body);
+        const response = await patchJob(id, etag, [
+          { op: 'replace', path, value: new_id },
+        ]);
         expect(response.status).toBe(400);
         expect(await response.text()).toContain(path);
 

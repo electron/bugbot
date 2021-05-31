@@ -1,11 +1,11 @@
 import * as semver from 'semver';
 import { v4 as mkuuid } from 'uuid';
 
-import { Current, Result } from '@electron/bugbot-shared/lib/interfaces';
+import { JobId, Current, Result } from '@electron/bugbot-shared/lib/interfaces';
 
 export class Task {
   public readonly history: Result[] = [];
-  public readonly id = mkuuid();
+  public readonly id: JobId = mkuuid();
   public readonly log: string[] = [];
   public readonly time_added = Date.now();
   public readonly type: string;
