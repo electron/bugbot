@@ -113,11 +113,13 @@ describe('runner', () => {
         status: 'success',
       } as const;
       expect(task.last.bisect_range).toStrictEqual(expected.bisect_range);
-      expect(task.last.runner).toStrictEqual(expected.runner);
-      expect(task.last.status).toStrictEqual(expected.status);
+      expect(task.last.runner).toBe(expected.runner);
+      expect(task.last.status).toBe(expected.status);
+
       const time_begun = Number.parseInt(task.last.time_begun, 10);
       expect(time_begun).not.toBeNaN();
       expect(time_begun).toBeGreaterThan(0);
+
       const time_ended = Number.parseInt(task.last.time_begun, 10);
       expect(time_ended).not.toBeNaN();
       expect(time_ended).toBeGreaterThanOrEqual(time_begun);

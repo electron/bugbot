@@ -2,13 +2,15 @@ export type BisectRange = [string, string];
 
 export type JobId = string;
 
+export type Platform = 'darwin' | 'linux' | 'win32';
+
 export type RunnerId = string;
 
 export interface BaseJob {
   bot_client_data?: string;
   gist: string;
-  id: string;
-  platform?: 'darwin' | 'linux' | 'win32';
+  id: JobId;
+  platform?: Platform;
   time_added: number;
 }
 
