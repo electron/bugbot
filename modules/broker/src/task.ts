@@ -1,88 +1,92 @@
 import * as semver from 'semver';
-import { v4 as mkuuid, validate as is_uuid } from 'uuid';
+import { v4 as mkuuid } from 'uuid';
+
+import { Current, Result } from '@electron/bugbot-shared/lib/interfaces';
 
 export class Task {
-  public readonly id: string;
+  public readonly history: Result[] = [];
+  public readonly id = mkuuid();
   public readonly log: string[] = [];
-  public readonly time_created: Date;
+  public readonly time_added = Date.now();
   public readonly type: string;
-  public bisect_result: string[] | undefined = undefined;
-  public client_data: string | undefined = undefined;
-  public error: string | undefined = undefined;
-  public etag: string | undefined = undefined;
-  public first: string | undefined = undefined;
+  public bisect_range: [string, string];
+  public client_data: string;
+  public current: Current;
+  public error: string;
+  public etag: string;
   public gist: string;
-  public last: string | undefined = undefined;
-  public os: string;
-  public runner: string;
-  public time_finished: Date | undefined = undefined;
-  public time_started: Date | undefined = undefined;
+  public last: any;
+  public platform: string;
 
   constructor(props: Record<string, any>) {
-    // provide default values for any missing required properties
-    if (!is_uuid(props.id)) props.id = mkuuid();
-    if (!props.time_created) props.time_created = Date.now();
-
     for (const [key, val] of Object.entries(props)) {
       this[key] = val;
     }
   }
 
-  public static PackageFields = Object.freeze(new Set(['etag', 'log']));
+  public static PackageFields: ReadonlyArray<string> = ['etag', 'log'] as const;
 
-  public static PublicFields = Object.freeze(
-    new Set([
-      'client_data',
-      'error',
-      'first',
-      'gist',
-      'id',
-      'last',
-      'os',
-      'result_bisect',
-      'runner',
-      'time_created',
-      'time_finished',
-      'time_started',
-      'type',
-    ]),
-  );
+  public static PublicFields: ReadonlyArray<string> = [
+    'bisect_range',
+    'bot_client_data',
+    'current',
+    'error',
+    'gist',
+    'history',
+    'id',
+    'last',
+    'platform',
+    'time_added',
+    'type',
+  ] as const;
 
-  private static ReadonlyProps = Object.freeze(
-    new Set(['id', 'log', 'time_created', 'type']),
-  );
+  public static KnownFields: ReadonlyArray<string> = [
+    ...Task.PackageFields,
+    ...Task.PublicFields,
+  ] as const;
 
-  private static KnownProps = Object.freeze(
-    new Set([...Task.PackageFields.values(), ...Task.PublicFields.values()]),
-  );
+  public static ReadonlyFields: ReadonlyArray<string> = [
+    'id',
+    'log',
+    'time_added',
+    'type',
+  ] as const;
 
   public publicSubset(): Record<string, any> {
     return Object.fromEntries(
-      Object.entries(this).filter(([key]) => Task.PublicFields.has(key)),
+      Object.entries(this).filter(([key]) => Task.PublicFields.includes(key)),
     );
   }
 
   private static PropertyTests = Object.freeze({
-    first: (value: string) => semver.valid(value),
-    last: (value: string) => semver.valid(value),
-    os: (value: string) => ['linux', 'mac', 'windows'].includes(value),
+    bisect_range: (value: string[]) =>
+      Array.isArray(value) &&
+      value.length === 2 &&
+      value.every((v) => semver.valid(v)),
+    platform: (value: string) => ['darwin', 'linux', 'win32'].includes(value),
     type: (value: string) => ['bisect', 'test'].includes(value),
   });
 
   public static canInit(key: string, value: any): boolean {
-    if (!Task.KnownProps.has(key)) return false;
+    if (!Task.KnownFields.includes(key)) return false;
     const test = Task.PropertyTests[key];
     return !test || test(value);
   }
 
   public static canSet(key: string, value: any): boolean {
-    return Task.canInit(key, value) && !Task.ReadonlyProps.has(key);
+    return Task.canInit(key, value) && !Task.ReadonlyFields.includes(key);
   }
 
   public static createBisectTask(props: Record<string, any>): Task {
     const required_all = ['gist', 'type'];
-    const required_type = new Map([['bisect', ['first', 'last']]]);
-    for (const name of [...required_all, ...required_type.get(props.type)]) {
+    const required_per_type = new Map([
+      ['bisect', ['bisect_range']],
+      ['test', ['version']],
+    ]);
+    for (const name of [
+      ...required_all,
+      ...required_per_type.get(props.type),
+    ]) {
       if (!props[name]) {
         throw new Error(`missing property: ${name}`);
       }

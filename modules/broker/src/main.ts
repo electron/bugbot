@@ -1,11 +1,21 @@
-import { Broker } from './broker';
-import { Server } from './server';
-import { Task } from './task';
+import debug from 'debug';
+import { cosmiconfigSync } from 'cosmiconfig';
 
-const broker = new Broker();
-const server = new Server({
-  broker,
-  createBisectTask: Task.createBisectTask,
-  port: Number.parseInt(process.env.PORT, 10) || 9099,
-});
-server.listen();
+import { Server } from './server';
+
+const d = debug('broker:server');
+
+export function createServer(): Server {
+  // load settings from a broker config file
+  const searchResult = cosmiconfigSync('broker').search();
+  if (!searchResult) throw new Error('broker config not found');
+  d(`using broker config file '${searchResult.filepath}'`);
+  const { config } = searchResult;
+
+  // create the webserver
+  return new Server(config?.server || {});
+}
+
+if (require.main === module) {
+  createServer().start();
+}
