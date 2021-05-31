@@ -1,10 +1,16 @@
 import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
+
 import { env } from '@electron/bugbot-shared/lib/env-vars';
 import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
+import { Result } from '@electron/bugbot-shared/lib/interfaces';
 import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
+
 import BrokerAPI from './api-client';
+import { Labels } from './github-labels';
+
+const AppName = 'BugBot' as const;
 
 const actions = {
   BISECT: 'bisect',
@@ -19,12 +25,50 @@ const brokerBaseURL = env('BROKER_BASE_URL');
  * @param result The result from a Fiddle bisection
  * @param context Probot context object
  */
-async function commentBisectResult(result: FiddleBisectResult, context: any) {
-  const resultComment = context.issue({
-    body: `🤖 Results from bisecting: \n ${JSON.stringify(result, null, 2)}`,
-  });
+async function commentBisectResult(result: Result, context: any) {
+  const d = debug('github-client:commentBisectResult');
+  const add_labels = new Set<string>();
+  const del_labels = new Set<string>([Labels.BugBot.Running]);
+  const paragraphs: string[] = [];
 
+  switch (result.status) {
+    case 'success': {
+      const [a, b] = result.bisect_range;
+      paragraphs.push(
+        `It looks like this bug was introduced between ${a} and ${b}`,
+        `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,
+      );
+      add_labels.add(Labels.Bug.Regression);
+      // FIXME(any): get the majors in [a..b] and add version labels e.g. 13-x-y
+      break;
+    }
+
+    // FIXME(any): need to distinguish between these two cases &
+    // give appropriate response
+    case 'system_error':
+    case 'test_error': {
+      paragraphs.push(
+        // FIXME(any): oh hmm we will need a permanent web address to have clickable links.
+        // Maybe we'll need to keep bugbot.electronjs.org around.
+        // FIXME(any): add the link here.
+        `${AppName} was unable to complete this bisection. Check the table’s links for more information.`,
+        'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.'
+      );
+      add_labels.add(Labels.BugBot.MaintainerNeeded);
+      break;
+    }
+
+    default:
+      d(`unhandled status: ${result.status}`);
+      break;
+  }
+
+  const resultComment = context.issue({ body: paragraphs.join('\n\n') });
   await context.octokit.issues.createComment(resultComment);
+  // FIXME(any): apply del_labels
+  d(`del_labels: ${[...del_labels.values()].join(',')}`);
+  // FIXME(any): apply add_labels
+  d(`add_labels: ${[...add_labels.values()].join(',')}`);
 }
 
 /**
@@ -75,24 +119,7 @@ export async function parseManualCommand(context: any): Promise<void> {
       }
       d(`job ${jobId} complete`);
       clearInterval(timer);
-      switch (job.last.status) {
-        case 'success':
-          await commentBisectResult(
-            {
-              badVersion: job.last.bisect_range[0],
-              goodVersion: job.last.bisect_range[1],
-              success: true,
-            },
-            context,
-          );
-          await api.completeJob(jobId);
-          break;
-
-        default: {
-          //FIXME: handle error results
-          d(`unhandled status: ${job.last.status}`);
-        }
-      }
+      await commentBisectResult(job.last, context);
     }, INTERVAL);
   }
 }
