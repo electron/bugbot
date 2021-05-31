@@ -5,7 +5,12 @@ import { URL } from 'url';
 import { execFile } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Result } from '@electron/bugbot-shared/lib/interfaces';
+import {
+  AnyJob,
+  BisectRange,
+  JobId,
+  Result,
+} from '@electron/bugbot-shared/lib/interfaces';
 
 import {
   FiddleBisectResult,
@@ -14,36 +19,7 @@ import {
 
 const d = debug('runner');
 
-interface BaseJob {
-  bot_client_data?: string;
-  gist: string;
-  id: string;
-  platform?: 'darwin' | 'linux' | 'win32';
-  time_added: number;
-}
-
-interface BisectJob extends BaseJob {
-  type: 'bisect';
-  bisect_range: [string, string];
-}
-
-interface TestJob extends BaseJob {
-  type: 'test';
-  version: string;
-}
-
-type AnyJob = BisectJob | TestJob;
-
 type JsonPatch = unknown;
-
-/**
- * Returns a promise that resolves after the specified timeout.
- */
-function timeout(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(), ms);
-  });
-}
 
 export class Runner {
   public readonly platform: string;
@@ -98,16 +74,12 @@ export class Runner {
   }
 
   public async poll(): Promise<void> {
-    // Check for any claimable jobs
-    const claimableJobs = await this.fetchUnclaimedJobs();
-
-    // If there are no unclaimed jobs then sleep and try again
-    if (claimableJobs.length === 0) {
+    // find the first available job
+    const jobId = (await this.fetchAvailableJobs()).shift();
+    if (!jobId) {
       return;
     }
 
-    // Otherwise, claim the first job available
-    const [jobId] = claimableJobs;
     // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
     // help reduce any possible contention?
     let etag = '';
@@ -197,7 +169,7 @@ export class Runner {
   /**
    * Polls the broker for a list of unclaimed job IDs.
    */
-  private async fetchUnclaimedJobs(): Promise<string[]> {
+  private async fetchAvailableJobs(): Promise<JobId[]> {
     // Craft the url to the broker
     const jobs_url = new URL('api/jobs', this.brokerUrl);
     // find jobs compatible with this runner...
@@ -225,7 +197,7 @@ export class Runner {
   }
 
   private async patchJobAndUpdateEtag(
-    id: string,
+    id: JobId,
     etag: string,
     patches: JsonPatch[],
   ): Promise<string> {
@@ -247,7 +219,7 @@ export class Runner {
   }
 
   private runBisect(
-    range: string[],
+    range: BisectRange,
     gistId: string,
   ): Promise<FiddleBisectResult> {
     const [goodVersion, badVersion] = range;

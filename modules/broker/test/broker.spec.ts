@@ -4,6 +4,8 @@ import fetch from 'node-fetch';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 import { URLSearchParams } from 'url';
 
+import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
+
 import { Broker } from '../src/broker';
 import { Server } from '../src/server';
 import { Task } from '../src/task';
@@ -212,10 +214,10 @@ describe('broker', () => {
     });
 
     describe('filters', () => {
-      let id_undefined;
-      let id_darwin;
-      let id_linux;
-      let id_win32;
+      let id_undefined: JobId;
+      let id_darwin: JobId;
+      let id_linux: JobId;
+      let id_win32: JobId;
 
       async function initPlatformJobs() {
         const responses = await Promise.all([
@@ -383,13 +385,13 @@ describe('broker', () => {
     });
 
     it('patches object types', async () => {
-      const result = {
+      const result: Result = {
         bisect_range: ['10.0.0', '10.0.1'],
         runner: mkuuid(),
         status: 'success',
-        time_ended: Date.now(),
         time_begun: Date.now(),
-      } as const;
+        time_ended: Date.now(),
+      };
       const response = await patchJob(id, etag, [
         { op: 'add', path: '/last', value: result },
       ]);
