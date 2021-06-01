@@ -195,49 +195,48 @@ export class Runner {
   }
 
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
-    let resolve;
-    const resolvesWhenClosed = new Promise<void>((r) => {
-      resolve = r;
-    });
+    const putLog = this.putLog.bind(this);
+    const patchResult = this.patchResult.bind(this);
+    const { childTimeoutMs, fiddleExecPath } = this;
 
-    const child = spawn(
-      this.fiddleExecPath,
-      ['bisect', range[0], range[1], '--fiddle', gistId],
-      { timeout: this.childTimeoutMs },
-    );
-    const stdout: any[] = [];
-    // TODO(any): could debounce/buffer this data before calling putLog()
-    child.stderr.on('data', (data) => this.putLog(data));
-    child.stdout.on('data', (data) => this.putLog(data));
-    child.stdout.on('data', (data) => stdout.push(data));
-    child.on('error', (err) => {
-      this.patchResult({
-        error: err.toString(),
-        status: 'system_error',
+    return new Promise<void>((resolve) => {
+      const child = spawn(
+        fiddleExecPath,
+        ['bisect', range[0], range[1], '--fiddle', gistId],
+        { timeout: childTimeoutMs },
+      );
+      const stdout: any[] = [];
+      // TODO(any): could debounce/buffer this data before calling putLog()
+      child.stderr.on('data', (data) => putLog(data));
+      child.stdout.on('data', (data) => putLog(data));
+      child.stdout.on('data', (data) => stdout.push(data));
+      child.on('error', (err) => {
+        patchResult({
+          error: err.toString(),
+          status: 'system_error',
+        });
+      });
+      child.on('close', (exitCode) => {
+        const result: Partial<Result> = {};
+        try {
+          const output = stdout.map((buf) => buf.toString()).join('');
+          const res = parseFiddleBisectOutput(output);
+          if (res.success) {
+            result.status = 'success';
+            result.bisect_range = [res.goodVersion, res.badVersion];
+          } else {
+            // TODO(clavin): ^ better wording
+            result.error = 'Failed to narrow test down to two versions';
+            result.status = exitCode === 1 ? 'test_error' : 'system_error';
+          }
+        } catch (parseErr) {
+          d('fiddle bisect parse error: %O', parseErr);
+          result.status = 'system_error';
+          result.error = parseErr.toString();
+        } finally {
+          patchResult(result).then(() => resolve());
+        }
       });
     });
-    child.on('close', (exitCode) => {
-      const result: Partial<Result> = {};
-      try {
-        const output = stdout.map((buf) => buf.toString()).join('');
-        const res = parseFiddleBisectOutput(output);
-        if (res.success) {
-          result.status = 'success';
-          result.bisect_range = [res.goodVersion, res.badVersion];
-        } else {
-          // TODO(clavin): ^ better wording
-          result.error = 'Failed to narrow test down to two versions';
-          result.status = exitCode === 1 ? 'test_error' : 'system_error';
-        }
-      } catch (parseErr) {
-        d('fiddle bisect parse error: %O', parseErr);
-        result.status = 'system_error';
-        result.error = parseErr.toString();
-      } finally {
-        this.patchResult(result).then(() => resolve());
-      }
-    });
-
-    return resolvesWhenClosed;
   }
 }
