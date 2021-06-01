@@ -65,12 +65,27 @@ async function commentBisectResult(result: Result, context: any) {
       break;
   }
 
-  const resultComment = context.issue({ body: paragraphs.join('\n\n') });
-  await context.octokit.issues.createComment(resultComment);
-  // FIXME(any): apply del_labels
-  d(`del_labels: ${[...del_labels.values()].join(',')}`);
-  // FIXME(any): apply add_labels
-  d(`add_labels: ${[...add_labels.values()].join(',')}`);
+  // add commment
+  const promises: Promise<any>[] = [];
+  const issue = context.issue();
+  const body = paragraphs.join('\n\n');
+  d('adding comment', body);
+  promises.push(context.octokit.issues.createComment({ ...issue, body }));
+
+  // maybe remove labels
+  for (const name of del_labels.values()) {
+    d('removing label', name);
+    promises.push(context.octokit.issues.removeLabel({ ...issue, name }));
+  }
+
+  // maybe add labels
+  if (add_labels.size > 0) {
+    const labels = [...add_labels.values()];
+    d('adding labels %O', labels);
+    promises.push(context.octokit.issues.addLabels({ ...issue, labels }));
+  }
+
+  await Promise.all(promises);
 }
 
 /**
