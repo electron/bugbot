@@ -45,7 +45,7 @@ export class Runner {
       childTimeoutMs = 5 * 60 * 1000, // 5 minutes
       fiddleExecPath = process.env.FIDDLE_EXEC_PATH || which.sync(fiddleExec),
       platform = process.platform,
-      pollTimeoutMs = 20 * 1000, // 20 seconds
+      pollTimeoutMs = process.env.BUGBOT_POLL_INTERVAL_MS || 20 * 1000, // 20 seconds
       uuid = uuidv4(),
     } = opts;
     Object.assign(this, {
@@ -64,12 +64,15 @@ export class Runner {
 
   public start(): void {
     this.stop();
+    d('runner:start', `interval is ${this.pollTimeoutMs}`);
     this.interval = setInterval(this.pollSafely.bind(this), this.pollTimeoutMs);
+    this.pollSafely();
   }
 
   public stop(): void {
     clearInterval(this.interval);
     this.interval = undefined;
+    d('runner:stop', 'interval cleared');
   }
 
   public pollSafely(): void {
@@ -200,13 +203,21 @@ export class Runner {
     const { childTimeoutMs, fiddleExecPath } = this;
 
     return new Promise<void>((resolve) => {
-      const child = spawn(
-        fiddleExecPath,
-        ['bisect', range[0], range[1], '--fiddle', gistId],
-        { timeout: childTimeoutMs },
+      const args = ['bisect', range[0], range[1], '--fiddle', gistId];
+      const opts = { timeout: childTimeoutMs };
+      const child = spawn(fiddleExecPath, args, opts);
+
+      const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
+      putLog(
+        [
+          `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
+          `${prefix} spawning '${fiddleExecPath}' ${args.join(' ')}`,
+          `${prefix}   ... with opts ${inspect(opts)}`,
+        ].join('\n')
       );
-      const stdout: any[] = [];
+
       // TODO(any): could debounce/buffer this data before calling putLog()
+      const stdout: any[] = [];
       child.stderr.on('data', (data) => putLog(data));
       child.stdout.on('data', (data) => putLog(data));
       child.stdout.on('data', (data) => stdout.push(data));
