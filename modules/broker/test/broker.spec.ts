@@ -7,6 +7,8 @@ import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
 
+import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
+
 import { Broker } from '../src/broker';
 import { Server } from '../src/server';
 import { Task } from '../src/task';
