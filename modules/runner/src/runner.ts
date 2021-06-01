@@ -1,8 +1,9 @@
 import debug from 'debug';
 import got from 'got';
 import which from 'which';
+import { inspect } from 'util';
 import { URL } from 'url';
-import { execFile } from 'child_process';
+import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { Operation as PatchOp } from 'fast-json-patch';
 
@@ -16,10 +17,7 @@ import {
   RunnerId,
 } from '@electron/bugbot-shared/lib/interfaces';
 
-import {
-  FiddleBisectResult,
-  parseFiddleBisectOutput,
-} from './fiddle-bisect-parser';
+import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 
 const d = debug('runner');
 
@@ -27,11 +25,14 @@ export class Runner {
   public readonly platform: Platform;
   public readonly uuid: RunnerId;
 
-  private readonly fiddleExecPath: string;
   private readonly brokerUrl: string;
+  private readonly childTimeoutMs: number;
+  private readonly fiddleExecPath: string;
   private readonly pollTimeoutMs: number;
-  private time_begun: number;
+  private etag: string;
   private interval: ReturnType<typeof setInterval>;
+  private jobId: JobId;
+  private timeBegun: number;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -40,16 +41,16 @@ export class Runner {
   constructor(opts: Record<string, any> = {}) {
     const fiddleExec = 'electron-fiddle' as const;
     const {
-      bisectTimeoutMs = 5 * 60 * 1000, // 5 minutes
       brokerUrl = process.env.BUGBOT_BROKER_URL,
+      childTimeoutMs = 5 * 60 * 1000, // 5 minutes
       fiddleExecPath = process.env.FIDDLE_EXEC_PATH || which.sync(fiddleExec),
       platform = process.platform,
-      pollTimeoutMs = 20 * 1000, // 20 seconds
+      pollTimeoutMs = process.env.BUGBOT_POLL_INTERVAL_MS || 20 * 1000, // 20 seconds
       uuid = uuidv4(),
     } = opts;
     Object.assign(this, {
-      bisectTimeoutMs,
       brokerUrl,
+      childTimeoutMs,
       fiddleExecPath,
       platform,
       pollTimeoutMs,
@@ -63,16 +64,19 @@ export class Runner {
 
   public start(): void {
     this.stop();
+    d('runner:start', `interval is ${this.pollTimeoutMs}`);
     this.interval = setInterval(this.pollSafely.bind(this), this.pollTimeoutMs);
+    this.pollSafely();
   }
 
   public stop(): void {
     clearInterval(this.interval);
     this.interval = undefined;
+    d('runner:stop', 'interval cleared');
   }
 
   public pollSafely(): void {
-    this.poll().catch((err) => d('error while polling broker: %O', err));
+    this.poll().catch((err) => d('error while polling broker:', inspect(err)));
   }
 
   public async poll(): Promise<void> {
@@ -84,69 +88,32 @@ export class Runner {
 
     // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
     // help reduce any possible contention?
-    let etag = '';
-    const [job, initalEtag] = await this.fetchJobAndEtag(jobId);
-    etag = initalEtag;
+    const [job, initialEtag] = await this.fetchJobAndEtag(jobId);
+    this.etag = initialEtag;
+    this.jobId = job.id;
+    this.timeBegun = Date.now();
 
     // Claim the job
-    this.time_begun = Date.now();
     const current: Current = {
       runner: this.uuid,
-      time_begun: this.time_begun,
+      time_begun: this.timeBegun,
     };
-    etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-      { op: 'replace', path: '/current', value: current },
-    ]);
+    await this.patchJob([{ op: 'replace', path: '/current', value: current }]);
 
-    // Another layer of catching errors to also unclaim the job if we error
-    try {
-      // Then determine how to run the job and return results
-      if (job.type === 'bisect') {
-        // Run the bisect
-        const res = await this.runBisect(job.bisect_range, job.gist);
-
-        // Report the result back to the job
-        const result: Result = {
-          runner: this.uuid,
-          status: 'success',
-          time_begun: this.time_begun,
-          time_ended: Date.now(),
-        };
-
-        if (res.success) {
-          result.bisect_range = [res.goodVersion, res.badVersion];
-        } else {
-          // TODO: distinguish between system_error (need maintainer attn)
-          // and test_error (implies user should revise test code).
-          // Examples:
-          // - child_process timeout: test_error
-          // - invalid gist id: test_error
-          // - failure to launch electron-fiddle: system error
-          result.status = 'system_error';
-          // TODO(clavin): ^ better wording
-          result.error = 'Failed to narrow test down to two versions';
-        }
-
-        etag = await this.patchJobAndUpdateEtag(job.id, etag, [
-          { op: 'add', path: '/history/-', value: result },
-          { op: 'replace', path: '/last', value: result },
-          { op: 'remove', path: '/current' },
-        ]);
-
-        // } else if (job.type === 'test') {
-        // TODO
-      } else {
-        throw new Error(`unexpected job type: "${(job as AnyJob).type}"`);
-      }
-    } catch (err) {
-      // Unclaim the job and rethrow
-      // FIXME: should append to history here and set
-      // system_error or test_error based on err type
-      await this.patchJobAndUpdateEtag(job.id, etag, [
-        { op: 'remove', path: '/current' },
-      ]);
-      throw err;
+    switch (job.type) {
+      case 'bisect':
+        await this.runBisect(job.bisect_range, job.gist);
+        break;
+      default:
+        d('unexpected job $O', job);
+        break;
     }
+
+    // cleanup
+    delete this.etag;
+    delete this.jobId;
+    delete this.timeBegun;
+    d('runner:poll done');
   }
 
   /**
@@ -161,6 +128,8 @@ export class Runner {
     jobs_url.searchParams.append('current.runner', 'undefined');
     // ...and which have never been run
     jobs_url.searchParams.append('last.status', 'undefined');
+    // FIXME: currently only support bisect but we should support others too
+    jobs_url.searchParams.append('type', 'bisect');
 
     // Make the request and return its response
     return await got(jobs_url).json();
@@ -179,55 +148,106 @@ export class Runner {
     return [JSON.parse(resp.body), etag];
   }
 
-  private async patchJobAndUpdateEtag(
-    id: JobId,
-    etag: string,
-    patches: Readonly<PatchOp>[],
-  ): Promise<string> {
+  private async patchJob(patches: Readonly<PatchOp>[]): Promise<void> {
+    d('patches: %O', patches);
+
     // Send the patch
-    const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
+    const job_url = new URL(`api/jobs/${this.jobId}`, this.brokerUrl);
     const resp = await got(job_url, {
-      headers: { etag },
+      headers: { etag: this.etag },
       json: patches,
       method: 'PATCH',
     });
 
     // Extract the etag header & make sure it was defined
-    const newEtag = resp.headers.etag;
-    if (!newEtag) {
+    const { etag } = resp.headers;
+    if (!etag) {
       throw new Error('missing etag in broker job response');
     }
 
-    return newEtag;
+    this.etag = etag;
   }
 
-  private runBisect(
-    range: BisectRange,
-    gistId: string,
-  ): Promise<FiddleBisectResult> {
-    const [goodVersion, badVersion] = range;
-    // Call fiddle and instruct it to bisect with the supplied parameters
-    return new Promise((resolve, reject) => {
-      execFile(
-        this.fiddleExecPath,
-        ['bisect', goodVersion, badVersion, '--fiddle', gistId] as string[],
-        (err, stdout, stderr) => {
-          // Ensure there was no error
-          if (err === null) {
-            try {
-              // Try to parse the output as well
-              resolve(parseFiddleBisectOutput(stdout));
-            } catch (parseErr) {
-              d('fiddle bisect parse error: %O', parseErr);
-              reject(parseErr);
-            }
-          } else {
-            d(`failed fiddle bisect stdout:\n${stdout}`);
-            d(`failed fiddle bisect stderr:\n${stderr}`);
-            reject(err);
-          }
-        },
+  private async putLog(data: any) {
+    const body = data.toString();
+    d('appendLog', body);
+    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
+    const resp = await got(log_url, {
+      body,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
+      method: 'PUT',
+    });
+    d(`appendLog resp.status ${resp.statusCode}`);
+  }
+
+  private patchResult(result: Partial<Result>): Promise<void> {
+    const defaults: Result = {
+      runner: this.uuid,
+      status: 'system_error',
+      time_begun: this.timeBegun,
+      time_ended: Date.now(),
+    };
+    result = Object.assign(defaults, result);
+    return this.patchJob([
+      { op: 'add', path: '/history/-', value: result },
+      { op: 'replace', path: '/last', value: result },
+      { op: 'remove', path: '/current' },
+    ]);
+  }
+
+  private runBisect(range: BisectRange, gistId: string): Promise<void> {
+    const putLog = this.putLog.bind(this);
+    const patchResult = this.patchResult.bind(this);
+    const { childTimeoutMs, fiddleExecPath } = this;
+
+    return new Promise<void>((resolve) => {
+      const args = ['bisect', range[0], range[1], '--fiddle', gistId];
+      const opts = { timeout: childTimeoutMs };
+      const child = spawn(fiddleExecPath, args, opts);
+
+      const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
+      putLog(
+        [
+          `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
+          `${prefix} spawning '${fiddleExecPath}' ${args.join(' ')}`,
+          `${prefix}   ... with opts ${inspect(opts)}`,
+        ].join('\n')
       );
+
+      // TODO(any): could debounce/buffer this data before calling putLog()
+      const stdout: any[] = [];
+      child.stderr.on('data', (data) => putLog(data));
+      child.stdout.on('data', (data) => putLog(data));
+      child.stdout.on('data', (data) => stdout.push(data));
+      child.on('error', (err) => {
+        patchResult({
+          error: err.toString(),
+          status: 'system_error',
+        });
+      });
+      child.on('close', (exitCode) => {
+        const result: Partial<Result> = {};
+        try {
+          const output = stdout.map((buf) => buf.toString()).join('');
+          const res = parseFiddleBisectOutput(output);
+          if (res.success) {
+            result.status = 'success';
+            result.bisect_range = [res.goodVersion, res.badVersion];
+          } else {
+            // TODO(clavin): ^ better wording
+            result.error = 'Failed to narrow test down to two versions';
+            result.status = exitCode === 1 ? 'test_error' : 'system_error';
+          }
+        } catch (parseErr) {
+          d('fiddle bisect parse error: %O', parseErr);
+          result.status = 'system_error';
+          result.error = parseErr.toString();
+        } finally {
+          patchResult(result).then(() => resolve());
+        }
+      });
     });
   }
 }

@@ -10,7 +10,7 @@ import express from 'express';
 import { Broker } from './broker';
 import { Task } from './task';
 
-const d = debug('broker:server');
+const DebugPrefix = 'broker:server';
 
 // eslint-disable-next-line no-unused-vars
 type TaskBuilder = (params: any) => Task;
@@ -53,18 +53,28 @@ export class Server {
   }
 
   private getLog(req: express.Request, res: express.Response) {
+    const d = debug(`${DebugPrefix}:getLog`);
+
     const id = path.basename(req.url);
+    d('getLog', id);
     const task = this.broker.getTask(id);
     if (!task) {
+      d('404 no such task');
       res.status(404).send(`Unknown job '${id}'`);
       return;
     }
 
-    const body = task.log.join('\n');
+    const pre = task.log.join('\n');
+    const refresh_interval_sec = task.current ? 5 : 60;
+    // FIXME: hardcoding all this is bad
+    const body = `<head><meta http-equiv="refresh" content="${refresh_interval_sec}"></head><body style="color: #66FF66; background: #282828;"><pre>${pre}</pre></body>`;
+    res.header('Content-Type', 'text/html; charset=UTF-8');
     res.status(200).send(body);
   }
 
   private putLog(req: express.Request, res: express.Response) {
+    const d = debug(`${DebugPrefix}:putLog`);
+
     const [, id] = /\/api\/jobs\/(.*)\/log/.exec(req.url);
     const task = this.broker.getTask(id);
     if (!task) {
@@ -72,7 +82,11 @@ export class Server {
       return;
     }
 
-    task.log.push(...req.body.split(/\/r?\n/));
+    const lines = req.body
+      .split(/\r?\n/)
+      .filter((line) => line && line.length > 0);
+    d('appending to log:', JSON.stringify(lines));
+    task.log.push(...lines);
     res.status(200).end();
   }
 
@@ -103,6 +117,7 @@ export class Server {
   }
 
   private patchJob(req: express.Request, res: express.Response) {
+    const d = debug(`${DebugPrefix}:patchJob`);
     const id = path.basename(req.url);
     const task = this.broker.getTask(id);
     if (!task) {
@@ -148,6 +163,8 @@ export class Server {
   }
 
   private getJobs(req: express.Request, res: express.Response) {
+    const d = debug(`${DebugPrefix}:getJobs`);
+
     d(`getJobs: query: ${JSON.stringify(req.query)}`);
     const tasks = this.broker.getTasks().map((task) => task.publicSubset());
     const ids = Server.filter(tasks, req.query as any).map((task) => task.id);
@@ -156,6 +173,9 @@ export class Server {
   }
 
   public start(): Promise<any> {
+    const d = debug(`${DebugPrefix}:start`);
+    d('starting server');
+
     const listen = (server: http.Server, port: number) => {
       return new Promise<void>((resolve, reject) => {
         server.listen(port, () => {
@@ -194,8 +214,10 @@ export class Server {
   }
 
   public stop(): void {
+    const d = debug(`${DebugPrefix}:stop`);
     this.servers.forEach((server) => server.close());
     this.servers.splice(0, this.servers.length);
+    d('server stopped');
   }
 
   /**
