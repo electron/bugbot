@@ -1,3 +1,4 @@
+import debug from 'debug';
 import dayjs from 'dayjs';
 import { v4 as mkuuid } from 'uuid';
 
@@ -12,6 +13,8 @@ import {
   Platform,
   Result,
 } from '@electron/bugbot-shared/lib/interfaces';
+
+const d = debug('test');
 
 jest.setTimeout(60 * 1000);
 
@@ -104,16 +107,22 @@ describe('runner', () => {
   describe('handles successful bisection', () => {
     let task: Task;
 
+    const bisect_range: Readonly<BisectRange> = [
+      '11.0.0-nightly.20200724',
+      '11.0.0-nightly.20200729',
+    ];
+
     beforeAll(async () => {
       task = createBisectTask();
       expect(task.last).toBeUndefined();
       expect(task.history).toHaveLength(0);
       await runTask(task);
+      d('task after running %O', task);
     });
 
     it('sets job.last', () => {
       const expected = {
-        bisect_range: ['11.0.0-nightly.20200724', '11.0.0-nightly.20200729'],
+        bisect_range,
         runner: runner.uuid,
         status: 'success',
       } as const;
@@ -136,6 +145,13 @@ describe('runner', () => {
 
     it('clears job.current', () => {
       expect(task.current).toBeFalsy();
+    });
+
+    it('includes the commit range to job.log', () => {
+      const log = task.log.join('\n');
+      const [a, b] = bisect_range;
+      const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
+      expect(log).toMatch(url);
     });
   });
 });
