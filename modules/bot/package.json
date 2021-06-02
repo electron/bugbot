@@ -5,6 +5,7 @@
   "main": "dist/github-client.js",
   "scripts": {
     "build": "tsc -b",
+    "heroku-postbuild": "yarn build",
     "start": "probot run ./dist/github-client.js",
     "test": "jest --coverage"
   },
