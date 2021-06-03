@@ -9,6 +9,7 @@ import express from 'express';
 
 import { Broker } from './broker';
 import { Task } from './task';
+import { buildLog } from './log';
 
 const DebugPrefix = 'broker:server';
 
@@ -64,30 +65,19 @@ export class Server {
       return;
     }
 
-    const pre = task.log.join('\n');
-    const refresh_interval_sec = task.current ? 5 : 60;
-    // FIXME: hardcoding all this is bad
-    const body = `<head><meta http-equiv="refresh" content="${refresh_interval_sec}"></head><body style="color: #66FF66; background: #282828;"><pre>${pre}</pre></body>`;
     res.header('Content-Type', 'text/html; charset=UTF-8');
-    res.status(200).send(body);
+    res.status(200).send(buildLog(task));
   }
 
   private putLog(req: express.Request, res: express.Response) {
-    const d = debug(`${DebugPrefix}:putLog`);
-
     const [, id] = /\/api\/jobs\/(.*)\/log/.exec(req.url);
     const task = this.broker.getTask(id);
-    if (!task) {
+    if (task) {
+      task.logText(req.body);
+      res.status(200).end();
+    } else {
       res.status(404).send(`Unknown job '${id}'`);
-      return;
     }
-
-    const lines = req.body
-      .split(/\r?\n/)
-      .filter((line) => line && line.length > 0);
-    d('appending to log:', JSON.stringify(lines));
-    task.log.push(...lines);
-    res.status(200).end();
   }
 
   private postJob(req: express.Request, res: express.Response) {

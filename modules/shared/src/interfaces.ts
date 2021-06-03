@@ -9,14 +9,14 @@ export type RunnerId = string;
 export interface Result {
   bisect_range?: BisectRange;
   error?: string;
-  runner: string;
+  runner: RunnerId;
   status: 'failure' | 'success' | 'system_error' | 'test_error';
   time_begun: number;
   time_ended: number;
 }
 
 export interface Current {
-  runner: string;
+  runner: RunnerId;
   time_begun: number;
 }
 
