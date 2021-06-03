@@ -98,11 +98,12 @@ export class Task {
 
   public logText(data: string): void {
     const d = debug('task:addLog');
-
     const { log } = this;
-    if (log.length === 0) {
-      this.logNewSection();
-    } else if (log[log.length - 1].runner !== this.current?.runner) {
+
+    if (
+      log.length === 0 ||
+      log[log.length - 1].runner !== this.current?.runner
+    ) {
       this.logNewSection();
     }
 
