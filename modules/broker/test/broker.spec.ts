@@ -7,8 +7,6 @@ import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
 
-import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
-
 import { Broker } from '../src/broker';
 import { Server } from '../src/server';
 import { Task } from '../src/task';
@@ -448,8 +446,7 @@ describe('broker', () => {
   async function getLog(job_id: string) {
     const response = await fetch(`${base_url}/log/${job_id}`);
     const text = await response.text();
-    const lines = `${text}`.split(/\r?\n/);
-    return { body: lines, response };
+    return { body: text, response };
   }
 
   describe('/log/$job_id (GET)', () => {
@@ -475,8 +472,10 @@ describe('broker', () => {
         await addLogMessages(job_id, line);
       }
 
-      const { body: log } = await getLog(job_id);
-      expect(log).toStrictEqual(lines);
+      const { body } = await getLog(job_id);
+      for (const line of lines) {
+        expect(body).toMatch(line);
+      }
     });
 
     it('errors if the task is unknown', async () => {

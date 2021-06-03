@@ -1,12 +1,27 @@
 import * as semver from 'semver';
+import debug from 'debug';
 import { v4 as mkuuid } from 'uuid';
 
-import { JobId, Current, Result } from '@electron/bugbot-shared/lib/interfaces';
+import {
+  JobId,
+  Current,
+  Result,
+  RunnerId,
+} from '@electron/bugbot-shared/lib/interfaces';
+
+class LogSection {
+  public readonly runner: RunnerId;
+  public readonly lines: string[] = [];
+
+  constructor(runner: RunnerId) {
+    this.runner = runner;
+  }
+}
 
 export class Task {
   public readonly history: Result[] = [];
   public readonly id: JobId = mkuuid();
-  public readonly log: string[] = [];
+  public readonly log: LogSection[] = [];
   public readonly time_added = Date.now();
   public readonly type: string;
   public bisect_range: [string, string];
@@ -75,6 +90,26 @@ export class Task {
 
   public static canSet(key: string, value: any): boolean {
     return Task.canInit(key, value) && !Task.ReadonlyFields.includes(key);
+  }
+
+  private logNewSection(): void {
+    this.log.push(new LogSection(this.current?.runner));
+  }
+
+  public logText(data: string): void {
+    const d = debug('task:addLog');
+    const { log } = this;
+
+    if (
+      log.length === 0 ||
+      log[log.length - 1].runner !== this.current?.runner
+    ) {
+      this.logNewSection();
+    }
+
+    d('appending to log:', data);
+    const lines = data.split(/\r?\n/).filter((line) => line?.length > 0);
+    log[log.length - 1].lines.push(...lines);
   }
 
   public static createBisectTask(props: Record<string, any>): Task {
