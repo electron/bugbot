@@ -196,15 +196,15 @@ export class Server {
 
     const url = new URL(this.baseUrl);
     const port = Number.parseInt(url.port, 10);
+    d(`url.protocol ${url.protocol}`);
     switch (url.protocol) {
-      case 'http': {
+      case 'http:': {
         const opts = {};
         this.server = http.createServer(opts, this.app);
         return listen(this.server, port);
-        break;
       }
 
-      case 'https': {
+      case 'https:': {
         const opts = {
           cert: fs.readFileSync(this.cert),
           key: fs.readFileSync(this.key),
@@ -213,9 +213,12 @@ export class Server {
         return listen(this.server, port);
       }
 
-      default:
-        console.error(`unknown protocol '${url.protocol}' in '${this.baseUrl}'`);
+      default: {
+        const msg = `unknown protocol '${url.protocol}' in '${this.baseUrl}'`;
+        console.log(msg);
+        debug(msg);
         process.exit(1);
+      }
     }
   }
 

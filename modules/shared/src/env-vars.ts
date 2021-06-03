@@ -18,7 +18,7 @@ export function env(name: string, opts: { default?: string } = {}): string {
   }
 
   const msg = `env var '${name}' not found. exiting.`;
-  console.error(msg);
+  console.log(msg);
   d(msg);
   process.exit(1);
 
@@ -34,7 +34,7 @@ export function envInt(name: string, opts: { default?: string } = {}): number {
   }
 
   const msg = `env var "${name}' value is not a number. exiting.`;
-  console.error(msg);
+  console.log(msg);
   d(msg);
   process.exit(1);
 

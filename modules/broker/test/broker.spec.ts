@@ -18,6 +18,8 @@ describe('broker', () => {
   const base_url = `http://localhost:${port}`;
 
   beforeEach(async () => {
+    process.env.BUGBOT_BROKER_URL = base_url;
+
     const { createBisectTask } = Task;
     broker = new Broker();
     server = new Server({ broker, createBisectTask, port });
