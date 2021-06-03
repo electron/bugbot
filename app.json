@@ -1,0 +1,37 @@
+{
+  "name": "@electron/bugbot-bot",
+  "description": "Probot client for Electron's issue tracker bug bot.",
+  "repository": "https://github.com/electron/bugbot",
+  "success_url": "/probot",
+  "website": "https://damp-temple-23212.herokuapp.com/",
+  "env": {
+    "APP_ID": {
+      "description": "ID number for the GitHub App."
+    },
+    "BROKER_BASE_URL": {
+      "description": "Base URL for the Bug Bot broker service."
+    },
+    "DEBUG": {
+      "description": "Pattern to enable debug statements.",
+      "required": false
+    },
+    "PRIVATE_KEY": {
+      "description": "RSA private key for the GitHub App."
+    },
+    "PROCFILE": {
+      "description": "Path to Procfile from repository root",
+      "value": "modules/bot/Procfile"
+    },
+    "WEBHOOK_SECRET": {
+      "description": "Webhook secret for the GitHub App."
+    },
+    "buildpacks": [
+      {
+        "url": "heroku/nodejs"
+      },
+      {
+        "url": "https://github.com/heroku/heroku-buildpack-multi-procfile"
+      }
+    ]
+  }
+}
