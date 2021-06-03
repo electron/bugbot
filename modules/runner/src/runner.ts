@@ -1,11 +1,11 @@
 import debug from 'debug';
 import got from 'got';
 import which from 'which';
-import { inspect } from 'util';
+import { Operation as PatchOp } from 'fast-json-patch';
 import { URL } from 'url';
+import { inspect } from 'util';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
-import { Operation as PatchOp } from 'fast-json-patch';
 
 import {
   AnyJob,
@@ -16,6 +16,7 @@ import {
   Result,
   RunnerId,
 } from '@electron/bugbot-shared/lib/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 
@@ -27,7 +28,7 @@ export class Runner {
 
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
-  private readonly fiddleExecPath: string;
+  private readonly fiddleExec: string;
   private readonly pollTimeoutMs: number;
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
@@ -39,27 +40,16 @@ export class Runner {
    * values, then starts the runner's execution loop.
    */
   constructor(opts: Record<string, any> = {}) {
-    const fiddleExec = 'electron-fiddle' as const;
-    const {
-      brokerUrl = process.env.BUGBOT_BROKER_URL,
-      childTimeoutMs = 5 * 60 * 1000, // 5 minutes
-      fiddleExecPath = process.env.FIDDLE_EXEC_PATH || which.sync(fiddleExec),
-      platform = process.platform,
-      pollTimeoutMs = process.env.BUGBOT_POLL_INTERVAL_MS || 20 * 1000, // 20 seconds
-      uuid = uuidv4(),
-    } = opts;
     Object.assign(this, {
-      brokerUrl,
-      childTimeoutMs,
-      fiddleExecPath,
-      platform,
-      pollTimeoutMs,
-      uuid,
+      brokerUrl: opts.brokerUrl || env('BUGBOT_BROKER_URL'),
+      childTimeoutMs: opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS'),
+      fiddleExec:
+        opts.fiddleExec ||
+        env('BUGBOT_FIDDLE_EXEC', { default: which.sync('electron-fiddle') }),
+      platform: opts.platform || process.platform,
+      pollTimeoutMs: opts.childTimeoutMs || envInt('BUGBOT_POLL_INTERVAL_MS'),
+      uuid: opts.uuid || uuidv4(),
     });
-
-    for (const name of ['brokerUrl', 'fiddleExecPath']) {
-      if (!this[name]) throw new Error(`missing option: 'Runner.${name}'`);
-    }
   }
 
   public start(): void {
@@ -200,18 +190,18 @@ export class Runner {
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
     const putLog = this.putLog.bind(this);
     const patchResult = this.patchResult.bind(this);
-    const { childTimeoutMs, fiddleExecPath } = this;
+    const { childTimeoutMs, fiddleExec } = this;
 
     return new Promise<void>((resolve) => {
       const args = ['bisect', range[0], range[1], '--fiddle', gistId];
       const opts = { timeout: childTimeoutMs };
-      const child = spawn(fiddleExecPath, args, opts);
+      const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
       putLog(
         [
           `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
-          `${prefix} spawning '${fiddleExecPath}' ${args.join(' ')}`,
+          `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
           `${prefix}   ... with opts ${inspect(opts)}`,
         ].join('\n')
       );

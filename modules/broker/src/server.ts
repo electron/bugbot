@@ -6,14 +6,14 @@ import * as path from 'path';
 import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
+import { URL } from 'url';
+
+import { env } from '@electron/bugbot-shared/lib/env-vars';
 
 import { Broker } from './broker';
 import { Task } from './task';
 
 const DebugPrefix = 'broker:server';
-
-// eslint-disable-next-line no-unused-vars
-type TaskBuilder = (params: any) => Task;
 
 function getTaskBody(task: Task) {
   const body = JSON.stringify(task.publicSubset());
@@ -21,27 +21,45 @@ function getTaskBody(task: Task) {
   return { body, etag };
 }
 
+function getData(data_env: string) {
+  const d = debug(`${DebugPrefix}:getData`);
+
+  if (Object.prototype.hasOwnProperty.call(process.env, data_env)) {
+    d(`found '${data_env}'; using that`);
+    return process.env[data_env];
+  }
+
+  const path_env = `${data_env}_PATH`;
+  if (Object.prototype.hasOwnProperty.call(process.env, path_env)) {
+    d(`found '${path_env}'; using that`);
+    return fs.readFileSync(path_env, { encoding: 'utf8' });
+  }
+
+  const message = `Neither '$${data_env}' nor '${path_env}' found`;
+  console.error(message);
+  d(message);
+  process.exit(1);
+}
+
 export class Server {
   public readonly port: number;
 
   private readonly app: express.Application;
-  private readonly createBisectTask: TaskBuilder;
+  private readonly baseUrl: string;
   private readonly broker: Broker;
-  private readonly sport: number;
-  private readonly key: string | undefined = undefined;
-  private readonly cert: string | undefined = undefined;
-  private servers: http.Server[] = [];
+  private readonly cert: string;
+  private readonly key: string;
+  private server: http.Server;
 
-  constructor(appInit: Record<string, any>) {
-    const {
-      broker = new Broker(),
-      cert,
-      createBisectTask = Task.createBisectTask,
-      key,
-      port = 8080,
-      sport = 8443,
-    } = appInit;
-    Object.assign(this, { broker, cert, createBisectTask, key, port, sport });
+  constructor(opts: Record<string, any> = {}) {
+    if (!opts.baseUrl) opts.baseUrl = env('BUGBOT_BROKER_URL');
+    if (!opts.broker) opts.broker = new Broker();
+    const url = new URL(opts.baseUrl);
+    if (url.protocol === 'https') {
+      if (!opts.cert) opts.cert = getData('BUGBOT_BROKER_CERT');
+      if (!opts.key) opts.key = getData('BUGBOT_BROKER_KEY');
+    }
+    Object.assign(this, opts);
 
     this.app = express();
     this.app.get('/api/jobs/', this.getJobs.bind(this));
@@ -93,7 +111,7 @@ export class Server {
   private postJob(req: express.Request, res: express.Response) {
     let task: Task;
     try {
-      task = this.createBisectTask(req.body);
+      task = Task.createBisectTask(req.body);
       this.broker.addTask(task);
       res.status(201).send(task.id);
     } catch (error) {
@@ -186,37 +204,35 @@ export class Server {
       });
     };
 
-    const promises: Promise<any>[] = [];
+    const url = new URL(this.baseUrl);
+    const port = Number.parseInt(url.port, 10);
+    switch (url.protocol) {
+      case 'http': {
+        const opts = {};
+        this.server = http.createServer(opts, this.app);
+        return listen(this.server, port);
+        break;
+      }
 
-    {
-      const server = http.createServer({}, this.app);
-      this.servers.push(server);
-      promises.push(listen(server, this.port));
-    }
-
-    if (!this.cert || !this.key) {
-      d('to enable ssl, set broker.server.cert and .key variables');
-    } else {
-      d(`using ssl cert: ${this.cert}`);
-      d(`using ssl key: ${this.key}`);
-      const server = https.createServer(
-        {
+      case 'https': {
+        const opts = {
           cert: fs.readFileSync(this.cert),
           key: fs.readFileSync(this.key),
-        },
-        this.app,
-      );
-      this.servers.push(server);
-      promises.push(listen(server, this.sport));
-    }
+        };
+        this.server = https.createServer(opts, this.app);
+        return listen(this.server, port);
+      }
 
-    return Promise.all(promises);
+      default:
+        console.error(`unknown protocol '${url.protocol}' in '${this.baseUrl}'`);
+        process.exit(1);
+    }
   }
 
   public stop(): void {
     const d = debug(`${DebugPrefix}:stop`);
-    this.servers.forEach((server) => server.close());
-    this.servers.splice(0, this.servers.length);
+    this.server.close();
+    delete this.server;
     d('server stopped');
   }
 
