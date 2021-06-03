@@ -2,8 +2,8 @@ import debug from 'debug';
 import { Probot } from 'probot';
 import { inspect } from 'util';
 
-import { env } from '@electron/bugbot-shared/lib/env-vars';
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
 import {
   FiddleInput,
   parseIssueBody,
@@ -18,9 +18,6 @@ const actions = {
   BISECT: 'bisect',
   STOP: 'stop',
 };
-
-// eg: http://localhost:9099
-const brokerBaseURL = env('BROKER_BASE_URL');
 
 /**
  * Comments on the issue once a bisect operation is completed
@@ -94,13 +91,16 @@ async function commentBisectResult(jobId: JobId, result: Result, context: any) {
  * Takes action based on a comment left on an issue
  * @param context Probot context object
  */
-export async function parseManualCommand(context: any): Promise<void> {
+export async function parseManualCommand(
+  settings: { brokerBaseUrl: string; pollIntervalMs: number },
+  context: any,
+): Promise<void> {
   const d = debug('github-client:parseManualCommand');
-  const api = new BrokerAPI({ baseURL: brokerBaseURL });
 
   const { payload } = context;
   const args = payload.comment.body.split(' ');
   const [command, action] = args;
+  const broker = new BrokerAPI({ baseURL: settings.brokerBaseUrl });
 
   if (command !== '/test') {
     return;
@@ -111,13 +111,13 @@ export async function parseManualCommand(context: any): Promise<void> {
   let currentJob;
 
   try {
-    currentJob = await api.getJob(id);
+    currentJob = await broker.getJob(id);
   } catch (e) {
     // no-op
   }
 
   if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-    api.stopJob(id);
+    broker.stopJob(id);
   } else if (action === actions.BISECT && !currentJob) {
     d('Running /test bisect');
     // Get issue input and fire a bisect job
@@ -131,30 +131,42 @@ export async function parseManualCommand(context: any): Promise<void> {
       return;
     }
 
-    const jobId = await api.queueBisectJob(input);
+    const jobId = await broker.queueBisectJob(input);
 
     d(`Queued bisect job ${jobId}`);
 
     // Poll every INTERVAL to see if the job is complete
-    const INTERVAL = 10 * 1000;
     const timer = setInterval(async () => {
       d(`polling job ${jobId}...`);
-      const job = await api.getJob(jobId);
+      const job = await broker.getJob(jobId);
       if (!job.last) {
         d('job still pending...', { job });
         return;
       }
       d(`job ${jobId} complete`);
       clearInterval(timer);
+<<<<<<< HEAD
       await commentBisectResult(jobId, job.last, context);
       await api.completeJob(jobId);
     }, INTERVAL);
+=======
+      await commentBisectResult(job.last, context);
+      await broker.completeJob(jobId);
+    }, settings.pollIntervalMs);
+>>>>>>> e801e10 (refactor: consistent env var naming)
   }
 }
 
 export default (robot: Probot): void => {
   const d = debug('github-client:probot');
   d('hello world');
+
+  // check for required env vars as soon as we start
+  // so that we'll know immediately if anything's missing
+  const settings = {
+    brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', { default: '20000' }),
+  } as const;
 
   robot.onAny((context) => {
     d('any', inspect(context.payload));
@@ -182,7 +194,7 @@ export default (robot: Probot): void => {
       context.payload.comment.user.id === context.payload.sender.id &&
       isMaintainer
     ) {
-      parseManualCommand(context);
+      parseManualCommand(settings, context);
     }
   });
   robot.on('issue_comment.edited', (context) => {
