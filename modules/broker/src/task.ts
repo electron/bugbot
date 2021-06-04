@@ -112,7 +112,7 @@ export class Task {
     log[log.length - 1].lines.push(...lines);
   }
 
-  public getLogAsString(): string {
+  public getRawLog(): string {
     return this.log.map((section) => section.lines.join('\n')).join();
   }
 

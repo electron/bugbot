@@ -148,7 +148,7 @@ describe('runner', () => {
     });
 
     it('includes the commit range to job.log', () => {
-      const log = task.getLogAsString();
+      const log = task.getRawLog();
       const [a, b] = bisect_range;
       const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
       expect(log).toMatch(url);
