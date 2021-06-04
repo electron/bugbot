@@ -1,4 +1,4 @@
-name: CI
+name: unit tests
 
 on:
   pull_request:
@@ -17,9 +17,9 @@ jobs:
         with:
           node-version: '14.x'
       - name: Install dependencies
-        run: 'yarn install'
+        run: yarn install
       - name: Build 
-        run: 'yarn build'
+        run: yarn build
       - name: Run Probot Client tests
         run: yarn workspace @electron/bugbot-bot test
       - name: Run Broker tests
