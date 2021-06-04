@@ -36,6 +36,7 @@ async function commentBisectResult(
   const add_labels = new Set<string>();
   const del_labels = new Set<string>([Labels.BugBot.Running]);
   const paragraphs: string[] = [];
+  const log_url = new URL(`/log/${jobId}`, brokerBaseURL);
 
   switch (result.status) {
     case 'success': {
@@ -43,7 +44,7 @@ async function commentBisectResult(
       paragraphs.push(
         `It looks like this bug was introduced between ${a} and ${b}`,
         `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,
-        `For more information, see ${brokerBaseURL}/log/${jobId}`,
+        `For more information, see ${log_url}`,
       );
       add_labels.add(Labels.Bug.Regression);
       // FIXME(any): get the majors in [a..b] and add version labels e.g. 13-x-y
@@ -60,7 +61,7 @@ async function commentBisectResult(
         // FIXME(any): add the link here.
         `${AppName} was unable to complete this bisection. Check the table’s links for more information.`,
         'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.',
-        `For more information, see ${brokerBaseURL}/log/${jobId}`,
+        `For more information, see ${log_url}`,
       );
       add_labels.add(Labels.BugBot.MaintainerNeeded);
       break;
