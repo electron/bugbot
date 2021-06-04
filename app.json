@@ -4,6 +4,14 @@
   "repository": "https://github.com/electron/bugbot",
   "success_url": "/probot",
   "website": "https://damp-temple-23212.herokuapp.com/",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "https://github.com/heroku/heroku-buildpack-multi-procfile"
+    }
+  ],
   "env": {
     "APP_ID": {
       "description": "ID number for the GitHub App."
@@ -24,14 +32,6 @@
     },
     "WEBHOOK_SECRET": {
       "description": "Webhook secret for the GitHub App."
-    },
-    "buildpacks": [
-      {
-        "url": "heroku/nodejs"
-      },
-      {
-        "url": "https://github.com/heroku/heroku-buildpack-multi-procfile"
-      }
-    ]
+    }
   }
 }
