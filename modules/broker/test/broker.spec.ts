@@ -2,27 +2,20 @@ import * as semver from 'semver';
 import dayjs from 'dayjs';
 import fetch from 'node-fetch';
 import { Operation as PatchOp } from 'fast-json-patch';
-import { URLSearchParams } from 'url';
+import { URL, URLSearchParams } from 'url';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
-
-import { Broker } from '../src/broker';
 import { Server } from '../src/server';
-import { Task } from '../src/task';
 
 describe('broker', () => {
-  let broker: Broker;
   let server: Server;
-  const port = 9099; // arbitrary
-  const base_url = `http://localhost:${port}`;
+  const base_url = `http://localhost:9090`; // arbitrary
 
   beforeEach(async () => {
     process.env.BUGBOT_BROKER_URL = base_url;
 
-    const { createBisectTask } = Task;
-    broker = new Broker();
-    server = new Server({ broker, createBisectTask, port });
+    server = new Server({ baseUrl: base_url });
     await server.start();
   });
 
@@ -31,7 +24,7 @@ describe('broker', () => {
   });
 
   function postJob(body) {
-    return fetch(`${base_url}/api/jobs`, {
+    return fetch(new URL('/api/jobs', base_url), {
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
@@ -53,7 +46,7 @@ describe('broker', () => {
   }
 
   async function getJob(id: string) {
-    const response = await fetch(`${base_url}/api/jobs/${id}`);
+    const response = await fetch(new URL(`/api/jobs/${id}`, base_url));
     const etag = response.headers.get('ETag');
     let body;
     try {
@@ -69,7 +62,7 @@ describe('broker', () => {
     for (const [key, val] of Object.entries(filter)) {
       params.set(key, val.toString());
     }
-    const response = await fetch(`${base_url}/api/jobs?${params}`);
+    const response = await fetch(new URL(`/api/jobs?${params}`, base_url));
     const body = await response.json();
     return { body, response };
   }
@@ -329,7 +322,7 @@ describe('broker', () => {
       patchEtag: string,
       body: Readonly<PatchOp>[],
     ) {
-      return fetch(`${base_url}/api/jobs/${patchId}`, {
+      return fetch(new URL(`/api/jobs/${patchId}`, base_url), {
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json', 'If-Match': patchEtag },
         method: 'PATCH',
@@ -446,7 +439,7 @@ describe('broker', () => {
   });
 
   async function getLog(job_id: string) {
-    const response = await fetch(`${base_url}/log/${job_id}`);
+    const response = await fetch(new URL(`/log/${job_id}`, base_url));
     const text = await response.text();
     return { body: text, response };
   }
@@ -460,7 +453,7 @@ describe('broker', () => {
 
   describe('/api/jobs/$job_id/log (PUT)', () => {
     function addLogMessages(job_id: string, body = '') {
-      return fetch(`${base_url}/api/jobs/${job_id}/log`, {
+      return fetch(new URL(`/api/jobs/${job_id}/log`, base_url), {
         body,
         method: 'PUT',
       });

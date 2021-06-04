@@ -1,5 +1,6 @@
 import debug from 'debug';
 import { Context, Probot } from 'probot';
+import { URL } from 'url';
 import { inspect } from 'util';
 
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
@@ -19,11 +20,9 @@ const actions = {
   STOP: 'stop',
 };
 
-// check for required env vars as soon as we start
-// so that we'll know immediately if anything's missing
 const settings = {
   brokerBaseUrl: env('BUGBOT_BROKER_URL'),
-  pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', { default: '20000' }),
+  pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
 } as const;
 
 /**
@@ -40,6 +39,7 @@ async function commentBisectResult(
   const add_labels = new Set<string>();
   const del_labels = new Set<string>([Labels.BugBot.Running]);
   const paragraphs: string[] = [];
+  const log_url = new URL(`/log/${jobId}`, settings.brokerBaseUrl);
 
   switch (result.status) {
     case 'success': {
@@ -47,7 +47,7 @@ async function commentBisectResult(
       paragraphs.push(
         `It looks like this bug was introduced between ${a} and ${b}`,
         `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,
-        `For more information, see ${settings.brokerBaseUrl}/log/${jobId}`,
+        `For more information, see ${log_url}`,
       );
       add_labels.add(Labels.Bug.Regression);
       // FIXME(any): get the majors in [a..b] and add version labels e.g. 13-x-y
@@ -64,7 +64,7 @@ async function commentBisectResult(
         // FIXME(any): add the link here.
         `${AppName} was unable to complete this bisection. Check the table’s links for more information.`,
         'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.',
-        `For more information, see ${settings.brokerBaseUrl}/log/${jobId}`,
+        `For more information, see ${log_url}`,
       );
       add_labels.add(Labels.BugBot.MaintainerNeeded);
       break;
@@ -104,11 +104,11 @@ async function commentBisectResult(
  */
 export async function parseManualCommand(context: Context): Promise<void> {
   const d = debug('github-client:parseManualCommand');
+  const api = new BrokerAPI({ baseURL: settings.brokerBaseUrl });
 
   const { payload } = context;
   const args = payload.comment.body.split(' ');
   const [command, action] = args;
-  const broker = new BrokerAPI({ baseURL: settings.brokerBaseUrl });
 
   if (command !== '/test') {
     return;
@@ -119,13 +119,13 @@ export async function parseManualCommand(context: Context): Promise<void> {
   let currentJob;
 
   try {
-    currentJob = await broker.getJob(id);
+    currentJob = await api.getJob(id);
   } catch (e) {
     // no-op
   }
 
   if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-    broker.stopJob(id);
+    api.stopJob(id);
   } else if (action === actions.BISECT && !currentJob) {
     d('Running /test bisect');
     // Get issue input and fire a bisect job
@@ -139,14 +139,14 @@ export async function parseManualCommand(context: Context): Promise<void> {
       return;
     }
 
-    const jobId = await broker.queueBisectJob(input);
+    const jobId = await api.queueBisectJob(input);
 
     d(`Queued bisect job ${jobId}`);
 
-    // Poll every INTERVAL to see if the job is complete
+    // Poll until the job is complete
     const timer = setInterval(async () => {
       d(`polling job ${jobId}...`);
-      const job = await broker.getJob(jobId);
+      const job = await api.getJob(jobId);
       if (!job.last) {
         d('job still pending...', { job });
         return;
@@ -154,7 +154,7 @@ export async function parseManualCommand(context: Context): Promise<void> {
       d(`job ${jobId} complete`);
       clearInterval(timer);
       await commentBisectResult(jobId, job.last, context);
-      await broker.completeJob(jobId);
+      await api.completeJob(jobId);
     }, settings.pollIntervalMs);
   }
 }

@@ -29,7 +29,7 @@ export class Runner {
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
-  private readonly pollTimeoutMs: number;
+  private readonly pollIntervalMs: number;
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
   private jobId: JobId;
@@ -39,23 +39,36 @@ export class Runner {
    * Creates and initializes the runner from environment variables and default
    * values, then starts the runner's execution loop.
    */
-  constructor(opts: Record<string, any> = {}) {
-    Object.assign(this, {
-      brokerUrl: opts.brokerUrl || env('BUGBOT_BROKER_URL'),
-      childTimeoutMs: opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS'),
-      fiddleExec:
-        opts.fiddleExec ||
-        env('BUGBOT_FIDDLE_EXEC', { default: which.sync('electron-fiddle') }),
-      platform: opts.platform || process.platform,
-      pollTimeoutMs: opts.childTimeoutMs || envInt('BUGBOT_POLL_INTERVAL_MS'),
-      uuid: opts.uuid || uuidv4(),
-    });
+  constructor(
+    opts: {
+      brokerUrl?: string;
+      childTimeoutMs?: number;
+      fiddleExec?: string;
+      platform?: Platform;
+      pollIntervalMs?: number;
+      uuid?: string;
+    } = {},
+  ) {
+    this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
+    this.childTimeoutMs =
+      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
+    this.fiddleExec =
+      opts.fiddleExec ||
+      process.env.BUGBOT_FIDDLE_EXEC ||
+      which.sync('electron-fiddle');
+    this.platform = (opts.platform || process.platform) as Platform;
+    this.pollIntervalMs =
+      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    this.uuid = opts.uuid || uuidv4();
   }
 
   public start(): void {
     this.stop();
-    d('runner:start', `interval is ${this.pollTimeoutMs}`);
-    this.interval = setInterval(this.pollSafely.bind(this), this.pollTimeoutMs);
+    d('runner:start', `interval is ${this.pollIntervalMs}`);
+    this.interval = setInterval(
+      this.pollSafely.bind(this),
+      this.pollIntervalMs,
+    );
     this.pollSafely();
   }
 
@@ -203,7 +216,7 @@ export class Runner {
           `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
           `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
           `${prefix}   ... with opts ${inspect(opts)}`,
-        ].join('\n')
+        ].join('\n'),
       );
 
       // TODO(any): could debounce/buffer this data before calling putLog()

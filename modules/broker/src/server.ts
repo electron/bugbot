@@ -22,45 +22,51 @@ function getTaskBody(task: Task) {
   return { body, etag };
 }
 
-function getData(data_env: string) {
-  const d = debug(`${DebugPrefix}:getData`);
+// load data from an environment variable
+// or from a file named in an environment variable,
+// e.g. check FOO and FOO_PATH
+function getEnvData(key: string) {
+  const d = debug(`${DebugPrefix}:getEnvData`);
 
-  if (Object.prototype.hasOwnProperty.call(process.env, data_env)) {
-    d(`found '${data_env}'; using that`);
-    return process.env[data_env];
+  if (key in process.env) {
+    d(`process.env.${key} found.`);
+    return process.env[key];
   }
 
-  const path_env = `${data_env}_PATH`;
-  if (Object.prototype.hasOwnProperty.call(process.env, path_env)) {
-    d(`found '${path_env}'; using that`);
-    return fs.readFileSync(path_env, { encoding: 'utf8' });
+  const path_key = `${key}_PATH`;
+  if (path_key in process.env) {
+    d(`process.env.${path_key} found.`);
+    return fs.readFileSync(path_key, { encoding: 'utf8' });
   }
 
-  const message = `Neither '$${data_env}' nor '${path_env}' found`;
-  console.error(message);
-  d(message);
+  console.error(`Neither '${key}' nor '${path_key}' found`);
   process.exit(1);
+  return '' as never; // notreached; make linter happy
 }
 
 export class Server {
-  public readonly port: number;
+  public readonly brokerUrl: URL;
 
   private readonly app: express.Application;
-  private readonly baseUrl: string;
   private readonly broker: Broker;
   private readonly cert: string;
   private readonly key: string;
   private server: http.Server;
 
-  constructor(opts: Record<string, any> = {}) {
-    if (!opts.baseUrl) opts.baseUrl = env('BUGBOT_BROKER_URL');
-    if (!opts.broker) opts.broker = new Broker();
-    const url = new URL(opts.baseUrl);
-    if (url.protocol === 'https') {
-      if (!opts.cert) opts.cert = getData('BUGBOT_BROKER_CERT');
-      if (!opts.key) opts.key = getData('BUGBOT_BROKER_KEY');
+  constructor(
+    opts: {
+      broker?: Broker;
+      brokerUrl?: string;
+      cert?: string;
+      key?: string;
+    } = {},
+  ) {
+    this.broker = opts.broker || new Broker();
+    this.brokerUrl = new URL(opts.brokerUrl || env('BUGBOT_BROKER_URL'));
+    if (this.brokerUrl.protocol === 'https:') {
+      this.cert = opts.cert || getEnvData('BUGBOT_BROKER_CERT');
+      this.key = opts.key || getEnvData('BUGBOT_BROKER_KEY');
     }
-    Object.assign(this, opts);
 
     this.app = express();
     this.app.get('/api/jobs/', this.getJobs.bind(this));
@@ -180,8 +186,11 @@ export class Server {
     res.status(200).json(ids);
   }
 
-  public start(): Promise<any> {
+  public start(): Promise<void> {
     const d = debug(`${DebugPrefix}:start`);
+
+    this.stop(); // ensure we don't accidentally start a 2nd server
+
     d('starting server');
 
     const listen = (server: http.Server, port: number) => {
@@ -194,10 +203,9 @@ export class Server {
       });
     };
 
-    const url = new URL(this.baseUrl);
-    const port = Number.parseInt(url.port, 10);
-    d(`url.protocol ${url.protocol}`);
-    switch (url.protocol) {
+    const port = Number.parseInt(this.brokerUrl.port, 10);
+    d(`url.protocol ${this.brokerUrl.protocol}`);
+    switch (this.brokerUrl.protocol) {
       case 'http:': {
         const opts = {};
         this.server = http.createServer(opts, this.app);
@@ -214,19 +222,20 @@ export class Server {
       }
 
       default: {
-        const msg = `unknown protocol '${url.protocol}' in '${this.baseUrl}'`;
-        console.log(msg);
-        debug(msg);
+        console.error(`Unsupported protocol in '${this.brokerUrl}'`);
         process.exit(1);
+        return undefined as never; // notreached; make linter happy
       }
     }
   }
 
   public stop(): void {
     const d = debug(`${DebugPrefix}:stop`);
-    this.server.close();
-    delete this.server;
-    d('server stopped');
+    if (this.server) {
+      this.server.close();
+      delete this.server;
+      d('server stopped');
+    }
   }
 
   /**

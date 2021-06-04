@@ -112,6 +112,10 @@ export class Task {
     log[log.length - 1].lines.push(...lines);
   }
 
+  public getRawLog(): string {
+    return this.log.map((section) => section.lines.join('\n')).join();
+  }
+
   public static createBisectTask(props: Record<string, any>): Task {
     const required_all = ['gist', 'type'];
     const required_per_type = new Map([

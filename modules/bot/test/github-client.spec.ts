@@ -1,4 +1,6 @@
-process.env.BROKER_BASE_URL = 'http://localhost:9099';
+process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
+
+import { Context } from 'probot';
 
 import { parseManualCommand } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
@@ -39,7 +41,7 @@ describe('github-client', () => {
             body: 'I am commenting!',
           },
         },
-      });
+      } as Context);
 
       expect(mockGetJob).not.toHaveBeenCalled();
     });
@@ -52,7 +54,7 @@ describe('github-client', () => {
             body: '/test stop',
           },
         },
-      });
+      } as Context);
 
       expect(mockGetJob).toHaveBeenCalled();
       expect(mockStopJob).toHaveBeenCalled();
@@ -68,7 +70,7 @@ describe('github-client', () => {
 
       await parseManualCommand({
         payload: fixture,
-      });
+      } as Context);
 
       expect(mockQueueBisectJob).toHaveBeenCalledWith(input);
     });
@@ -79,7 +81,7 @@ describe('github-client', () => {
       });
       await parseManualCommand({
         payload: fixture,
-      });
+      } as Context);
 
       expect(mockQueueBisectJob).not.toHaveBeenCalled();
     });
