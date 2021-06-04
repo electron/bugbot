@@ -1,5 +1,6 @@
 import debug from 'debug';
 import { Context, Probot } from 'probot';
+import { URL } from 'url';
 import { inspect } from 'util';
 
 import { env } from '@electron/bugbot-shared/lib/env-vars';
