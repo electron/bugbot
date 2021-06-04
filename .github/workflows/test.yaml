@@ -20,5 +20,10 @@ jobs:
         run: 'yarn install'
       - name: Build 
         run: 'yarn build'
-      - name: Run tests
-        run: 'yarn test'
+      - name: Run Probot Client tests
+        run: yarn workspace @electron/bugbot-bot test
+      - name: Run Broker tests
+        run: yarn workspace @electron/bugbot-broker test
+      - name: Run Runner tests
+        run: yarn workspace @electron/bugbot-runner test
+
