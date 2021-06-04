@@ -1,6 +1,7 @@
 import debug from 'debug';
 import dayjs from 'dayjs';
 import { v4 as mkuuid } from 'uuid';
+import { inspect } from 'util';
 
 import { Broker } from '../../modules/broker/src/broker';
 import { Task } from '../../modules/broker/src/task';
@@ -20,11 +21,16 @@ jest.setTimeout(60 * 1000);
 
 describe('runner', () => {
   const port = 9999 as const;
+  const brokerUrl = `http://localhost:${port}`;
   const platform: Platform = 'linux';
 
   let broker: Broker;
   let brokerServer: BrokerServer;
   let runner: Runner;
+
+  beforeAll(() => {
+    process.env.BUGBOT_BROKER_URL = brokerUrl;
+  });
 
   function startBroker(opts: Record<string, any> = {}) {
     broker = new Broker();
@@ -148,7 +154,7 @@ describe('runner', () => {
     });
 
     it('includes the commit range to job.log', () => {
-      const log = task.log.join('\n');
+      const log = task.getLogAsString();
       const [a, b] = bisect_range;
       const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
       expect(log).toMatch(url);

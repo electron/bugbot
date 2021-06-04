@@ -1,5 +1,6 @@
-process.env.BROKER_BASE_URL = 'http://localhost:9099';
+process.env.BUGBOT_BROKER_URL = `http://localhost:9099`;
 
+import { Context } from 'probot';
 import { parseManualCommand } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
 import fixture from './fixtures/issue_comment.created.json';
@@ -32,8 +33,14 @@ describe('github-client', () => {
   });
 
   describe('parseManualCommand()', () => {
+    // lets us pass incomplete contexts to parseManualCommand()
+    // without losing type safety
+    function parseManualCommandWrapper(context: Partial<Context>) {
+      return parseManualCommand(context as any as Context);
+    }
+
     it('does nothing without a test command', async () => {
-      await parseManualCommand({
+      await parseManualCommandWrapper({
         payload: {
           comment: {
             body: 'I am commenting!',
@@ -46,7 +53,7 @@ describe('github-client', () => {
 
     it('stops a test job if one is running', async () => {
       mockGetJob.mockResolvedValueOnce({});
-      await parseManualCommand({
+      await parseManualCommandWrapper({
         payload: {
           comment: {
             body: '/test stop',
@@ -66,7 +73,7 @@ describe('github-client', () => {
       };
       (parseIssueBody as jest.Mock).mockReturnValueOnce(input);
 
-      await parseManualCommand({
+      await parseManualCommandWrapper({
         payload: fixture,
       });
 
@@ -77,7 +84,7 @@ describe('github-client', () => {
       (parseIssueBody as jest.Mock).mockImplementationOnce(() => {
         throw new Error();
       });
-      await parseManualCommand({
+      await parseManualCommandWrapper({
         payload: fixture,
       });
 

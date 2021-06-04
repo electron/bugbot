@@ -42,12 +42,15 @@ export class Runner {
   constructor(opts: Record<string, any> = {}) {
     Object.assign(this, {
       brokerUrl: opts.brokerUrl || env('BUGBOT_BROKER_URL'),
-      childTimeoutMs: opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS'),
+      childTimeoutMs:
+        opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60 * 1000),
       fiddleExec:
         opts.fiddleExec ||
-        env('BUGBOT_FIDDLE_EXEC', { default: which.sync('electron-fiddle') }),
+        process.env.BUGBOT_FIDDLE_EXEC ||
+        which.sync('electron-fiddle'),
       platform: opts.platform || process.platform,
-      pollTimeoutMs: opts.childTimeoutMs || envInt('BUGBOT_POLL_INTERVAL_MS'),
+      pollTimeoutMs:
+        opts.childTimeoutMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20 * 1000),
       uuid: opts.uuid || uuidv4(),
     });
   }

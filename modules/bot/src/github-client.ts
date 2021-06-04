@@ -1,6 +1,7 @@
 import debug from 'debug';
-import { Probot } from 'probot';
+import { Context, Probot } from 'probot';
 import { inspect } from 'util';
+import { URL } from 'url';
 
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
@@ -19,16 +20,28 @@ const actions = {
   STOP: 'stop',
 };
 
+// check for required env vars as soon as we start
+// so that we'll know immediately if anything's missing
+const settings = {
+  brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+  pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20 * 1000),
+} as const;
+
 /**
  * Comments on the issue once a bisect operation is completed
  * @param result The result from a Fiddle bisection
  * @param context Probot context object
  */
-async function commentBisectResult(jobId: JobId, result: Result, context: any) {
+async function commentBisectResult(
+  jobId: JobId,
+  result: Result,
+  context: Context,
+) {
   const d = debug('github-client:commentBisectResult');
   const add_labels = new Set<string>();
   const del_labels = new Set<string>([Labels.BugBot.Running]);
   const paragraphs: string[] = [];
+  const log_url = new URL(`/log/${jobId}`, settings.brokerBaseUrl);
 
   switch (result.status) {
     case 'success': {
@@ -36,7 +49,7 @@ async function commentBisectResult(jobId: JobId, result: Result, context: any) {
       paragraphs.push(
         `It looks like this bug was introduced between ${a} and ${b}`,
         `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,
-        `For more information, see ${brokerBaseURL}/log/${jobId}`,
+        `For more information, see ${log_url}`,
       );
       add_labels.add(Labels.Bug.Regression);
       // FIXME(any): get the majors in [a..b] and add version labels e.g. 13-x-y
@@ -53,7 +66,7 @@ async function commentBisectResult(jobId: JobId, result: Result, context: any) {
         // FIXME(any): add the link here.
         `${AppName} was unable to complete this bisection. Check the table’s links for more information.`,
         'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.',
-        `For more information, see ${brokerBaseURL}/log/${jobId}`,
+        `For more information, see ${log_url}`,
       );
       add_labels.add(Labels.BugBot.MaintainerNeeded);
       break;
@@ -91,10 +104,7 @@ async function commentBisectResult(jobId: JobId, result: Result, context: any) {
  * Takes action based on a comment left on an issue
  * @param context Probot context object
  */
-export async function parseManualCommand(
-  settings: { brokerBaseUrl: string; pollIntervalMs: number },
-  context: any,
-): Promise<void> {
+export async function parseManualCommand(context: Context): Promise<void> {
   const d = debug('github-client:parseManualCommand');
 
   const { payload } = context;
@@ -155,13 +165,6 @@ export default (robot: Probot): void => {
   const d = debug('github-client:probot');
   d('hello world');
 
-  // check for required env vars as soon as we start
-  // so that we'll know immediately if anything's missing
-  const settings = {
-    brokerBaseUrl: env('BUGBOT_BROKER_URL'),
-    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', { default: '20000' }),
-  } as const;
-
   robot.onAny((context) => {
     d('any', inspect(context.payload));
   });
@@ -188,7 +191,7 @@ export default (robot: Probot): void => {
       context.payload.comment.user.id === context.payload.sender.id &&
       isMaintainer
     ) {
-      parseManualCommand(settings, context);
+      parseManualCommand(context);
     }
   });
   robot.on('issue_comment.edited', (context) => {

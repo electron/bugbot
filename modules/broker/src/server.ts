@@ -22,24 +22,23 @@ function getTaskBody(task: Task) {
   return { body, etag };
 }
 
-function getData(data_env: string) {
+function getEnvData(key: string): string {
   const d = debug(`${DebugPrefix}:getData`);
 
-  if (Object.prototype.hasOwnProperty.call(process.env, data_env)) {
-    d(`found '${data_env}'; using that`);
-    return process.env[data_env];
+  if (key in process.env) {
+    d(`found process.env.${key}; using that.`);
+    return process.env[key];
   }
 
-  const path_env = `${data_env}_PATH`;
-  if (Object.prototype.hasOwnProperty.call(process.env, path_env)) {
-    d(`found '${path_env}'; using that`);
-    return fs.readFileSync(path_env, { encoding: 'utf8' });
+  const path_key = `${key}_PATH`;
+  if (key in process.env) {
+    d(`found process.env.${path_key}; using that.`);
+    return fs.readFileSync(process.env[path_key], { encoding: 'utf8' });
   }
 
-  const message = `Neither '$${data_env}' nor '${path_env}' found`;
-  console.error(message);
-  d(message);
+  console.error(`Neither '$${key}' nor '${path_key}' found`);
   process.exit(1);
+  return ''; // notreached; make linter happy
 }
 
 export class Server {
@@ -57,8 +56,8 @@ export class Server {
     if (!opts.broker) opts.broker = new Broker();
     const url = new URL(opts.baseUrl);
     if (url.protocol === 'https') {
-      if (!opts.cert) opts.cert = getData('BUGBOT_BROKER_CERT');
-      if (!opts.key) opts.key = getData('BUGBOT_BROKER_KEY');
+      if (!opts.cert) opts.cert = getEnvData('BUGBOT_BROKER_CERT');
+      if (!opts.key) opts.key = getEnvData('BUGBOT_BROKER_KEY');
     }
     Object.assign(this, opts);
 
@@ -196,15 +195,15 @@ export class Server {
 
     const url = new URL(this.baseUrl);
     const port = Number.parseInt(url.port, 10);
+    d(`url.protocol ${url.protocol}`);
     switch (url.protocol) {
-      case 'http': {
+      case 'http:': {
         const opts = {};
         this.server = http.createServer(opts, this.app);
         return listen(this.server, port);
-        break;
       }
 
-      case 'https': {
+      case 'https:': {
         const opts = {
           cert: fs.readFileSync(this.cert),
           key: fs.readFileSync(this.key),
@@ -213,16 +212,21 @@ export class Server {
         return listen(this.server, port);
       }
 
-      default:
-        console.error(`unknown protocol '${url.protocol}' in '${this.baseUrl}'`);
+      default: {
+        const msg = `unknown protocol '${url.protocol}' in '${this.baseUrl}'`;
+        console.log(msg);
+        debug(msg);
         process.exit(1);
+      }
     }
   }
 
   public stop(): void {
     const d = debug(`${DebugPrefix}:stop`);
-    this.server.close();
-    delete this.server;
+    if (this.server) {
+      this.server.close();
+      delete this.server;
+    }
     d('server stopped');
   }
 

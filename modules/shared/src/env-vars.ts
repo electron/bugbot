@@ -1,42 +1,47 @@
 import debug = require('debug');
 
 /**
- * Gets a variable from the environment (`process.env`), showing a debug warning
- * if the requested variable wasn't found.
+ * Gets a variable from the environment (`process.env`).
+ * Exits the process if the requested variable isn't found.
  */
-export function env(name: string, opts: { default?: string } = {}): string {
+export function env(name: string, fallback: string = undefined): string {
   const d = debug('env-vars:env');
 
-  if (Object.prototype.hasOwnProperty.call(process.env, name)) {
-    d(`env var '${name}' found: '${process.env[name]}'`);
-    return process.env[name];
+  const value = process.env[name];
+  if (value !== undefined) {
+    d(`env var '${name}' found: '${value}'`);
+    return value;
   }
 
-  if (opts?.default) {
-    d(`env var '${name}' not found; defaulting to '${opts.default}'`);
-    return opts.default;
+  if (fallback !== undefined) {
+    d(`env var '${name}' not found: using fallback '${fallback}'`);
+    return fallback;
   }
 
-  const msg = `env var '${name}' not found. exiting.`;
-  console.error(msg);
-  d(msg);
+  console.error(`env var '${name}' not found. exiting.`);
   process.exit(1);
-
   return undefined; // notreached; make linter happy
 }
 
-export function envInt(name: string, opts: { default?: string } = {}): number {
+/**
+ * Gets an integer variable from the environment (`process.env`).
+ * Exits the process if the requested variable isn't found.
+ */
+export function envInt(name: string, fallback: number = undefined): number {
   const d = debug('env-vars:envInt');
 
-  const number = Number.parseInt(env(name, opts), 10);
-  if (!Number.isNaN(number)) {
-    return number;
+  const value = Number.parseInt(process.env[name], 10);
+  if (Number.isInteger(value)) {
+    d(`env var '${name}' integer found: '${value}'`);
+    return value;
   }
 
-  const msg = `env var "${name}' value is not a number. exiting.`;
-  console.error(msg);
-  d(msg);
-  process.exit(1);
+  if (Number.isInteger(fallback)) {
+    d(`env var '${name}' not found: using fallback '${fallback}'`);
+    return fallback;
+  }
 
+  console.error(`env var '${name}' not found. exiting.`);
+  process.exit(1);
   return undefined; // notreached; make linter happy
 }
