@@ -1,5 +1,5 @@
 import debug from 'debug';
-import { Probot } from 'probot';
+import { Context, Probot } from 'probot';
 import { inspect } from 'util';
 
 import { env } from '@electron/bugbot-shared/lib/env-vars';
@@ -27,7 +27,11 @@ const brokerBaseURL = env('BROKER_BASE_URL');
  * @param result The result from a Fiddle bisection
  * @param context Probot context object
  */
-async function commentBisectResult(jobId: JobId, result: Result, context: any) {
+async function commentBisectResult(
+  jobId: JobId,
+  result: Result,
+  context: Context,
+) {
   const d = debug('github-client:commentBisectResult');
   const add_labels = new Set<string>();
   const del_labels = new Set<string>([Labels.BugBot.Running]);
@@ -94,7 +98,7 @@ async function commentBisectResult(jobId: JobId, result: Result, context: any) {
  * Takes action based on a comment left on an issue
  * @param context Probot context object
  */
-export async function parseManualCommand(context: any): Promise<void> {
+export async function parseManualCommand(context: Context): Promise<void> {
   const d = debug('github-client:parseManualCommand');
   const api = new BrokerAPI({ baseURL: brokerBaseURL });
 
