@@ -1,9 +1,6 @@
-/**
- * This file contains the root TypeScript project which ties together the modules.
- *
- * For more info see: https://www.typescriptlang.org/docs/handbook/project-references.html
- */
 {
+  "extends": "@electron/bugbot-shared/tsconfig.base.json",
+
   // NOTE: this list should be synced with the "workspaces" field in the root `package.json` file.
   "references": [
     { "path": "./modules/shared" },

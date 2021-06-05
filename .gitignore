@@ -3,6 +3,7 @@
 node_modules/
 
 # Coverage
+coverage
 integration-tests/coverage
 modules/bot/coverage
 modules/broker/coverage
