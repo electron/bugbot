@@ -1,5 +1,5 @@
+import * as path from 'path';
 import debug from 'debug';
-import dayjs from 'dayjs';
 import { v4 as mkuuid } from 'uuid';
 
 import { Broker } from '../../modules/broker/src/broker';
@@ -35,6 +35,7 @@ describe('runner', () => {
   function createRunner(opts: Record<string, any> = {}) {
     runner = new Runner({
       brokerUrl: `http://localhost:${brokerServer.port}`,
+      fiddleExecPath: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
       platform,
       ...opts,
     });
