@@ -11,6 +11,7 @@
     "start:broker": "yarn workspace @electron/bugbot-broker start",
     "start:runner": "yarn workspace @electron/bugbot-runner start",
     "test": "yarn workspaces run test",
+    "test:ci": "yarn workspaces run test:ci",
     "lint": "run-p lint:eslint lint:prettier",
     "lint:fix": "run-p lint:eslint:fix lint:prettier:fix",
     "lint:eslint": "eslint modules/*/src/**/*.ts",
