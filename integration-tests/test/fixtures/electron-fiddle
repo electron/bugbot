@@ -4,7 +4,8 @@ const fs = require('fs');
 const hash = require('object-hash');
 const path = require('path');
 
-const argv_hash = hash(process.argv);
+// argv[0] is probably a fully-qualified path to node, so don't hash it
+const argv_hash = hash(process.argv.slice(1));
 const logfile = path.resolve(__dirname, 'electron-fiddle-logs', argv_hash);
 
 if (!fs.existsSync(logfile)) {
