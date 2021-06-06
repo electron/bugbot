@@ -2,6 +2,7 @@ import debug from 'debug';
 import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
+import { URL } from 'url';
 
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';

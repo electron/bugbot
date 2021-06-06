@@ -1,5 +1,5 @@
 import debug from 'debug';
-import got from 'got';
+import fetch from 'node-fetch';
 import which from 'which';
 import { Operation as PatchOp } from 'fast-json-patch';
 import { URL } from 'url';
@@ -135,20 +135,21 @@ export class Runner {
     jobs_url.searchParams.append('type', 'bisect');
 
     // Make the request and return its response
-    return await got(jobs_url).json();
+    return await fetch(jobs_url).then((res) => res.json());
   }
 
   private async fetchJobAndEtag(id: string): Promise<[AnyJob, string]> {
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
-    const resp = await got(job_url);
+    const resp = await fetch(job_url);
 
     // Extract the etag header & make sure it was defined
-    const { etag } = resp.headers;
+    const etag = resp.headers.get('etag');
     if (!etag) {
       throw new Error('missing etag in broker job response');
     }
 
-    return [JSON.parse(resp.body), etag];
+    const body = await resp.text();
+    return [JSON.parse(body), etag];
   }
 
   private async patchJob(patches: Readonly<PatchOp>[]): Promise<void> {
@@ -156,14 +157,17 @@ export class Runner {
 
     // Send the patch
     const job_url = new URL(`api/jobs/${this.jobId}`, this.brokerUrl);
-    const resp = await got(job_url, {
-      headers: { etag: this.etag },
-      json: patches,
+    const resp = await fetch(job_url, {
+      body: JSON.stringify(patches),
+      headers: {
+        'Content-Type': 'application/json',
+        ETag: this.etag,
+      },
       method: 'PATCH',
     });
 
     // Extract the etag header & make sure it was defined
-    const { etag } = resp.headers;
+    const etag = resp.headers.get('etag');
     if (!etag) {
       throw new Error('missing etag in broker job response');
     }
@@ -175,14 +179,14 @@ export class Runner {
     const body = data.toString();
     d('appendLog', body);
     const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
-    const resp = await got(log_url, {
+    const resp = await fetch(log_url, {
       body,
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
       },
       method: 'PUT',
     });
-    d(`appendLog resp.status ${resp.statusCode}`);
+    d(`appendLog resp.status ${resp.status}`);
   }
 
   private patchResult(result: Partial<Result>): Promise<void> {
