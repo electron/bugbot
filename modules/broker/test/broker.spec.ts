@@ -15,7 +15,7 @@ describe('broker', () => {
   beforeEach(async () => {
     process.env.BUGBOT_BROKER_URL = base_url;
 
-    server = new Server({ baseUrl: base_url });
+    server = new Server({ brokerUrl: base_url });
     await server.start();
   });
 
