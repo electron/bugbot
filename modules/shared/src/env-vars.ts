@@ -1,4 +1,5 @@
 import debug = require('debug');
+import * as fs from 'fs';
 
 /**
  * Gets a variable from the environment (`process.env`).
@@ -42,6 +43,28 @@ export function envInt(name: string, fallback: number = undefined): number {
   }
 
   console.error(`process.env.${name} not found. exiting.`);
+  process.exit(1);
+  return '' as never; // notreached; make linter happy
+}
+
+// load data from an environment variable
+// or from a file named in an environment variable,
+// e.g. check FOO and FOO_PATH
+export function getEnvData(key: string): string {
+  const d = debug(`env-vars:getEnvData`);
+
+  if (key in process.env) {
+    d(`process.env.${key} found.`);
+    return process.env[key];
+  }
+
+  const path_key = `${key}_PATH`;
+  if (path_key in process.env) {
+    d(`process.env.${path_key} found.`);
+    return fs.readFileSync(path_key, { encoding: 'utf8' });
+  }
+
+  console.error(`Neither '${key}' nor '${path_key}' found`);
   process.exit(1);
   return '' as never; // notreached; make linter happy
 }

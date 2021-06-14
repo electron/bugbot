@@ -8,7 +8,7 @@ import create_etag from 'etag';
 import express from 'express';
 import { URL } from 'url';
 
-import { env } from '@electron/bugbot-shared/lib/env-vars';
+import { env, getEnvData } from '@electron/bugbot-shared/lib/env-vars';
 
 import { Broker } from './broker';
 import { Task } from './task';
@@ -20,28 +20,6 @@ function getTaskBody(task: Task) {
   const body = JSON.stringify(task.publicSubset());
   const etag = create_etag(body);
   return { body, etag };
-}
-
-// load data from an environment variable
-// or from a file named in an environment variable,
-// e.g. check FOO and FOO_PATH
-function getEnvData(key: string) {
-  const d = debug(`${DebugPrefix}:getEnvData`);
-
-  if (key in process.env) {
-    d(`process.env.${key} found.`);
-    return process.env[key];
-  }
-
-  const path_key = `${key}_PATH`;
-  if (path_key in process.env) {
-    d(`process.env.${path_key} found.`);
-    return fs.readFileSync(path_key, { encoding: 'utf8' });
-  }
-
-  console.error(`Neither '${key}' nor '${path_key}' found`);
-  process.exit(1);
-  return '' as never; // notreached; make linter happy
 }
 
 export class Server {
