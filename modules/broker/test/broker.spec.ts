@@ -10,7 +10,7 @@ import { Server } from '../src/server';
 
 describe('broker', () => {
   let server: Server;
-  const base_url = `http://localhost:9090`; // arbitrary
+  const base_url = 'http://localhost:9090'; // arbitrary port
 
   beforeEach(async () => {
     process.env.BUGBOT_BROKER_URL = base_url;
@@ -30,6 +30,14 @@ describe('broker', () => {
       method: 'POST',
     });
   }
+
+  it('requires an http or https scheme 2', () => {
+    const bad_url = 'sftp://localhost:22';
+    process.env.BUGBOT_BROKER_URL = bad_url;
+    const sftp_server = new Server({ brokerUrl: bad_url });
+    expect(sftp_server.start()).rejects.toThrow('sftp');
+    sftp_server.stop();
+  });
 
   async function postNewBisectJob(params = {}) {
     // fill in defaults for any missing required values

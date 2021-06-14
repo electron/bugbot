@@ -200,9 +200,9 @@ export class Server {
       }
 
       default: {
-        console.error(`Unsupported protocol in '${this.brokerUrl}'`);
-        process.exit(1);
-        return undefined as never; // notreached; make linter happy
+        return Promise.reject(
+          new Error(`Unsupported protocol in '${this.brokerUrl}'`),
+        );
       }
     }
   }
