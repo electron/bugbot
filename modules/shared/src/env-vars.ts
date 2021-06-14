@@ -61,7 +61,7 @@ export function getEnvData(key: string): string {
   const path_key = `${key}_PATH`;
   if (path_key in process.env) {
     d(`process.env.${path_key} found.`);
-    return fs.readFileSync(path_key, { encoding: 'utf8' });
+    return fs.readFileSync(process.env[path_key], { encoding: 'utf8' });
   }
 
   console.error(`Neither '${key}' nor '${path_key}' found`);

@@ -191,10 +191,8 @@ export class Server {
       }
 
       case 'https:': {
-        const opts = {
-          cert: fs.readFileSync(this.cert),
-          key: fs.readFileSync(this.key),
-        };
+        const { cert, key } = this;
+        const opts = { cert, key };
         this.server = https.createServer(opts, this.app);
         return listen(this.server, port);
       }
