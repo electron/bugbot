@@ -6,15 +6,15 @@ import * as path from 'path';
 import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
+import { URL } from 'url';
+
+import { env, getEnvData } from '@electron/bugbot-shared/lib/env-vars';
 
 import { Broker } from './broker';
 import { Task } from './task';
 import { buildLog } from './log';
 
 const DebugPrefix = 'broker:server';
-
-// eslint-disable-next-line no-unused-vars
-type TaskBuilder = (params: any) => Task;
 
 function getTaskBody(task: Task) {
   const body = JSON.stringify(task.publicSubset());
@@ -23,26 +23,28 @@ function getTaskBody(task: Task) {
 }
 
 export class Server {
-  public readonly port: number;
+  public readonly brokerUrl: URL;
 
   private readonly app: express.Application;
-  private readonly createBisectTask: TaskBuilder;
   private readonly broker: Broker;
-  private readonly sport: number;
-  private readonly key: string | undefined = undefined;
-  private readonly cert: string | undefined = undefined;
-  private servers: http.Server[] = [];
+  private readonly cert: string;
+  private readonly key: string;
+  private server: http.Server;
 
-  constructor(appInit: Record<string, any>) {
-    const {
-      broker = new Broker(),
-      cert,
-      createBisectTask = Task.createBisectTask,
-      key,
-      port = 8080,
-      sport = 8443,
-    } = appInit;
-    Object.assign(this, { broker, cert, createBisectTask, key, port, sport });
+  constructor(
+    opts: {
+      broker?: Broker;
+      brokerUrl?: string;
+      cert?: string;
+      key?: string;
+    } = {},
+  ) {
+    this.broker = opts.broker || new Broker();
+    this.brokerUrl = new URL(opts.brokerUrl || env('BUGBOT_BROKER_URL'));
+    if (this.brokerUrl.protocol === 'https:') {
+      this.cert = opts.cert || getEnvData('BUGBOT_BROKER_CERT');
+      this.key = opts.key || getEnvData('BUGBOT_BROKER_KEY');
+    }
 
     this.app = express();
     this.app.get('/api/jobs/', this.getJobs.bind(this));
@@ -83,7 +85,7 @@ export class Server {
   private postJob(req: express.Request, res: express.Response) {
     let task: Task;
     try {
-      task = this.createBisectTask(req.body);
+      task = Task.createBisectTask(req.body);
       this.broker.addTask(task);
       res.status(201).send(task.id);
     } catch (error) {
@@ -162,8 +164,11 @@ export class Server {
     res.status(200).json(ids);
   }
 
-  public start(): Promise<any> {
+  public start(): Promise<void> {
     const d = debug(`${DebugPrefix}:start`);
+
+    this.stop(); // ensure we don't accidentally start a 2nd server
+
     d('starting server');
 
     const listen = (server: http.Server, port: number) => {
@@ -176,38 +181,37 @@ export class Server {
       });
     };
 
-    const promises: Promise<any>[] = [];
+    const port = Number.parseInt(this.brokerUrl.port, 10);
+    d(`url.protocol ${this.brokerUrl.protocol}`);
+    switch (this.brokerUrl.protocol) {
+      case 'http:': {
+        const opts = {};
+        this.server = http.createServer(opts, this.app);
+        return listen(this.server, port);
+      }
 
-    {
-      const server = http.createServer({}, this.app);
-      this.servers.push(server);
-      promises.push(listen(server, this.port));
+      case 'https:': {
+        const { cert, key } = this;
+        const opts = { cert, key };
+        this.server = https.createServer(opts, this.app);
+        return listen(this.server, port);
+      }
+
+      default: {
+        return Promise.reject(
+          new Error(`Unsupported protocol in '${this.brokerUrl}'`),
+        );
+      }
     }
-
-    if (!this.cert || !this.key) {
-      d('to enable ssl, set broker.server.cert and .key variables');
-    } else {
-      d(`using ssl cert: ${this.cert}`);
-      d(`using ssl key: ${this.key}`);
-      const server = https.createServer(
-        {
-          cert: fs.readFileSync(this.cert),
-          key: fs.readFileSync(this.key),
-        },
-        this.app,
-      );
-      this.servers.push(server);
-      promises.push(listen(server, this.sport));
-    }
-
-    return Promise.all(promises);
   }
 
   public stop(): void {
     const d = debug(`${DebugPrefix}:stop`);
-    this.servers.forEach((server) => server.close());
-    this.servers.splice(0, this.servers.length);
-    d('server stopped');
+    if (this.server) {
+      this.server.close();
+      delete this.server;
+      d('server stopped');
+    }
   }
 
   /**

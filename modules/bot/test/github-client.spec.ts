@@ -1,4 +1,4 @@
-process.env.BROKER_BASE_URL = 'http://localhost:9099';
+process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
 
 import { Context } from 'probot';
 

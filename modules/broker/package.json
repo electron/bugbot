@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@electron/bugbot-shared": "*",
-    "cosmiconfig": "^7.0.0",
     "dayjs": "^1.10.5",
     "debug": "^4.3.1",
     "etag": "^1.8.1",

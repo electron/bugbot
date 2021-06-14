@@ -1,26 +1,30 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as semver from 'semver';
 import dayjs from 'dayjs';
 import fetch from 'node-fetch';
 import { Operation as PatchOp } from 'fast-json-patch';
-import { URLSearchParams } from 'url';
+import { URL, URLSearchParams } from 'url';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
-
-import { Broker } from '../src/broker';
 import { Server } from '../src/server';
-import { Task } from '../src/task';
 
 describe('broker', () => {
-  let broker: Broker;
   let server: Server;
-  const port = 9099; // arbitrary
-  const base_url = `http://localhost:${port}`;
+  const base_url = 'http://localhost:9090'; // arbitrary port
+
+  function fixturePath(name) {
+    return path.resolve(__dirname, 'fixtures', name);
+  }
+  function readFixture(name) {
+    return fs.readFileSync(fixturePath(name)).toString();
+  }
 
   beforeEach(async () => {
-    const { createBisectTask } = Task;
-    broker = new Broker();
-    server = new Server({ broker, createBisectTask, port });
+    process.env.BUGBOT_BROKER_URL = base_url;
+
+    server = new Server({ brokerUrl: base_url });
     await server.start();
   });
 
@@ -29,12 +33,47 @@ describe('broker', () => {
   });
 
   function postJob(body) {
-    return fetch(`${base_url}/api/jobs`, {
+    return fetch(new URL('/api/jobs', base_url), {
       body: JSON.stringify(body),
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     });
   }
+
+  it('errors if scheme is not http nor https', () => {
+    const bad_url = 'sftp://localhost:22';
+    process.env.BUGBOT_BROKER_URL = bad_url;
+    const sftp_server = new Server({ brokerUrl: bad_url });
+    expect(sftp_server.start()).rejects.toThrow('sftp');
+    sftp_server.stop();
+  });
+
+  it('can run as an https server', async () => {
+    const https_url = 'https://localhost:9991'; // arbitrary port
+    const https_server = new Server({
+      brokerUrl: https_url,
+      cert: readFixture('test.cert'),
+      key: readFixture('test.key'),
+    });
+    await expect(https_server.start()).resolves.not.toThrow();
+    https_server.stop();
+  });
+
+  it('uses environmental variables as a fallback', async () => {
+    const broker_url = new URL('https://localhost:9229');
+    process.env.BUGBOT_BROKER_URL = broker_url.toString();
+    process.env.BUGBOT_BROKER_CERT_PATH = fixturePath('test.cert');
+    process.env.BUGBOT_BROKER_KEY_PATH = fixturePath('test.key');
+
+    const https_server = new Server();
+    expect(https_server.brokerUrl).toStrictEqual(broker_url);
+    await expect(https_server.start()).resolves.not.toThrow();
+    https_server.stop();
+
+    delete process.env.BUGBOT_BROKER_URL;
+    delete process.env.BUGBOT_BROKER_CERT_PATH;
+    delete process.env.BUGBOT_BROKER_KEY_PATH;
+  });
 
   async function postNewBisectJob(params = {}) {
     // fill in defaults for any missing required values
@@ -51,7 +90,7 @@ describe('broker', () => {
   }
 
   async function getJob(id: string) {
-    const response = await fetch(`${base_url}/api/jobs/${id}`);
+    const response = await fetch(new URL(`/api/jobs/${id}`, base_url));
     const etag = response.headers.get('ETag');
     let body;
     try {
@@ -67,7 +106,7 @@ describe('broker', () => {
     for (const [key, val] of Object.entries(filter)) {
       params.set(key, val.toString());
     }
-    const response = await fetch(`${base_url}/api/jobs?${params}`);
+    const response = await fetch(new URL(`/api/jobs?${params}`, base_url));
     const body = await response.json();
     return { body, response };
   }
@@ -327,7 +366,7 @@ describe('broker', () => {
       patchEtag: string,
       body: Readonly<PatchOp>[],
     ) {
-      return fetch(`${base_url}/api/jobs/${patchId}`, {
+      return fetch(new URL(`/api/jobs/${patchId}`, base_url), {
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json', 'If-Match': patchEtag },
         method: 'PATCH',
@@ -444,7 +483,7 @@ describe('broker', () => {
   });
 
   async function getLog(job_id: string) {
-    const response = await fetch(`${base_url}/log/${job_id}`);
+    const response = await fetch(new URL(`/log/${job_id}`, base_url));
     const text = await response.text();
     return { body: text, response };
   }
@@ -458,7 +497,7 @@ describe('broker', () => {
 
   describe('/api/jobs/$job_id/log (PUT)', () => {
     function addLogMessages(job_id: string, body = '') {
-      return fetch(`${base_url}/api/jobs/${job_id}/log`, {
+      return fetch(new URL(`/api/jobs/${job_id}/log`, base_url), {
         body,
         method: 'PUT',
       });

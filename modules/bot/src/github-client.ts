@@ -3,8 +3,8 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
-import { env } from '@electron/bugbot-shared/lib/env-vars';
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
 import {
   FiddleInput,
   parseIssueBody,
@@ -20,8 +20,10 @@ const actions = {
   STOP: 'stop',
 };
 
-// eg: http://localhost:9099
-const brokerBaseURL = env('BROKER_BASE_URL');
+const settings = {
+  brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+  pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+} as const;
 
 /**
  * Comments on the issue once a bisect operation is completed
@@ -37,7 +39,7 @@ async function commentBisectResult(
   const add_labels = new Set<string>();
   const del_labels = new Set<string>([Labels.BugBot.Running]);
   const paragraphs: string[] = [];
-  const log_url = new URL(`/log/${jobId}`, brokerBaseURL);
+  const log_url = new URL(`/log/${jobId}`, settings.brokerBaseUrl);
 
   switch (result.status) {
     case 'success': {
@@ -102,7 +104,7 @@ async function commentBisectResult(
  */
 export async function parseManualCommand(context: Context): Promise<void> {
   const d = debug('github-client:parseManualCommand');
-  const api = new BrokerAPI({ baseURL: brokerBaseURL });
+  const api = new BrokerAPI({ baseURL: settings.brokerBaseUrl });
 
   const { payload } = context;
   const args = payload.comment.body.split(' ');
@@ -141,8 +143,7 @@ export async function parseManualCommand(context: Context): Promise<void> {
 
     d(`Queued bisect job ${jobId}`);
 
-    // Poll every INTERVAL to see if the job is complete
-    const INTERVAL = 10 * 1000;
+    // Poll until the job is complete
     const timer = setInterval(async () => {
       d(`polling job ${jobId}...`);
       const job = await api.getJob(jobId);
@@ -154,7 +155,7 @@ export async function parseManualCommand(context: Context): Promise<void> {
       clearInterval(timer);
       await commentBisectResult(jobId, job.last, context);
       await api.completeJob(jobId);
-    }, INTERVAL);
+    }, settings.pollIntervalMs);
   }
 }
 

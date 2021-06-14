@@ -1,19 +1,70 @@
 import debug = require('debug');
-
-const d = debug('env-vars');
+import * as fs from 'fs';
 
 /**
- * Gets a variable from the environment (`process.env`), showing a debug warning
- * if the requested variable wasn't found.
+ * Gets a variable from the environment (`process.env`).
+ * Exits the process if the requested variable isn't found.
  */
-export function env(name: string): string {
-  if (Object.prototype.hasOwnProperty.call(process.env, name)) {
-    return process.env[name];
+export function env(name: string, fallback: string = undefined): string {
+  const d = debug('env-vars:env');
+
+  const value = process.env[name];
+  if (value !== undefined) {
+    d(`process.env.${name} found.`);
+    return value;
   }
 
-  d(`Could not find environment variable "${name}"`);
-  process.exit(1);
+  if (fallback !== undefined) {
+    d(`process.env.${name} not found. using fallback value.`);
+    return fallback;
+  }
 
-  // This line is never reached and only here to appease the linter
-  return '' as never;
+  console.error(`process.env.${name} not found. exiting.`);
+  process.exit(1);
+  return '' as never; // notreached; make linter happy
+}
+
+/**
+ * Gets an integer variable from the environment (`process.env`).
+ * Exits the process if the requested variable isn't found.
+ */
+export function envInt(name: string, fallback: number = undefined): number {
+  const d = debug('env-vars:envInt');
+
+  const value = Number.parseInt(process.env[name], 10);
+  if (Number.isInteger(value)) {
+    d(`'process.env.${name}' found.`);
+    return value;
+  }
+
+  if (Number.isInteger(fallback)) {
+    d(`process.env.${name} not found. using fallback value.`);
+    return fallback;
+  }
+
+  console.error(`process.env.${name} not found. exiting.`);
+  process.exit(1);
+  return '' as never; // notreached; make linter happy
+}
+
+// load data from an environment variable
+// or from a file named in an environment variable,
+// e.g. check FOO and FOO_PATH
+export function getEnvData(key: string): string {
+  const d = debug(`env-vars:getEnvData`);
+
+  if (key in process.env) {
+    d(`process.env.${key} found.`);
+    return process.env[key];
+  }
+
+  const path_key = `${key}_PATH`;
+  if (path_key in process.env) {
+    d(`process.env.${path_key} found.`);
+    return fs.readFileSync(process.env[path_key], { encoding: 'utf8' });
+  }
+
+  console.error(`Neither '${key}' nor '${path_key}' found`);
+  process.exit(1);
+  return '' as never; // notreached; make linter happy
 }

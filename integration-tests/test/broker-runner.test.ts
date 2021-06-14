@@ -1,5 +1,5 @@
 import * as path from 'path';
-import debug from 'debug';
+import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
 import { Broker } from '../../modules/broker/src/broker';
@@ -14,12 +14,10 @@ import {
   Result,
 } from '@electron/bugbot-shared/lib/interfaces';
 
-const d = debug('test');
-
 jest.setTimeout(60 * 1000);
 
 describe('runner', () => {
-  const port = 9999 as const;
+  const brokerUrl = `http://localhost:9090`; // arbitrary port
   const platform: Platform = 'linux';
 
   let broker: Broker;
@@ -28,14 +26,14 @@ describe('runner', () => {
 
   function startBroker(opts: Record<string, any> = {}) {
     broker = new Broker();
-    brokerServer = new BrokerServer({ broker, port, ...opts });
+    brokerServer = new BrokerServer({ broker, brokerUrl, ...opts });
     brokerServer.start();
   }
 
   function createRunner(opts: Record<string, any> = {}) {
     runner = new Runner({
-      brokerUrl: `http://localhost:${brokerServer.port}`,
-      fiddleExecPath: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
+      brokerUrl,
+      fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
       platform,
       ...opts,
     });
@@ -48,7 +46,7 @@ describe('runner', () => {
 
   it('starts', () => {
     startBroker();
-    expect(brokerServer.port).toBe(port);
+    expect(brokerServer.brokerUrl).toStrictEqual(new URL(brokerUrl));
 
     createRunner();
     expect(runner.platform).toBe(platform);
@@ -118,7 +116,6 @@ describe('runner', () => {
       expect(task.last).toBeUndefined();
       expect(task.history).toHaveLength(0);
       await runTask(task);
-      d('task after running %O', task);
     });
 
     it('sets job.last', () => {
