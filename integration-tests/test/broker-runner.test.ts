@@ -1,4 +1,4 @@
-import debug from 'debug';
+import * as path from 'path';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
@@ -13,8 +13,6 @@ import {
   Platform,
   Result,
 } from '@electron/bugbot-shared/lib/interfaces';
-
-const d = debug('test');
 
 jest.setTimeout(60 * 1000);
 
@@ -33,7 +31,12 @@ describe('runner', () => {
   }
 
   function createRunner(opts: Record<string, any> = {}) {
-    runner = new Runner({ brokerUrl, platform, ...opts });
+    runner = new Runner({
+      brokerUrl,
+      fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
+      platform,
+      ...opts,
+    });
   }
 
   afterEach(() => {

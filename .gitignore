@@ -1,2 +1,12 @@
-node_modules/
 .DS_Store
+.env
+node_modules/
+
+# Coverage
+coverage
+integration-tests/coverage
+modules/bot/coverage
+modules/broker/coverage
+modules/runner/coverage
+modules/shared/coverage
+

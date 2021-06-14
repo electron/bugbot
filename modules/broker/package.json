@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc -b",
     "start": "node ./dist/main.js",
-    "test": "jest --coverage"
+    "test": "jest",
+    "test:ci": "jest --coverage --runInBand"
   },
   "dependencies": {
     "@electron/bugbot-shared": "*",

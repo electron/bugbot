@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const hash = require('object-hash');
+const path = require('path');
+const util = require('util');
+
+// skip past the absolute paths to node and electron-fiddle
+const argv = process.argv.slice(process.argv.indexOf(__filename) + 1);
+
+// find the logfile by hashing the remaining args
+const argv_hash = hash(argv);
+const logfile = path.resolve(__dirname, 'electron-fiddle-logs', argv_hash);
+
+// dump the logfile so that Runner thinks it actually called electron-fiddle
+if (fs.existsSync(logfile)) {
+  console.log(fs.readFileSync(logfile, { encoding: 'utf8' }));
+} else {
+  throw new Error(`No logfile found for ${argv_hash} ${util.inspect(argv)}`);
+}
