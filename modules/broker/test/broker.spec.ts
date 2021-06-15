@@ -60,14 +60,15 @@ describe('broker', () => {
   });
 
   it('uses environmental variables as a fallback', async () => {
-    const broker_url = new URL('https://localhost');
     process.env.PORT = '9229';
-    process.env.BUGBOT_BROKER_URL = broker_url.toString();
+    process.env.BUGBOT_BROKER_URL = 'https://localhost';
     process.env.BUGBOT_BROKER_CERT_PATH = fixturePath('test.cert');
     process.env.BUGBOT_BROKER_KEY_PATH = fixturePath('test.key');
 
     const https_server = new Server();
-    expect(https_server.brokerUrl).toStrictEqual(broker_url);
+    expect(https_server.brokerUrl).toStrictEqual(
+      new URL(`${process.env.BUGBOT_BROKER_URL}:${process.env.PORT}`),
+    );
     await expect(https_server.start()).resolves.not.toThrow();
     https_server.stop();
 
