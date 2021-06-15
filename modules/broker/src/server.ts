@@ -72,7 +72,7 @@ export class Server {
   }
 
   private putLog(req: express.Request, res: express.Response) {
-    const [, id] = /\/api\/jobs\/(.*)\/log/.exec(req.url);
+    const id = req.path.split('/', 4).pop(); // /api/jobs/${id}/log
     const task = this.broker.getTask(id);
     if (task) {
       task.logText(req.body);
