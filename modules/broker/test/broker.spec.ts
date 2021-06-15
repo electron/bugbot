@@ -60,7 +60,8 @@ describe('broker', () => {
   });
 
   it('uses environmental variables as a fallback', async () => {
-    const broker_url = new URL('https://localhost:9229');
+    const broker_url = new URL('https://localhost');
+    process.env.PORT = '9229';
     process.env.BUGBOT_BROKER_URL = broker_url.toString();
     process.env.BUGBOT_BROKER_CERT_PATH = fixturePath('test.cert');
     process.env.BUGBOT_BROKER_KEY_PATH = fixturePath('test.key');
@@ -70,6 +71,7 @@ describe('broker', () => {
     await expect(https_server.start()).resolves.not.toThrow();
     https_server.stop();
 
+    delete process.env.PORT;
     delete process.env.BUGBOT_BROKER_URL;
     delete process.env.BUGBOT_BROKER_CERT_PATH;
     delete process.env.BUGBOT_BROKER_KEY_PATH;

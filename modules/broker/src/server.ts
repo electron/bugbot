@@ -7,7 +7,7 @@ import create_etag from 'etag';
 import express from 'express';
 import { URL } from 'url';
 
-import { env, getEnvData } from '@electron/bugbot-shared/lib/env-vars';
+import { env, envInt, getEnvData } from '@electron/bugbot-shared/lib/env-vars';
 
 import { Broker } from './broker';
 import { Task } from './task';
@@ -28,6 +28,7 @@ export class Server {
   private readonly broker: Broker;
   private readonly cert: string;
   private readonly key: string;
+  private readonly port: number;
   private server: http.Server;
 
   constructor(
@@ -40,6 +41,7 @@ export class Server {
   ) {
     this.broker = opts.broker || new Broker();
     this.brokerUrl = new URL(opts.brokerUrl || env('BUGBOT_BROKER_URL'));
+    this.port = Number.parseInt(this.brokerUrl.port, 10) || envInt('PORT');
     if (this.brokerUrl.protocol === 'https:') {
       this.cert = opts.cert || getEnvData('BUGBOT_BROKER_CERT');
       this.key = opts.key || getEnvData('BUGBOT_BROKER_KEY');
@@ -180,20 +182,19 @@ export class Server {
       });
     };
 
-    const port = Number.parseInt(this.brokerUrl.port, 10);
     d(`url.protocol ${this.brokerUrl.protocol}`);
     switch (this.brokerUrl.protocol) {
       case 'http:': {
         const opts = {};
         this.server = http.createServer(opts, this.app);
-        return listen(this.server, port);
+        return listen(this.server, this.port);
       }
 
       case 'https:': {
         const { cert, key } = this;
         const opts = { cert, key };
         this.server = https.createServer(opts, this.app);
-        return listen(this.server, port);
+        return listen(this.server, this.port);
       }
 
       default: {
