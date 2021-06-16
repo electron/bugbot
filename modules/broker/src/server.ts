@@ -41,6 +41,12 @@ export class Server {
   ) {
     this.broker = opts.broker || new Broker();
     this.brokerUrl = new URL(opts.brokerUrl || env('BUGBOT_BROKER_URL'));
+
+    // For Heroku, the $PORT env var is set dynamically
+    if (!this.brokerUrl.port) {
+      this.brokerUrl.port = env('PORT');
+    }
+
     if (this.brokerUrl.protocol === 'https:') {
       this.cert = opts.cert || getEnvData('BUGBOT_BROKER_CERT');
       this.key = opts.key || getEnvData('BUGBOT_BROKER_KEY');
