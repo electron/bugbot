@@ -1,8 +1,8 @@
-import * as fs from 'fs';
 import * as http from 'http';
 import * as https from 'https';
 import * as jsonpatch from 'fast-json-patch';
 import * as path from 'path';
+import escapeHtml from 'escape-html';
 import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
@@ -63,7 +63,7 @@ export class Server {
     const task = this.broker.getTask(id);
     if (!task) {
       d('404 no such task');
-      res.status(404).send(`Unknown job '${id}'`);
+      res.status(404).send(escapeHtml(`Unknown job '${id}'`));
       return;
     }
 
@@ -72,13 +72,13 @@ export class Server {
   }
 
   private putLog(req: express.Request, res: express.Response) {
-    const [, id] = /\/api\/jobs\/(.*)\/log/.exec(req.url);
+    const id = req.path.split('/', 4).pop(); // /api/jobs/${id}/log
     const task = this.broker.getTask(id);
     if (task) {
       task.logText(req.body);
       res.status(200).end();
     } else {
-      res.status(404).send(`Unknown job '${id}'`);
+      res.status(404).send(escapeHtml(`Unknown job '${id}'`));
     }
   }
 
@@ -87,9 +87,9 @@ export class Server {
     try {
       task = Task.createBisectTask(req.body);
       this.broker.addTask(task);
-      res.status(201).send(task.id);
+      res.status(201).send(escapeHtml(task.id));
     } catch (error) {
-      res.status(422).send(error.message);
+      res.status(422).send(escapeHtml(error.message));
     }
   }
 
@@ -97,7 +97,7 @@ export class Server {
     const id = path.basename(req.url);
     const task = this.broker.getTask(id);
     if (!task) {
-      res.status(404).send(`Unknown job '${id}'`);
+      res.status(404).send(escapeHtml(`Unknown job '${id}'`));
       return;
     }
 
@@ -113,14 +113,14 @@ export class Server {
     const id = path.basename(req.url);
     const task = this.broker.getTask(id);
     if (!task) {
-      res.status(404).send(`Unknown job '${id}'`);
+      res.status(404).send(escapeHtml(`Unknown job '${id}'`));
       return;
     }
 
     const if_header = 'If-Match';
     const if_etag = req.header(if_header);
     if (if_etag && if_etag !== task.etag) {
-      res.status(412).send(`Invalid ${if_header} header: ${if_etag}`);
+      res.status(412).send(escapeHtml(`Invalid ${if_header} header: ${if_etag}`));
       return;
     }
 
@@ -150,7 +150,7 @@ export class Server {
       res.status(200).end();
     } catch (err) {
       d(err);
-      res.status(400).send(err);
+      res.status(400).send(escapeHtml(err.message));
     }
   }
 
