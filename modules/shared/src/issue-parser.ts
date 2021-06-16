@@ -30,7 +30,7 @@ function getHeadingContent(tree: Node, test: string) {
 // copied from Fiddle code
 export function getGistId(input: string): string | null {
   let id: string | undefined = input;
-  if (input.startsWith('https://gist.github.com')) {
+  if (input.startsWith('https://gist.github.com/')) {
     if (input.endsWith('/')) {
       input = input.slice(0, -1);
     }
