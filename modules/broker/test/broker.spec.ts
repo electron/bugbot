@@ -480,6 +480,16 @@ describe('broker', () => {
         expect(res.status).toBe(404);
       });
     });
+
+    it('sanitizes its return messages', async () => {
+      const malicious_etag = `<a href="http://www.electronjs.org/">Click Me</a>`;
+      const new_gist = 'new_gist';
+      const response = await patchJob(id, malicious_etag, [
+        { op: 'replace', path: '/gist', value: new_gist },
+      ]);
+      expect(response.status).toBe(412);
+      expect(await response.text()).not.toMatch(malicious_etag);
+    });
   });
 
   async function getLog(job_id: string) {
