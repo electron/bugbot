@@ -9,6 +9,7 @@ import { URL } from 'url';
 
 import { env, getEnvData } from '@electron/bugbot-shared/lib/env-vars';
 
+import { Auth, AuthScope } from './auth';
 import { Broker } from './broker';
 import { Task } from './task';
 import { buildLog } from './log';
@@ -25,6 +26,7 @@ export class Server {
   public readonly brokerUrl: URL;
 
   private readonly app: express.Application;
+  private readonly auth: Auth;
   private readonly broker: Broker;
   private readonly cert: string;
   private readonly key: string;
@@ -32,12 +34,15 @@ export class Server {
 
   constructor(
     opts: {
+      auth?: Auth;
       broker?: Broker;
       brokerUrl?: string;
       cert?: string;
       key?: string;
     } = {},
   ) {
+    // Initialize some fields either from being passed in, from the environment,
+    // or to a sensible default
     this.broker = opts.broker || new Broker();
     this.brokerUrl = new URL(opts.brokerUrl || env('BUGBOT_BROKER_URL'));
 
@@ -51,21 +56,61 @@ export class Server {
       this.key = opts.key || getEnvData('BUGBOT_BROKER_KEY');
     }
 
+    // Initialize auth either from being passed in or by creating a new auth
+    // with a control token that is printed out
+    if (opts.auth !== undefined) {
+      this.auth = opts.auth;
+    } else {
+      this.auth = new Auth();
+
+      // Create a control token and debug print it out
+      const controlTokenId = this.auth.createToken([AuthScope.ControlTokens]);
+      debug(`${DebugPrefix}:auth`)(
+        `Empty auth created with control token "${controlTokenId}"`,
+      );
+    }
+
     this.app = express();
-    this.app.get('/api/jobs', this.getJobs.bind(this));
-    this.app.get('/api/jobs/:jobId', this.getJob.bind(this));
+    this.app.get(
+      '/api/jobs',
+      this.authMiddleware([AuthScope.Jobs]),
+      this.getJobs.bind(this),
+    );
+    this.app.get(
+      '/api/jobs/:jobId',
+      this.authMiddleware([AuthScope.Jobs]),
+      this.getJob.bind(this),
+    );
     this.app.patch(
       '/api/jobs/:jobId',
+      this.authMiddleware([AuthScope.Jobs]),
       express.json(),
       this.patchJob.bind(this),
     );
-    this.app.post('/api/jobs', express.json(), this.postJob.bind(this));
+    this.app.post(
+      '/api/jobs',
+      this.authMiddleware([AuthScope.Jobs]),
+      express.json(),
+      this.postJob.bind(this),
+    );
     this.app.put(
       '/api/jobs/:jobId/log',
+      this.authMiddleware([AuthScope.Jobs]),
       express.text(),
       this.putLog.bind(this),
     );
     this.app.get('/log/:jobId', this.getLog.bind(this));
+    this.app.post(
+      '/api/tokens',
+      this.authMiddleware([AuthScope.ControlTokens]),
+      express.json(),
+      this.postTokens.bind(this),
+    );
+    this.app.delete(
+      '/api/tokens',
+      this.authMiddleware([AuthScope.ControlTokens]),
+      this.deleteTokens.bind(this),
+    );
   }
 
   private getLog(req: express.Request, res: express.Response) {
@@ -177,6 +222,57 @@ export class Server {
     const ids = Server.filter(tasks, req.query as any).map((task) => task.id);
     d(`getJobs: tasks: [${ids.join(', ')}]`);
     res.status(200).json(ids);
+  }
+
+  private postTokens(req: express.Request, res: express.Response) {
+    const scopes = req.body;
+    const tokenId = this.auth.createToken(scopes);
+    res.status(200).json(tokenId);
+  }
+
+  private deleteTokens(req: express.Request, res: express.Response) {
+    const tokenId = req.body;
+    const success = this.auth.revokeToken(tokenId);
+    if (success) {
+      res.status(200).end();
+    } else {
+      res.status(404).end();
+    }
+  }
+
+  /**
+   * Creates a middleware for use in routing to ensure requests have certain
+   * required scopes before progressing to the route function.
+   */
+  private authMiddleware(scopes: AuthScope[]): express.RequestHandler {
+    return (req, res, next) => {
+      // Get the `authorization` header value, rejecting requests that don't
+      // provide one
+      const authHeader = req.headers.authorization;
+      if (authHeader === undefined) {
+        res.status(401).end();
+        return;
+      }
+
+      // Ensure the header is the correct type
+      const match = authHeader.match(/^Bearer (.+)$/);
+      if (match === null) {
+        res.status(401).end();
+        return;
+      }
+
+      // Extract the token from the header
+      const [, tokenId] = match;
+
+      // Check if the token is authorized for the given scopes
+      const isAuthed = this.auth.tokenHasScopes(tokenId, scopes);
+      if (!isAuthed) {
+        res.status(403).end();
+        return;
+      }
+
+      next();
+    };
   }
 
   public start(): Promise<void> {
