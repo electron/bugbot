@@ -4,11 +4,11 @@ import { randomBytes } from 'crypto';
  * Creates a random token.
  */
 function randomToken(): string {
-  return Buffer.concat([Buffer.from(new Uint8Array([1])), randomBytes(63)])
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  const TOKEN_VERSION = 1;
+  return Buffer.concat([
+    Buffer.from(new Uint8Array([TOKEN_VERSION])),
+    randomBytes(63),
+  ]).toString('base64url');
 }
 
 export const enum AuthScope {
