@@ -55,7 +55,7 @@ export class Server {
     this.app.get('/api/jobs', this.getJobs.bind(this));
     this.app.get('/api/jobs/:jobId', this.getJob.bind(this));
     this.app.patch(
-      '/api/jobs/:jobId?',
+      '/api/jobs/:jobId',
       express.json(),
       this.patchJob.bind(this),
     );
