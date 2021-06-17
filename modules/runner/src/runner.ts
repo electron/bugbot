@@ -1,5 +1,6 @@
 import debug from 'debug';
 import fetch from 'node-fetch';
+import stringArgv from 'string-argv';
 import which from 'which';
 import { Operation as PatchOp } from 'fast-json-patch';
 import { URL } from 'url';
@@ -29,6 +30,7 @@ export class Runner {
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
+  private readonly fiddleArgv: string[];
   private readonly pollIntervalMs: number;
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
@@ -52,14 +54,17 @@ export class Runner {
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
       opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
-    this.fiddleExec =
-      opts.fiddleExec ||
-      process.env.BUGBOT_FIDDLE_EXEC ||
-      which.sync('electron-fiddle');
     this.platform = (opts.platform || process.platform) as Platform;
     this.pollIntervalMs =
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     this.uuid = opts.uuid || uuidv4();
+
+    this.fiddleArgv = stringArgv(
+      opts.fiddleExec ||
+        process.env.BUGBOT_FIDDLE_EXEC ||
+        which.sync('electron-fiddle'),
+    );
+    this.fiddleExec = this.fiddleArgv.shift();
   }
 
   public start(): void {
@@ -207,10 +212,17 @@ export class Runner {
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
     const putLog = this.putLog.bind(this);
     const patchResult = this.patchResult.bind(this);
-    const { childTimeoutMs, fiddleExec } = this;
+    const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
 
     return new Promise<void>((resolve) => {
-      const args = ['bisect', range[0], range[1], '--fiddle', gistId];
+      const args = [
+        ...fiddleArgv,
+        'bisect',
+        range[0],
+        range[1],
+        '--fiddle',
+        gistId,
+      ];
       const opts = { timeout: childTimeoutMs };
       const child = spawn(fiddleExec, args, opts);
 
