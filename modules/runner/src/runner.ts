@@ -30,6 +30,7 @@ export class Runner {
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
   private readonly pollIntervalMs: number;
+  private readonly logIntervalMs: number;
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
   private jobId: JobId;
@@ -44,6 +45,7 @@ export class Runner {
       brokerUrl?: string;
       childTimeoutMs?: number;
       fiddleExec?: string;
+      logIntervalMs?: number;
       platform?: Platform;
       pollIntervalMs?: number;
       uuid?: string;
@@ -56,6 +58,7 @@ export class Runner {
       opts.fiddleExec ||
       process.env.BUGBOT_FIDDLE_EXEC ||
       which.sync('electron-fiddle');
+    this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
     this.pollIntervalMs =
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
@@ -175,18 +178,25 @@ export class Runner {
     this.etag = etag;
   }
 
-  private async putLog(data: any) {
-    const body = data.toString();
-    d('appendLog', body);
-    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
-    const resp = await fetch(log_url, {
-      body,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-      },
-      method: 'PUT',
-    });
-    d(`appendLog resp.status ${resp.status}`);
+  private putLogTimer: ReturnType<typeof setTimeout>;
+
+  private putLogBuf: string[] = [];
+
+  private putLog(data: any) {
+    this.putLogBuf.push(data);
+    this.putLogTimer ||= setTimeout(async () => {
+      const body = this.putLogBuf.splice(0).join('\n');
+      delete this.putLogTimer;
+
+      d('putLog', body);
+      const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
+      const resp = await fetch(log_url, {
+        body,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        method: 'PUT',
+      });
+      d(`putLog resp.status ${resp.status}`);
+    }, this.logIntervalMs);
   }
 
   private patchResult(result: Partial<Result>): Promise<void> {
