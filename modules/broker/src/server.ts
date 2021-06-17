@@ -1,7 +1,6 @@
 import * as http from 'http';
 import * as https from 'https';
 import * as jsonpatch from 'fast-json-patch';
-import * as path from 'path';
 import escapeHtml from 'escape-html';
 import debug from 'debug';
 import create_etag from 'etag';
@@ -53,18 +52,26 @@ export class Server {
     }
 
     this.app = express();
-    this.app.get('/api/jobs/', this.getJobs.bind(this));
-    this.app.get('/api/jobs/*', this.getJob.bind(this));
-    this.app.get('/log/*', this.getLog.bind(this));
-    this.app.patch('/api/jobs/*', express.json(), this.patchJob.bind(this));
+    this.app.get('/api/jobs', this.getJobs.bind(this));
+    this.app.get('/api/jobs/:jobId', this.getJob.bind(this));
+    this.app.patch(
+      '/api/jobs/:jobId',
+      express.json(),
+      this.patchJob.bind(this),
+    );
     this.app.post('/api/jobs', express.json(), this.postJob.bind(this));
-    this.app.put('/api/jobs/*/log', express.text(), this.putLog.bind(this));
+    this.app.put(
+      '/api/jobs/:jobId/log',
+      express.text(),
+      this.putLog.bind(this),
+    );
+    this.app.get('/log/:jobId', this.getLog.bind(this));
   }
 
   private getLog(req: express.Request, res: express.Response) {
     const d = debug(`${DebugPrefix}:getLog`);
 
-    const id = path.basename(req.url);
+    const id = req.params.jobId;
     d('getLog', id);
     const task = this.broker.getTask(id);
     if (!task) {
@@ -78,7 +85,7 @@ export class Server {
   }
 
   private putLog(req: express.Request, res: express.Response) {
-    const id = req.path.split('/', 4).pop(); // /api/jobs/${id}/log
+    const id = req.params.jobId;
     const task = this.broker.getTask(id);
     if (task) {
       task.logText(req.body);
@@ -100,7 +107,7 @@ export class Server {
   }
 
   private getJob(req: express.Request, res: express.Response) {
-    const id = path.basename(req.url);
+    const id = req.params.jobId;
     const task = this.broker.getTask(id);
     if (!task) {
       res.status(404).send(escapeHtml(`Unknown job '${id}'`));
@@ -116,7 +123,7 @@ export class Server {
 
   private patchJob(req: express.Request, res: express.Response) {
     const d = debug(`${DebugPrefix}:patchJob`);
-    const id = path.basename(req.url);
+    const id = req.params.jobId;
     const task = this.broker.getTask(id);
     if (!task) {
       res.status(404).send(escapeHtml(`Unknown job '${id}'`));
@@ -126,7 +133,9 @@ export class Server {
     const if_header = 'If-Match';
     const if_etag = req.header(if_header);
     if (if_etag && if_etag !== task.etag) {
-      res.status(412).send(escapeHtml(`Invalid ${if_header} header: ${if_etag}`));
+      res
+        .status(412)
+        .send(escapeHtml(`Invalid ${if_header} header: ${if_etag}`));
       return;
     }
 
