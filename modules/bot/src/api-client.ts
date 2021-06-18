@@ -20,9 +20,11 @@ export class APIError extends Error {
 }
 
 export default class BrokerAPI {
+  authToken: string;
   baseURL: string;
 
-  constructor(props: { baseURL: string }) {
+  constructor(props: { authToken: string; baseURL: string }) {
+    this.authToken = props.authToken;
     this.baseURL = props.baseURL;
   }
 
@@ -41,6 +43,7 @@ export default class BrokerAPI {
     const res = await fetch(url.toString(), {
       body: JSON.stringify(bisectJob),
       headers: {
+        Authentication: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
       },
       method: 'POST',
@@ -56,7 +59,11 @@ export default class BrokerAPI {
 
   public async getJob(jobId: JobId): Promise<AnyJob> {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), {
+      headers: {
+        Authentication: `Bearer ${this.authToken}`,
+      },
+    });
     return res.json();
   }
 
@@ -67,6 +74,7 @@ export default class BrokerAPI {
         { op: 'replace', path: '/bot_client_data', value: 'complete' },
       ]),
       headers: {
+        Authentication: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
       },
       method: 'PATCH',

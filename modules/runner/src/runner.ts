@@ -26,6 +26,7 @@ export class Runner {
   public readonly platform: Platform;
   public readonly uuid: RunnerId;
 
+  private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
@@ -41,6 +42,7 @@ export class Runner {
    */
   constructor(
     opts: {
+      authToken?: string;
       brokerUrl?: string;
       childTimeoutMs?: number;
       fiddleExec?: string;
@@ -49,6 +51,7 @@ export class Runner {
       uuid?: string;
     } = {},
   ) {
+    this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
       opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
@@ -135,12 +138,20 @@ export class Runner {
     jobs_url.searchParams.append('type', 'bisect');
 
     // Make the request and return its response
-    return await fetch(jobs_url).then((res) => res.json());
+    return await fetch(jobs_url, {
+      headers: {
+        Authentication: `Bearer ${this.authToken}`,
+      },
+    }).then((res) => res.json());
   }
 
   private async fetchJobAndEtag(id: string): Promise<[AnyJob, string]> {
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
-    const resp = await fetch(job_url);
+    const resp = await fetch(job_url, {
+      headers: {
+        Authentication: `Bearer ${this.authToken}`,
+      },
+    });
 
     // Extract the etag header & make sure it was defined
     const etag = resp.headers.get('etag');
@@ -160,6 +171,7 @@ export class Runner {
     const resp = await fetch(job_url, {
       body: JSON.stringify(patches),
       headers: {
+        Authentication: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
         ETag: this.etag,
       },
@@ -182,6 +194,7 @@ export class Runner {
     const resp = await fetch(log_url, {
       body,
       headers: {
+        Authentication: `Bearer ${this.authToken}`,
         'Content-Type': 'text/plain; charset=utf-8',
       },
       method: 'PUT',
