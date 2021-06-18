@@ -183,13 +183,14 @@ export class Runner {
   private putLogBuf: string[] = [];
 
   private putLog(data: any) {
+    // save the URL to safeguard against this.jobId being cleared at end-of-job
+    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
     this.putLogBuf.push(data);
     this.putLogTimer ||= setTimeout(async () => {
       const body = this.putLogBuf.splice(0).join('\n');
       delete this.putLogTimer;
 
       d('putLog', body);
-      const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
       const resp = await fetch(log_url, {
         body,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
