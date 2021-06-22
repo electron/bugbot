@@ -34,6 +34,7 @@ describe('runner', () => {
     runner = new Runner({
       brokerUrl,
       fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
+      logIntervalMs: 1, // minimize batching to avoid timing issues during testing
       platform,
       ...opts,
     });
