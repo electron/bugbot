@@ -187,8 +187,9 @@ export class Runner {
   private async putLogImpl(url: URL) {
     delete this.putLogTimer;
 
-    const body = this.putLogBuf.splice(0).join('\n');
-    d(`putLogImpl sending ${body.split('\n').length} lines`, body);
+    const lines = this.putLogBuf.splice(0);
+    const body = lines.join('\n');
+    d(`putLogImpl sending ${lines.length} lines`, body);
     const resp = await fetch(url, {
       body,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
