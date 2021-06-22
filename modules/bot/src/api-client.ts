@@ -43,7 +43,7 @@ export default class BrokerAPI {
     const res = await fetch(url.toString(), {
       body: JSON.stringify(bisectJob),
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
       },
       method: 'POST',
@@ -61,7 +61,7 @@ export default class BrokerAPI {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     const res = await fetch(url.toString(), {
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
       },
     });
     return res.json();
@@ -74,7 +74,7 @@ export default class BrokerAPI {
         { op: 'replace', path: '/bot_client_data', value: 'complete' },
       ]),
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
       },
       method: 'PATCH',

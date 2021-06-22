@@ -140,7 +140,7 @@ export class Runner {
     // Make the request and return its response
     return await fetch(jobs_url, {
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
       },
     }).then((res) => res.json());
   }
@@ -149,7 +149,7 @@ export class Runner {
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
     const resp = await fetch(job_url, {
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
       },
     });
 
@@ -171,7 +171,7 @@ export class Runner {
     const resp = await fetch(job_url, {
       body: JSON.stringify(patches),
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
         ETag: this.etag,
       },
@@ -194,7 +194,7 @@ export class Runner {
     const resp = await fetch(log_url, {
       body,
       headers: {
-        Authentication: `Bearer ${this.authToken}`,
+        Authorization: `Bearer ${this.authToken}`,
         'Content-Type': 'text/plain; charset=utf-8',
       },
       method: 'PUT',
