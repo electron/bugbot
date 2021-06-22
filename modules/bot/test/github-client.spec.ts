@@ -1,4 +1,5 @@
 process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
+process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
 import { Context } from 'probot';
 
