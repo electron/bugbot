@@ -36,6 +36,8 @@ export class Runner {
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
   private jobId: JobId;
+  private putLogBuf: string[] = [];
+  private putLogTimer: ReturnType<typeof setTimeout>;
   private timeBegun: number;
 
   /**
@@ -181,10 +183,6 @@ export class Runner {
 
     this.etag = etag;
   }
-
-  private putLogTimer: ReturnType<typeof setTimeout>;
-
-  private putLogBuf: string[] = [];
 
   private putLog(data: any) {
     // save the URL to safeguard against this.jobId being cleared at end-of-job
