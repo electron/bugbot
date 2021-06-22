@@ -23,5 +23,8 @@
   },
   "devDependencies": {
     "@types/escape-html": "^1.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
