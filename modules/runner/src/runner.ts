@@ -184,22 +184,29 @@ export class Runner {
     this.etag = etag;
   }
 
+  private async putLogImpl(url: URL) {
+    delete this.putLogTimer;
+
+    const body = this.putLogBuf.splice(0).join('\n');
+    d(`putLogImpl sending ${body.split('\n').length} lines`, body);
+    const resp = await fetch(url, {
+      body,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      method: 'PUT',
+    });
+    d(`putLogImpl resp.status ${resp.status}`);
+  }
+
   private putLog(data: any) {
     // save the URL to safeguard against this.jobId being cleared at end-of-job
     const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
     this.putLogBuf.push(data);
-    this.putLogTimer ||= setTimeout(async () => {
-      const body = this.putLogBuf.splice(0).join('\n');
-      delete this.putLogTimer;
-
-      d('putLog', body);
-      const resp = await fetch(log_url, {
-        body,
-        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-        method: 'PUT',
-      });
-      d(`putLog resp.status ${resp.status}`);
-    }, this.logIntervalMs);
+    if (!this.putLogTimer) {
+      this.putLogTimer = setTimeout(
+        this.putLogImpl.bind(this, log_url),
+        this.logIntervalMs,
+      );
+    }
   }
 
   private patchResult(result: Partial<Result>): Promise<void> {
