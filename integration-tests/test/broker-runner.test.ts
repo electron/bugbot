@@ -22,7 +22,7 @@ describe('runner', () => {
   const platform: Platform = 'linux';
 
   const auth = new Auth();
-  const authToken = auth.createToken([AuthScope.Jobs]);
+  const authToken = auth.createToken([AuthScope.UpdateJobs]);
 
   let broker: Broker;
   let brokerServer: BrokerServer;

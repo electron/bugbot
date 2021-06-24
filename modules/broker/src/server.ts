@@ -63,7 +63,8 @@ export class Server {
     } else {
       this.auth = new Auth();
 
-      // Create a control token and debug print it out
+      // Create a control token and debug print it out so someone can see it
+      // and use it to control and make more tokens
       const controlTokenId = this.auth.createToken([AuthScope.ControlTokens]);
       debug(`${DebugPrefix}:auth`)(
         `Empty auth created with control token "${controlTokenId}"`,
@@ -71,31 +72,23 @@ export class Server {
     }
 
     this.app = express();
-    this.app.get(
-      '/api/jobs',
-      this.authMiddleware([AuthScope.Jobs]),
-      this.getJobs.bind(this),
-    );
-    this.app.get(
-      '/api/jobs/:jobId',
-      this.authMiddleware([AuthScope.Jobs]),
-      this.getJob.bind(this),
-    );
+    this.app.get('/api/jobs', this.getJobs.bind(this));
+    this.app.get('/api/jobs/:jobId', this.getJob.bind(this));
     this.app.patch(
       '/api/jobs/:jobId',
-      this.authMiddleware([AuthScope.Jobs]),
+      this.authMiddleware([AuthScope.UpdateJobs]),
       express.json(),
       this.patchJob.bind(this),
     );
     this.app.post(
       '/api/jobs',
-      this.authMiddleware([AuthScope.Jobs]),
+      this.authMiddleware([AuthScope.CreateJobs]),
       express.json(),
       this.postJob.bind(this),
     );
     this.app.put(
       '/api/jobs/:jobId/log',
-      this.authMiddleware([AuthScope.Jobs]),
+      this.authMiddleware([AuthScope.UpdateJobs]),
       express.text(),
       this.putLog.bind(this),
     );
@@ -225,19 +218,55 @@ export class Server {
   }
 
   private postTokens(req: express.Request, res: express.Response) {
-    const scopes = req.body;
-    const tokenId = this.auth.createToken(scopes);
-    res.status(200).json(tokenId);
+    // Get the scopes from the body and try to make sure it looks like a token
+    // data object
+    const tokenData = req.body;
+
+    // Ensure it is an object
+    if (typeof tokenData !== 'object') {
+      res.status(400).send('Must send an object');
+      return;
+    }
+
+    // Make sure there is a scopes field that is an array
+    if (!Array.isArray(tokenData.scopes)) {
+      res.status(400).send('Missing scopes array');
+      return;
+    }
+
+    // Make sure each scope is real and valid
+    for (const scope of tokenData.scopes) {
+      if (typeof scope !== 'string') {
+        res.status(400).send('Passed scope is not a string');
+        return;
+      }
+      if (AuthScope[scope] === undefined) {
+        res.status(400).send(escapeHtml(`Unknown scope "${scope}"`));
+        return;
+      }
+    }
+
+    // Create the token and send it back
+    const token = this.auth.createToken(tokenData);
+    res.status(200).json(token);
   }
 
   private deleteTokens(req: express.Request, res: express.Response) {
-    const tokenId = req.body;
-    const success = this.auth.revokeToken(tokenId);
-    if (success) {
-      res.status(200).end();
-    } else {
-      res.status(404).end();
+    // Get the token and make sure it looks like a token
+    const token = req.body;
+    if (typeof token !== 'string') {
+      res.status(400).send('Must send token as a string');
+      return;
     }
+
+    // Attempt to delete the token
+    const deleted = this.auth.revokeToken(token);
+    if (!deleted) {
+      res.status(404).send('Token not found');
+      return;
+    }
+
+    res.status(200).end();
   }
 
   /**
@@ -247,16 +276,9 @@ export class Server {
   private authMiddleware(scopes: AuthScope[]): express.RequestHandler {
     return (req, res, next) => {
       // Get the `authorization` header value, rejecting requests that don't
-      // provide one
-      const authHeader = req.headers.authorization;
-      if (authHeader === undefined) {
-        res.status(401).end();
-        return;
-      }
-
-      // Ensure the header is the correct type
-      const match = authHeader.match(/^Bearer (.+)$/);
-      if (match === null) {
+      // provide one or have the wrong format or wrong type.
+      const match = req.headers.authorization?.match(/^Bearer (.+)$/);
+      if (!match) {
         res.status(401).end();
         return;
       }
@@ -265,8 +287,7 @@ export class Server {
       const [, tokenId] = match;
 
       // Check if the token is authorized for the given scopes
-      const isAuthed = this.auth.tokenHasScopes(tokenId, scopes);
-      if (!isAuthed) {
+      if (!this.auth.tokenHasScopes(tokenId, scopes)) {
         res.status(403).end();
         return;
       }

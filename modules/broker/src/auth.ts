@@ -11,77 +11,82 @@ function randomToken(): string {
   ]).toString('base64url');
 }
 
-export const enum AuthScope {
+export enum AuthScope {
   /** Ability to create and revoke tokens. */
   ControlTokens = 'tokens',
 
-  /** Ability to see the list of jobs, create new jobs, and update jobs. */
-  Jobs = 'jobs:write',
+  /** Ability to create new jobs. */
+  CreateJobs = 'jobs:create',
+
+  /** Ability to update existing jobs. */
+  UpdateJobs = 'jobs:update',
 }
 
-export interface AuthToken {
-  id: string;
-  scopes: AuthScope[];
+/**
+ * Data about an authorization through the security layer.
+ */
+interface AuthData {
+  /** Authentication token. */
+  token: string;
+
+  /** Allowed scopes. */
+  scopes: Set<AuthScope>;
 }
 
+/**
+ * Stores information about authorizations through the security layer. Queries
+ * can be made about those authorizations to enable authentication.
+ */
 export class Auth {
-  /** The token store. */
-  private tokens: AuthToken[];
+  /**
+   * The token store, mapped from token to an auth data object.
+   */
+  private tokens: Map<string, AuthData>;
 
   public constructor() {
-    this.tokens = [];
+    this.tokens = new Map();
   }
 
   /**
-   * Creates a new token with the supplied scopes, adds it to the token store,
-   * then returns the token's ID.
+   * Generates a new auth data object with the supplied scopes, adds it to the
+   * token store, then returns the token.
    */
   public createToken(scopes: AuthScope[]): string {
-    // Generate a new UUID for the token
-    const id = randomToken();
+    // Generate a token
+    const token = randomToken();
 
-    // Add the token to the token store
-    this.tokens.push({
-      id,
-      scopes,
+    // Add a token object to the token store
+    this.tokens.set(token, {
+      scopes: new Set(scopes),
+      token,
     });
 
-    // Return the token's ID
-    return id;
+    // Return the token
+    return token;
   }
 
   /**
    * Revokes a token from the token store and returns whether the operation was
-   * successful or failed (e.g. could not find the token with the given ID).
+   * successful or failed (e.g. could not find the token).
    */
-  public revokeToken(id: string): boolean {
-    // Find the token with the given ID
-    const idx = this.tokens.findIndex((token) => token.id === id);
-
-    // Ensure a token with the given ID was found
-    if (idx === -1) {
-      return false;
-    }
-
-    // Remove the token from the token store
-    this.tokens.splice(idx, 1);
-    return true;
+  public revokeToken(token: string): boolean {
+    return this.tokens.delete(token);
   }
 
   /**
-   * Checks that a token with the given ID is registered in the token store and
-   * has all of the given scopes.
+   * Checks that a token is registered in the token store and has *all* of the
+   * given scopes.
    */
-  public tokenHasScopes(id: string, scopes: AuthScope[]): boolean {
-    // Find the token with the given ID
-    const token = this.tokens.find((t) => t.id === id);
+  public tokenHasScopes(token: string, scopes: AuthScope[]): boolean {
+    // Find the token from the token store
+    const authObj = this.tokens.get(token);
 
-    // Ensure the token was found
-    if (token === undefined) {
+    // Ensure the token object was found
+    if (authObj === undefined) {
       return false;
     }
 
-    // Ensure the token has every scope given
-    return scopes.every((scope) => token.scopes.includes(scope));
+    // Ensure the token object has every scope given
+    return scopes.every((scope) => authObj.scopes.has(scope));
   }
 }

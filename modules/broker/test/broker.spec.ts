@@ -12,10 +12,8 @@ import { Auth, AuthScope } from '../src/auth';
 import { Server } from '../src/server';
 
 describe('broker', () => {
-  const auth = new Auth();
-  const authToken = auth.createToken([AuthScope.Jobs]);
-
   let server: Server;
+  let authToken: string;
   const base_url = 'http://localhost:9090'; // arbitrary port
 
   function fixturePath(name) {
@@ -28,12 +26,43 @@ describe('broker', () => {
   beforeEach(async () => {
     process.env.BUGBOT_BROKER_URL = base_url;
 
+    const auth = new Auth();
+    authToken = auth.createToken([AuthScope.CreateJobs, AuthScope.UpdateJobs]);
     server = new Server({ auth, brokerUrl: base_url });
     await server.start();
   });
 
   afterEach(() => {
     server.stop();
+  });
+
+  describe('authorization', () => {
+    it('rejects requests missing authorization header with error code 401', async () => {
+      const response = await fetch(new URL('/api/jobs', base_url), {
+        method: 'POST',
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects requests with misformed authorization header with error code 401', async () => {
+      const response = await fetch(new URL('/api/jobs', base_url), {
+        headers: {
+          Authorization: 'just trust me',
+        },
+        method: 'POST',
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects requests with unknown auth tokens with error code 403', async () => {
+      const response = await fetch(new URL('/api/jobs', base_url), {
+        headers: {
+          Authorization: `Bearer justTrustMe`,
+        },
+        method: 'POST',
+      });
+      expect(response.status).toBe(403);
+    });
   });
 
   function postJob(body) {
