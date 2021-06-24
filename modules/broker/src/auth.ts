@@ -41,11 +41,7 @@ export class Auth {
   /**
    * The token store, mapped from token to an auth data object.
    */
-  private tokens: Map<string, AuthData>;
-
-  public constructor() {
-    this.tokens = new Map();
-  }
+  private tokens: Map<string, AuthData> = new Map();
 
   /**
    * Generates a new auth data object with the supplied scopes, adds it to the
