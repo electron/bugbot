@@ -1,5 +1,6 @@
 import debug from 'debug';
 import fetch from 'node-fetch';
+import stringArgv from 'string-argv';
 import which from 'which';
 import { Operation as PatchOp } from 'fast-json-patch';
 import { URL } from 'url';
@@ -30,7 +31,11 @@ export class Runner {
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
+  private readonly fiddleArgv: string[];
   private readonly pollIntervalMs: number;
+  private readonly logIntervalMs: number;
+  private logBuffer: string[] = [];
+  private logTimer: ReturnType<typeof setTimeout>;
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
   private jobId: JobId;
@@ -46,6 +51,7 @@ export class Runner {
       brokerUrl?: string;
       childTimeoutMs?: number;
       fiddleExec?: string;
+      logIntervalMs?: number;
       platform?: Platform;
       pollIntervalMs?: number;
       uuid?: string;
@@ -55,10 +61,13 @@ export class Runner {
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
       opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
-    this.fiddleExec =
+    this.fiddleArgv = stringArgv(
       opts.fiddleExec ||
-      process.env.BUGBOT_FIDDLE_EXEC ||
-      which.sync('electron-fiddle');
+        process.env.BUGBOT_FIDDLE_EXEC ||
+        which.sync('electron-fiddle'),
+    );
+    this.fiddleExec = this.fiddleArgv.shift();
+    this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
     this.pollIntervalMs =
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
@@ -187,11 +196,13 @@ export class Runner {
     this.etag = etag;
   }
 
-  private async putLog(data: any) {
-    const body = data.toString();
-    d('appendLog', body);
-    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
-    const resp = await fetch(log_url, {
+  private async sendLogDataBuffer(url: URL) {
+    delete this.logTimer;
+
+    const lines = this.logBuffer.splice(0);
+    const body = lines.join('\n');
+    d(`sendLogDataBuffer sending ${lines.length} lines`, body);
+    const resp = await fetch(url, {
       body,
       headers: {
         Authorization: `Bearer ${this.authToken}`,
@@ -199,7 +210,19 @@ export class Runner {
       },
       method: 'PUT',
     });
-    d(`appendLog resp.status ${resp.status}`);
+    d(`sendLogDataBuffer resp.status ${resp.status}`);
+  }
+
+  private addLogData(data: any) {
+    // save the URL to safeguard against this.jobId being cleared at end-of-job
+    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
+    this.logBuffer.push(data);
+    if (!this.logTimer) {
+      this.logTimer = setTimeout(
+        this.sendLogDataBuffer.bind(this, log_url),
+        this.logIntervalMs,
+      );
+    }
   }
 
   private patchResult(result: Partial<Result>): Promise<void> {
@@ -218,17 +241,24 @@ export class Runner {
   }
 
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
-    const putLog = this.putLog.bind(this);
+    const addLogData = this.addLogData.bind(this);
     const patchResult = this.patchResult.bind(this);
-    const { childTimeoutMs, fiddleExec } = this;
+    const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
 
     return new Promise<void>((resolve) => {
-      const args = ['bisect', range[0], range[1], '--fiddle', gistId];
+      const args = [
+        ...fiddleArgv,
+        'bisect',
+        range[0],
+        range[1],
+        '--fiddle',
+        gistId,
+      ];
       const opts = { timeout: childTimeoutMs };
       const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      putLog(
+      addLogData(
         [
           `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
           `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
@@ -236,10 +266,10 @@ export class Runner {
         ].join('\n'),
       );
 
-      // TODO(any): could debounce/buffer this data before calling putLog()
+      // TODO(any): could debounce/buffer this data before calling addLogData()
       const stdout: any[] = [];
-      child.stderr.on('data', (data) => putLog(data));
-      child.stdout.on('data', (data) => putLog(data));
+      child.stderr.on('data', (data) => addLogData(data));
+      child.stdout.on('data', (data) => addLogData(data));
       child.stdout.on('data', (data) => stdout.push(data));
       child.on('error', (err) => {
         patchResult({

@@ -22,6 +22,6 @@ $ yarn run build
 | `BUGBOT_BROKER_KEY` or `BUGBOT_BROKER_KEY_PATH` | Required by Broker if `BUGBOT_BROKER_URL` is https | The data (or the path to it) to use as the `key` option to [https.createServer()](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener). | None |
 | `BUGBOT_BROKER_URL` | Required by all | The base URL for the broker, e.g. `https://bugbot.electronjs.org:8443`. | None |
 | `BUGBOT_CHILD_TIMEOUT_MS` | Runner | When to cancel a hung child | 5 minutes |
-| `BUGBOT_FIDDLE_EXEC` | Runner | Used to invoke electron-fiddle | '[which](https://github.com/npm/node-which) electron-fiddle' |
+| `BUGBOT_FIDDLE_EXEC` | Runner | Used to invoke electron-fiddle. This can include other space-delimited command-line arguments, e.g. `xvfb-run electron-fiddle` | '[which](https://github.com/npm/node-which) electron-fiddle' |
 | `BUGBOT_POLL_INTERVAL_MS` | Bot, Runner | How frequently to poll the Broker | 20 seconds |
 | `BUGBOT_AUTH_TOKEN` | Bot, Runner | The auth token for communications with the Broker |
