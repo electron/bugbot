@@ -8,10 +8,12 @@ import { URL, URLSearchParams } from 'url';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
 import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
+import { Auth, AuthScope } from '../src/auth';
 import { Server } from '../src/server';
 
 describe('broker', () => {
   let server: Server;
+  let authToken: string;
   const base_url = 'http://localhost:9090'; // arbitrary port
 
   function fixturePath(name) {
@@ -24,7 +26,9 @@ describe('broker', () => {
   beforeEach(async () => {
     process.env.BUGBOT_BROKER_URL = base_url;
 
-    server = new Server({ brokerUrl: base_url });
+    const auth = new Auth();
+    authToken = auth.createToken([AuthScope.CreateJobs, AuthScope.UpdateJobs]);
+    server = new Server({ auth, brokerUrl: base_url });
     await server.start();
   });
 
@@ -32,10 +36,42 @@ describe('broker', () => {
     server.stop();
   });
 
+  describe('authorization', () => {
+    it('rejects requests missing authorization header with error code 401', async () => {
+      const response = await fetch(new URL('/api/jobs', base_url), {
+        method: 'POST',
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects requests with misformed authorization header with error code 401', async () => {
+      const response = await fetch(new URL('/api/jobs', base_url), {
+        headers: {
+          Authorization: 'just trust me',
+        },
+        method: 'POST',
+      });
+      expect(response.status).toBe(401);
+    });
+
+    it('rejects requests with unknown auth tokens with error code 403', async () => {
+      const response = await fetch(new URL('/api/jobs', base_url), {
+        headers: {
+          Authorization: `Bearer justTrustMe`,
+        },
+        method: 'POST',
+      });
+      expect(response.status).toBe(403);
+    });
+  });
+
   function postJob(body) {
     return fetch(new URL('/api/jobs', base_url), {
       body: JSON.stringify(body),
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
       method: 'POST',
     });
   }
@@ -93,7 +129,11 @@ describe('broker', () => {
   }
 
   async function getJob(id: string) {
-    const response = await fetch(new URL(`/api/jobs/${id}`, base_url));
+    const response = await fetch(new URL(`/api/jobs/${id}`, base_url), {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
     const etag = response.headers.get('ETag');
     let body;
     try {
@@ -109,7 +149,11 @@ describe('broker', () => {
     for (const [key, val] of Object.entries(filter)) {
       params.set(key, val.toString());
     }
-    const response = await fetch(new URL(`/api/jobs?${params}`, base_url));
+    const response = await fetch(new URL(`/api/jobs?${params}`, base_url), {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
     const body = await response.json();
     return { body, response };
   }
@@ -371,7 +415,11 @@ describe('broker', () => {
     ) {
       return fetch(new URL(`/api/jobs/${patchId}`, base_url), {
         body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json', 'If-Match': patchEtag },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          'If-Match': patchEtag,
+        },
         method: 'PATCH',
       });
     }
@@ -496,7 +544,11 @@ describe('broker', () => {
   });
 
   async function getLog(job_id: string) {
-    const response = await fetch(new URL(`/log/${job_id}`, base_url));
+    const response = await fetch(new URL(`/log/${job_id}`, base_url), {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
     const text = await response.text();
     return { body: text, response };
   }
@@ -512,6 +564,9 @@ describe('broker', () => {
     function addLogMessages(job_id: string, body = '') {
       return fetch(new URL(`/api/jobs/${job_id}/log`, base_url), {
         body,
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
         method: 'PUT',
       });
     }

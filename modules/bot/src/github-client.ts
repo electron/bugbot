@@ -21,6 +21,7 @@ const actions = {
 };
 
 const settings = {
+  authToken: env('BUGBOT_AUTH_TOKEN'),
   brokerBaseUrl: env('BUGBOT_BROKER_URL'),
   pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
 } as const;
@@ -104,7 +105,10 @@ async function commentBisectResult(
  */
 export async function parseManualCommand(context: Context): Promise<void> {
   const d = debug('github-client:parseManualCommand');
-  const api = new BrokerAPI({ baseURL: settings.brokerBaseUrl });
+  const api = new BrokerAPI({
+    authToken: settings.authToken,
+    baseURL: settings.brokerBaseUrl,
+  });
 
   const { payload } = context;
   const args = payload.comment.body.split(' ');

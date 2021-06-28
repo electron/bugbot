@@ -2,6 +2,7 @@ import * as path from 'path';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
+import { Auth, AuthScope } from '../../modules/broker/src/auth';
 import { Broker } from '../../modules/broker/src/broker';
 import { Task } from '../../modules/broker/src/task';
 import { Server as BrokerServer } from '../../modules/broker/src/server';
@@ -20,18 +21,22 @@ describe('runner', () => {
   const brokerUrl = `http://localhost:9090`; // arbitrary port
   const platform: Platform = 'linux';
 
+  const auth = new Auth();
+  const authToken = auth.createToken([AuthScope.UpdateJobs]);
+
   let broker: Broker;
   let brokerServer: BrokerServer;
   let runner: Runner;
 
   function startBroker(opts: Record<string, any> = {}) {
     broker = new Broker();
-    brokerServer = new BrokerServer({ broker, brokerUrl, ...opts });
+    brokerServer = new BrokerServer({ auth, broker, brokerUrl, ...opts });
     brokerServer.start();
   }
 
   function createRunner(opts: Record<string, any> = {}) {
     runner = new Runner({
+      authToken,
       brokerUrl,
       fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
       logIntervalMs: 1, // minimize batching to avoid timing issues during testing
