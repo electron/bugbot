@@ -35,7 +35,7 @@ export class Runner {
   private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
   private logBuffer: string[] = [];
-  private logTimer: ReturnType<typeof setTimeout>;
+  private logPromise: Promise<void> | undefined;
   private etag: string;
   private interval: ReturnType<typeof setInterval>;
   private jobId: JobId;
@@ -194,7 +194,7 @@ export class Runner {
   }
 
   private async sendLogDataBuffer(url: URL) {
-    delete this.logTimer;
+    delete this.logPromise;
 
     const lines = this.logBuffer.splice(0);
     const body = lines.join('\n');
@@ -211,15 +211,13 @@ export class Runner {
   }
 
   private addLogData(data: any) {
-    // save the URL to safeguard against this.jobId being cleared at end-of-job
-    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
     this.logBuffer.push(data);
-    if (!this.logTimer) {
-      this.logTimer = setTimeout(
-        () => this.sendLogDataBuffer(log_url),
-        this.logIntervalMs,
-      );
-    }
+    if (this.logPromise !== undefined) return;
+
+    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
+    this.logPromise = new Promise((resolve) =>
+      setTimeout(resolve, this.logIntervalMs),
+    ).then(() => this.sendLogDataBuffer(log_url));
   }
 
   private patchResult(result: Partial<Result>): Promise<void> {

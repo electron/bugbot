@@ -1,9 +1,9 @@
 import debug from 'debug';
 import { Context, Probot } from 'probot';
 import { URL } from 'url';
-import { inspect } from 'util';
+import { inspect, promisify } from 'util';
 
-import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
+import { AnyJob, JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
 import {
   FiddleInput,
@@ -99,6 +99,15 @@ async function commentBisectResult(
   await Promise.all(promises);
 }
 
+async function getFinishedJob(api: BrokerAPI, jobId: string): Promise<AnyJob> {
+  const wait = promisify(setTimeout);
+  for (;;) {
+    await wait(settings.pollIntervalMs);
+    const job = await api.getJob(jobId);
+    if (job.last) return job;
+  }
+}
+
 /**
  * Takes action based on a comment left on an issue
  * @param context Probot context object
@@ -146,20 +155,10 @@ export async function parseManualCommand(context: Context): Promise<void> {
     const jobId = await api.queueBisectJob(input);
 
     d(`Queued bisect job ${jobId}`);
-
-    // Poll until the job is complete
-    const timer = setInterval(async () => {
-      d(`polling job ${jobId}...`);
-      const job = await api.getJob(jobId);
-      if (!job.last) {
-        d('job still pending...', { job });
-        return;
-      }
-      d(`job ${jobId} complete`);
-      clearInterval(timer);
-      await commentBisectResult(jobId, job.last, context);
-      await api.completeJob(jobId);
-    }, settings.pollIntervalMs);
+    const job = await getFinishedJob(api, jobId);
+    d(`job ${jobId} complete`);
+    await commentBisectResult(jobId, job.last, context);
+    await api.completeJob(jobId);
   }
 }
 
