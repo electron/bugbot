@@ -7,8 +7,8 @@
     "build": "tsc -b",
     "heroku-postbuild": "yarn build",
     "start": "probot run ./dist/github-client.js",
-    "test": "jest",
-    "test:ci": "jest --coverage --runInBand"
+    "test": "jest --runInBand",
+    "test:ci": "jest --runInBand --coverage"
   },
   "dependencies": {
     "@electron/bugbot-shared": "*",
