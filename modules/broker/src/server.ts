@@ -296,10 +296,10 @@ export class Server {
     };
   }
 
-  public start(): Promise<void> {
+  public async start(): Promise<void> {
     const d = debug(`${DebugPrefix}:start`);
 
-    this.stop(); // ensure we don't accidentally start a 2nd server
+    await this.stop(); // ensure we don't accidentally start a 2nd server
 
     d('starting server');
 
@@ -337,13 +337,21 @@ export class Server {
     }
   }
 
-  public stop(): void {
+  public stop(): Promise<void> {
     const d = debug(`${DebugPrefix}:stop`);
-    if (this.server) {
-      this.server.close();
-      delete this.server;
-      d('server stopped');
+
+    if (!this.server) {
+      d('server was not running');
+      return Promise.resolve();
     }
+
+    return new Promise<void>((resolve) => {
+      this.server.close(() => {
+        delete this.server;
+        d('server stopped');
+        return resolve();
+      });
+    });
   }
 
   /**

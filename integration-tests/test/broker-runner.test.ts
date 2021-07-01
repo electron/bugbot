@@ -28,10 +28,10 @@ describe('runner', () => {
   let brokerServer: BrokerServer;
   let runner: Runner;
 
-  function startBroker(opts: Record<string, any> = {}) {
+  async function startBroker(opts: Record<string, any> = {}) {
     broker = new Broker();
     brokerServer = new BrokerServer({ auth, broker, brokerUrl, ...opts });
-    brokerServer.start();
+    await brokerServer.start();
   }
 
   function createRunner(opts: Record<string, any> = {}) {
@@ -45,13 +45,13 @@ describe('runner', () => {
     });
   }
 
-  afterEach(() => {
-    runner.stop();
+  afterEach(async () => {
     brokerServer.stop();
+    await runner.stop();
   });
 
-  it('starts', () => {
-    startBroker();
+  it('starts', async () => {
+    await startBroker();
     expect(brokerServer.brokerUrl).toStrictEqual(new URL(brokerUrl));
 
     createRunner();
@@ -59,7 +59,7 @@ describe('runner', () => {
   });
 
   async function runTask(task: Task) {
-    startBroker();
+    await startBroker();
     broker.addTask(task);
     createRunner();
     await runner.poll();
