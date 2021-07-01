@@ -32,8 +32,8 @@ describe('broker', () => {
     await server.start();
   });
 
-  afterEach(() => {
-    server.stop();
+  afterEach(async () => {
+    await server.stop();
   });
 
   describe('authorization', () => {
@@ -65,6 +65,10 @@ describe('broker', () => {
     });
   });
 
+  it('errors if you try to start a server that is already running', async () => {
+    await expect(server.start()).rejects.toThrow(/already running/);
+  });
+
   function postJob(body) {
     return fetch(new URL('/api/jobs', base_url), {
       body: JSON.stringify(body),
@@ -76,12 +80,12 @@ describe('broker', () => {
     });
   }
 
-  it('errors if scheme is not http nor https', () => {
+  it('errors if scheme is not http nor https', async () => {
     const bad_url = 'sftp://localhost:22';
     process.env.BUGBOT_BROKER_URL = bad_url;
     const sftp_server = new Server({ brokerUrl: bad_url });
     expect(sftp_server.start()).rejects.toThrow('sftp');
-    sftp_server.stop();
+    await sftp_server.stop();
   });
 
   it('can run as an https server', async () => {
@@ -92,7 +96,7 @@ describe('broker', () => {
       key: readFixture('test.key'),
     });
     await expect(https_server.start()).resolves.not.toThrow();
-    https_server.stop();
+    await https_server.stop();
   });
 
   it('uses environmental variables as a fallback', async () => {
@@ -106,7 +110,7 @@ describe('broker', () => {
       new URL(`${process.env.BUGBOT_BROKER_URL}:${process.env.PORT}`),
     );
     await expect(https_server.start()).resolves.not.toThrow();
-    https_server.stop();
+    await https_server.stop();
 
     delete process.env.PORT;
     delete process.env.BUGBOT_BROKER_URL;

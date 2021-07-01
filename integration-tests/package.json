@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "scripts": {
     "build": "# no-op",
-    "test": "jest",
-    "test:ci": "jest --coverage --runInBand"
+    "test": "jest --runInBand",
+    "test:ci": "jest --runInBand --coverage"
   },
   "devDependencies": {
     "@types/jest": "^26.0.23",

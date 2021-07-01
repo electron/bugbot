@@ -5,8 +5,8 @@
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc -b",
-    "test": "jest",
-    "test:ci": "jest --coverage --runInBand"
+    "test": "jest --runInBand",
+    "test:ci": "jest --runInBand --coverage"
   },
   "dependencies": {
     "mdast-util-from-markdown": "^0.8.5",
