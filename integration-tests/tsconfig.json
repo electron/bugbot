@@ -3,10 +3,13 @@
   "compilerOptions": {
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo",
-    "rootDir": "src",
+    "rootDir": "src"
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../shared" }
+    { "path": "../modules/bot" },
+    { "path": "../modules/broker" },
+    { "path": "../modules/runner" },
+    { "path": "../modules/shared" }
   ]
 }
