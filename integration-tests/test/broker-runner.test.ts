@@ -13,7 +13,7 @@ import {
   Current,
   Platform,
   Result,
-} from '@electron/bugbot-shared/lib/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60 * 1000);
 

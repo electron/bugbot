@@ -3,12 +3,12 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
-import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
-import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
+import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 import {
   FiddleInput,
   parseIssueBody,
-} from '@electron/bugbot-shared/lib/issue-parser';
+} from '@electron/bugbot-shared/build/issue-parser';
 
 import BrokerAPI from './api-client';
 import { Labels } from './github-labels';

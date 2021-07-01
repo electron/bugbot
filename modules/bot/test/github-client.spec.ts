@@ -6,11 +6,11 @@ import { Context } from 'probot';
 import { parseManualCommand } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
 import fixture from './fixtures/issue_comment.created.json';
-import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
+import { parseIssueBody } from '@electron/bugbot-shared/build/issue-parser';
 
 jest.mock('../src/api-client');
 
-jest.mock('../../shared/lib/issue-parser', () => ({
+jest.mock('../../shared/build/issue-parser', () => ({
   parseIssueBody: jest.fn(),
 }));
 
