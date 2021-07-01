@@ -77,10 +77,7 @@ export class Runner {
   public start(): void {
     this.stop();
     d('runner:start', `interval is ${this.pollIntervalMs}`);
-    this.interval = setInterval(
-      this.pollSafely.bind(this),
-      this.pollIntervalMs,
-    );
+    this.interval = setInterval(() => this.pollSafely(), this.pollIntervalMs);
     this.pollSafely();
   }
 
@@ -219,7 +216,7 @@ export class Runner {
     this.logBuffer.push(data);
     if (!this.logTimer) {
       this.logTimer = setTimeout(
-        this.sendLogDataBuffer.bind(this, log_url),
+        () => this.sendLogDataBuffer(log_url),
         this.logIntervalMs,
       );
     }
