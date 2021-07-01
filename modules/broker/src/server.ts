@@ -277,7 +277,7 @@ export class Server {
     return (req, res, next) => {
       // Get the `authorization` header value, rejecting requests that don't
       // provide one or have the wrong format or wrong type.
-      const match = req.headers.authorization?.match(/^Bearer (.+)$/);
+      const match = /^Bearer (.+)$/.exec(req.headers.authorization);
       if (!match) {
         res.status(401).end();
         return;

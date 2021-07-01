@@ -25,17 +25,17 @@ export function buildLog(task: Readonly<Task>): string {
     const lines = block.lines
       // make urls clickable
       .map((line) => {
-        const m = line.match(UrlRegex);
+        const m = UrlRegex.exec(line);
         return m ? line.replace(m[0], `<a href="${m[0]}">${m[0]}</a>`) : line;
       })
       // make electron releases clickable
       .map((line) => {
-        const m = line.match(ElectronRegex);
+        const m = ElectronRegex.exec(line);
         return m ? line.replace(m[0], electronAnchor(m[1])) : line;
       })
       // cycle through colors in the timestamp when we change runners
       .map((line) => {
-        const m = line.match(TimestampRegex);
+        const m = TimestampRegex.exec(line);
         return m
           ? `<span class="style${idx % NumStyles}">${m[1]}</span> ${m[2]}`
           : line;
