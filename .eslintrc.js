@@ -23,6 +23,7 @@ const config = {
     tsconfigRootDir: __dirname,
   },
   rules: {
+    // TODO(anyone): re-enable any of these tests & fix the warnings
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/no-misused-promises': 'off',
