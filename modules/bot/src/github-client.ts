@@ -185,7 +185,7 @@ export default (robot: Probot): void => {
   robot.on('issues.edited', (context) => {
     d('issues.edited', inspect(context.payload));
   });
-  robot.on('issue_comment.created', (context) => {
+  robot.on('issue_comment.created', async (context) => {
     // TODO(erickzhao): add allowlist here
     const isMaintainer = true;
 
@@ -193,7 +193,7 @@ export default (robot: Probot): void => {
       context.payload.comment.user.id === context.payload.sender.id &&
       isMaintainer
     ) {
-      parseManualCommand(context);
+      await parseManualCommand(context);
     }
   });
   robot.on('issue_comment.edited', (context) => {
