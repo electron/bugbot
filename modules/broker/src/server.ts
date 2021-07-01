@@ -296,10 +296,11 @@ export class Server {
     };
   }
 
-  public async start(): Promise<void> {
+  public start(): Promise<void> {
     const d = debug(`${DebugPrefix}:start`);
 
-    await this.stop(); // ensure we don't accidentally start a 2nd server
+    if (this.server)
+      throw new Error(`server already running on port $${this.brokerUrl.port}`);
 
     d('starting server');
 

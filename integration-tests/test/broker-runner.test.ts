@@ -28,10 +28,10 @@ describe('runner', () => {
   let brokerServer: BrokerServer;
   let runner: Runner;
 
-  async function startBroker(opts: Record<string, any> = {}) {
+  function startBroker(opts: Record<string, any> = {}): Promise<void> {
     broker = new Broker();
     brokerServer = new BrokerServer({ auth, broker, brokerUrl, ...opts });
-    await brokerServer.start();
+    return brokerServer.start();
   }
 
   function createRunner(opts: Record<string, any> = {}) {

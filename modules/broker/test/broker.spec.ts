@@ -80,13 +80,7 @@ describe('broker', () => {
     const bad_url = 'sftp://localhost:22';
     process.env.BUGBOT_BROKER_URL = bad_url;
     const sftp_server = new Server({ brokerUrl: bad_url });
-    let caughtErr: string;
-    try {
-      await sftp_server.start();
-    } catch (err: unknown) {
-      caughtErr = `${err}`;
-    }
-    expect(caughtErr).toMatch('sftp');
+    expect(sftp_server.start()).rejects.toThrow('sftp');
     await sftp_server.stop();
   });
 
