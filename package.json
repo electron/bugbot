@@ -18,7 +18,8 @@
     "lint:eslint:fix": "eslint --fix modules/*/src/**/*.ts",
     "lint:prettier": "prettier --check package.json modules/*/package.json modules/*/src/**/*.ts",
     "lint:prettier:fix": "prettier --write package.json modules/*/package.json modules/*/src/**/*.ts",
-    "heroku-postbuild": "yarn build"
+    "heroku-postbuild": "yarn build",
+    "tsc": "yarn workspaces run tsc"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^4.24.0",
