@@ -65,6 +65,10 @@ describe('broker', () => {
     });
   });
 
+  it('errors if you try to start a server that is already running', async () => {
+    await expect(server.start()).rejects.toThrow(/already running/);
+  });
+
   function postJob(body) {
     return fetch(new URL('/api/jobs', base_url), {
       body: JSON.stringify(body),

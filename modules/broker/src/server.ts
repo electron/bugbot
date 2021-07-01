@@ -296,11 +296,11 @@ export class Server {
     };
   }
 
-  public start(): Promise<void> {
+  public async start(): Promise<void> {
     const d = debug(`${DebugPrefix}:start`);
 
     if (this.server)
-      throw new Error(`server already running on port $${this.brokerUrl.port}`);
+      throw new Error(`server already running on port ${this.brokerUrl.port}`);
 
     d('starting server');
 
@@ -320,21 +320,18 @@ export class Server {
       case 'http:': {
         const opts = {};
         this.server = http.createServer(opts, this.app);
-        return listen(this.server, port);
+        return await listen(this.server, port);
       }
 
       case 'https:': {
         const { cert, key } = this;
         const opts = { cert, key };
         this.server = https.createServer(opts, this.app);
-        return listen(this.server, port);
+        return await listen(this.server, port);
       }
 
-      default: {
-        return Promise.reject(
-          new Error(`Unsupported protocol in '${this.brokerUrl}'`),
-        );
-      }
+      default:
+        throw new Error(`Unsupported protocol in '${this.brokerUrl}'`);
     }
   }
 
