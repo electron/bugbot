@@ -15,9 +15,9 @@ const RunnerStyles = RunnerColors.map(
 );
 const NumStyles = RunnerStyles.length;
 
-const electronUrl = (version) =>
+const electronUrl = (version: string) =>
   `https://github.com/electron/electron/releases/v${version}`;
-const electronAnchor = (version) =>
+const electronAnchor = (version: string) =>
   `<a href="${electronUrl(version)}">Electron ${version}</a>`;
 
 export function buildLog(task: Readonly<Task>): string {

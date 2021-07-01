@@ -331,7 +331,7 @@ export class Server {
       }
 
       default:
-        throw new Error(`Unsupported protocol in '${this.brokerUrl}'`);
+        throw new Error(`Unsupported protocol in ${this.brokerUrl.toString()}`);
     }
   }
 
