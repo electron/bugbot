@@ -5,8 +5,9 @@ import { PartialDeep } from 'type-fest';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types/schema';
 
-import { GithubClient } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
+
+import { GithubClient } from '../src/github-client';
 
 jest.mock('../src/api-client');
 
