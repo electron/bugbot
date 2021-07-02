@@ -29,9 +29,9 @@ export class GithubClient {
   constructor(
     public readonly robot: Probot,
     opts: {
-      authToken?: string,
-      brokerBaseUrl?: string,
-      pollIntervalMs?: number,
+      authToken?: string;
+      brokerBaseUrl?: string;
+      pollIntervalMs?: number;
     } = {},
   ) {
     const d = debug('GithubClient:constructor');
@@ -39,7 +39,8 @@ export class GithubClient {
     // init properties
     this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerBaseUrl = opts.brokerBaseUrl || env('BUGBOT_BROKER_URL');
-    this.pollIntervalMs = opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    this.pollIntervalMs =
+      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     d('brokerBaseUrl', this.brokerBaseUrl);
 
     this.listenToRobot();
@@ -48,44 +49,32 @@ export class GithubClient {
   private listenToRobot() {
     const d = debug('GithubClient:listenToRobot');
 
-    this.robot.onAny((context) => {
-      d('any', inspect(context.payload));
-    });
-    this.robot.on('issue_comment', (context) => {
-      d('issue_comment', inspect(context.payload));
-    });
-    this.robot.on('issues.opened', (context) => {
-      d('issues.opened', inspect(context.payload));
-    });
-    this.robot.on('issues.labeled', (context) => {
-      d('issues.labeled', inspect(context.payload));
-    });
-    this.robot.on('issues.unlabeled', (context) => {
-      d('issues.unlabeled', inspect(context.payload));
-    });
-    this.robot.on('issues.edited', (context) => {
-      d('issues.edited', inspect(context.payload));
-    });
-    this.robot.on('issue_comment.created', async (context) => {
-      d('issue_comment.created', inspect(context.payload));
-      await this.onIssueCommentCreated(context);
-    });
-    this.robot.on('issue_comment.edited', (context) => {
-      d('issue_comment.edited', inspect(context.payload));
-    });
+    const debugContext = (context) => d(context.name, inspect(context.payload));
+    this.robot.onAny(debugContext);
+    this.robot.on('issue_comment', debugContext);
+    this.robot.on('issues.opened', debugContext);
+    this.robot.on('issues.labeled', debugContext);
+    this.robot.on('issues.unlabeled', debugContext);
+    this.robot.on('issues.edited', debugContext);
+
+    this.robot.on('issue_comment.created', (ctx) => this.onIssueComment(ctx));
+    this.robot.on('issue_comment.edited', (ctx) => this.onIssueComment(ctx));
   }
 
-  private async isMaintainer(login: string): Promise<boolean> {
+  private static isMaintainer(login: string): Promise<boolean> {
     // TODO(erickzhao): add allowlist here
     const maintainers = ['ckerr', 'clavin', 'erickzhao'];
-    return maintainers.includes(login);
+    return Promise.resolve(maintainers.includes(login));
   }
 
-  public async onIssueCommentCreated(context: Context<'issue_comment'>) {
+  public async onIssueComment(
+    context: Context<'issue_comment'>,
+  ): Promise<void> {
     const d = debug('GithubClient:onIssueCommentCreated');
     d('===> payload <===', JSON.stringify(context.payload));
 
-    if (!(await this.isMaintainer(context.payload.comment.user.login))) {
+    const { login } = context.payload.comment.user;
+    if (!(await GithubClient.isMaintainer(login))) {
       d('not a maintainer; doing nothing');
       return;
     }
@@ -176,7 +165,7 @@ export class GithubClient {
     jobId: JobId,
     result: Result,
     context: Context<'issue_comment'>,
-  ) {
+  ): Promise<void> {
     const d = debug('github-client:commentBisectResult');
     const add_labels = new Set<string>();
     const del_labels = new Set<string>([Labels.BugBot.Running]);
@@ -243,4 +232,4 @@ export class GithubClient {
 
 export default (robot: Probot): void => {
   new GithubClient(robot);
-}
+};
