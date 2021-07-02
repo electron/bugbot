@@ -3,14 +3,14 @@ process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
 import { Context } from 'probot';
 
-import { parseManualCommand } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
+import { parseManualCommand } from '../src/github-client';
+import { parseIssueBody } from '../src/issue-parser';
 import fixture from './fixtures/issue_comment.created.json';
-import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
 
 jest.mock('../src/api-client');
 
-jest.mock('../../shared/lib/issue-parser', () => ({
+jest.mock('../src/issue-parser', () => ({
   parseIssueBody: jest.fn(),
 }));
 

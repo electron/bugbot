@@ -5,13 +5,10 @@ import { inspect } from 'util';
 
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
-import {
-  FiddleInput,
-  parseIssueBody,
-} from '@electron/bugbot-shared/lib/issue-parser';
 
 import BrokerAPI from './api-client';
 import { Labels } from './github-labels';
+import { FiddleInput, parseIssueBody } from './issue-parser';
 
 const AppName = 'BugBot' as const;
 

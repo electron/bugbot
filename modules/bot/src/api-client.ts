@@ -3,12 +3,13 @@ import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
 // import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
-import { FiddleInput } from '@electron/bugbot-shared/lib/issue-parser';
 import {
   AnyJob,
   BisectJob,
   JobId,
 } from '@electron/bugbot-shared/lib/interfaces';
+
+import { FiddleInput } from './issue-parser';
 
 export class APIError extends Error {
   public res: Response;
