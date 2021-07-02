@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "rootDir": "src"
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*", "test/**/*"],
   "references": [
     { "path": "../shared" }
   ]
