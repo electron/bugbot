@@ -1,25 +1,27 @@
 process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
 process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
-import { Context } from 'probot';
+import { PartialDeep } from 'type-fest';
+import { createProbot, Probot, ProbotOctokit } from 'probot';
+import { IssueCommentCreatedEvent } from '@octokit/webhooks-types/schema';
 
-import { parseManualCommand } from '../src/github-client';
 import BrokerAPI from '../src/api-client';
-import fixture from './fixtures/issue_comment.created.json';
-import { parseIssueBody } from '@electron/bugbot-shared/lib/issue-parser';
+
+import { GithubClient } from '../src/github-client';
 
 jest.mock('../src/api-client');
 
-jest.mock('../../shared/lib/issue-parser', () => ({
-  parseIssueBody: jest.fn(),
-}));
-
 describe('github-client', () => {
-  const mockGetJob = jest.fn();
-  const mockQueueBisectJob = jest.fn();
-  const mockStopJob = jest.fn();
+  let ghclient: GithubClient;
+  let mockGetJob: jest.Mock;
+  let mockQueueBisectJob: jest.Mock;
+  let mockStopJob: jest.Mock;
+  let probot: Probot;
 
-  beforeAll(() => {
+  beforeEach(() => {
+    mockGetJob = jest.fn();
+    mockStopJob = jest.fn();
+    mockQueueBisectJob = jest.fn();
     (BrokerAPI as jest.Mock).mockImplementation(() => {
       return {
         getJob: mockGetJob,
@@ -27,64 +29,98 @@ describe('github-client', () => {
         stopJob: mockStopJob,
       };
     });
-  });
 
-  beforeEach(() => {
-    // Clear all instances and calls to constructor and all methods:
-    (BrokerAPI as jest.Mock).mockClear();
-  });
-
-  describe('parseManualCommand()', () => {
-    it('does nothing without a test command', async () => {
-      await parseManualCommand({
-        payload: {
-          comment: {
-            body: 'I am commenting!',
-          },
-        },
-      } as Context);
-
-      expect(mockGetJob).not.toHaveBeenCalled();
+    probot = createProbot({
+      overrides: {
+        Octokit: ProbotOctokit.defaults({
+          retry: { enabled: false },
+          throttle: { enabled: false },
+        }),
+        githubToken: 'test',
+      },
     });
 
-    it('stops a test job if one is running', async () => {
-      mockGetJob.mockResolvedValueOnce({});
-      await parseManualCommand({
-        payload: {
-          comment: {
-            body: '/test stop',
+    ghclient = new GithubClient(probot);
+  });
+
+  describe('GithubClient', () => {
+    function createBisectPayload({
+      badVersion = '11.0.2',
+      comment = '/test bisect',
+      gistId = '59444f92bffd5730944a0de6d85067fd',
+      goodVersion = '10.1.6',
+      login = 'ckerr',
+    } = {}) {
+      const payload: PartialDeep<IssueCommentCreatedEvent> = {
+        action: 'created',
+        comment: {
+          body: comment,
+          user: {
+            login,
           },
         },
-      } as Context);
-
-      expect(mockGetJob).toHaveBeenCalled();
-      expect(mockStopJob).toHaveBeenCalled();
-    });
-
-    it('starts a bisect job if no tests are running for the issue', async () => {
-      const input = {
-        badVersion: 'v10.1.6',
-        gistId: '1abcdef',
-        goodVersion: 'v11.0.2',
+        issue: {
+          body: `### Electron Version\r\n\r\n${badVersion}\r\n\r\n### What operating system are you using?\r\n\r\nWindows\r\n\r\n### Operating System Version\r\n\r\n10\r\n\r\n### What arch are you using?\r\n\r\nx64\r\n\r\n### Last Known Working Electron Version\r\n\r\n${goodVersion}\r\n\r\n### Testcase Gist URL\r\n\r\n${gistId}`,
+        },
       };
-      (parseIssueBody as jest.Mock).mockReturnValueOnce(input);
+      return { badVersion, comment, gistId, goodVersion, login, payload };
+    }
 
-      await parseManualCommand({
-        payload: fixture,
-      } as Context);
-
-      expect(mockQueueBisectJob).toHaveBeenCalledWith(input);
-    });
-
-    it('fails gracefully if the issue body cannot be parsed', async () => {
-      (parseIssueBody as jest.Mock).mockImplementationOnce(() => {
-        throw new Error();
+    describe('onIssueComment()', () => {
+      it('starts a bisect job if no tests are running for the issue', async () => {
+        const { badVersion, gistId, goodVersion, payload } =
+          createBisectPayload();
+        await probot.receive({ name: 'issue_comment', payload } as any);
+        expect(mockQueueBisectJob).toHaveBeenCalledWith({
+          badVersion,
+          gistId,
+          goodVersion,
+        });
       });
-      await parseManualCommand({
-        payload: fixture,
-      } as Context);
 
-      expect(mockQueueBisectJob).not.toHaveBeenCalled();
+      it.todo('stops a test job if one is running');
+
+      describe('does nothing if', () => {
+        it('...the comment does not have a command', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const { payload } = createBisectPayload();
+          payload.comment.body = 'This issue comment has no command';
+
+          await probot.receive({ name: 'issue_comment', payload } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
+
+        it('...the comment has an invalid command', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const { payload } = createBisectPayload();
+          payload.comment.body = '/test bisetc';
+
+          await probot.receive({ name: 'issue_comment', payload } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
+
+        it('...the commenter is not a maintainer', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const { payload } = createBisectPayload();
+          payload.comment.user.login = 'fnord';
+
+          await probot.receive({ name: 'issue_comment', payload } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
+
+        it('...the issue body has no gistId', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const { payload } = createBisectPayload();
+          payload.issue.body = 'This issue body has no gistId';
+
+          await probot.receive({ name: 'issue_comment', payload } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
+      });
     });
   });
 });
