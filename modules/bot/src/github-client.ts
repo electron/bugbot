@@ -66,9 +66,9 @@ export class GithubClient {
     this.robot.on('issues.edited', (context) => {
       d('issues.edited', inspect(context.payload));
     });
-    this.robot.on('issue_comment.created', (context) => {
+    this.robot.on('issue_comment.created', async (context) => {
       d('issue_comment.created', inspect(context.payload));
-      this.onIssueCommentCreated(context);
+      await this.onIssueCommentCreated(context);
     });
     this.robot.on('issue_comment.edited', (context) => {
       d('issue_comment.edited', inspect(context.payload));
@@ -81,11 +81,11 @@ export class GithubClient {
     return maintainers.includes(login);
   }
 
-  public onIssueCommentCreated(context: Context<'issue_comment'>) {
+  public async onIssueCommentCreated(context: Context<'issue_comment'>) {
     const d = debug('GithubClient:onIssueCommentCreated');
     d('===> payload <===', JSON.stringify(context.payload));
 
-    if (!this.isMaintainer(context.payload.comment.user.login)) {
+    if (!(await this.isMaintainer(context.payload.comment.user.login))) {
       d('not a maintainer; doing nothing');
       return;
     }
