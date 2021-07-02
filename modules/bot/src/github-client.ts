@@ -77,7 +77,7 @@ export class GithubClient {
     }
 
     d('calling parseManualCommand');
-    this.parseManualCommand(context);
+    return this.parseManualCommand(context);
   }
 
   /**
@@ -175,7 +175,7 @@ export class GithubClient {
         paragraphs.push(
           `It looks like this bug was introduced between ${a} and ${b}`,
           `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,
-          `For more information, see ${log_url}`,
+          `For more information, see ${log_url.toString()}`,
         );
         add_labels.add(Labels.Bug.Regression);
         // FIXME(any): get the majors in [a..b] and add version labels e.g. 13-x-y
@@ -192,7 +192,7 @@ export class GithubClient {
           // FIXME(any): add the link here.
           `${AppName} was unable to complete this bisection. Check the table’s links for more information.`,
           'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.',
-          `For more information, see ${log_url}`,
+          `For more information, see ${log_url.toString()}`,
         );
         add_labels.add(Labels.BugBot.MaintainerNeeded);
         break;

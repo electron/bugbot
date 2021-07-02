@@ -20,18 +20,16 @@ export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
   //     [TIMESTAMP] Task: Bisect  success
   //
   // Try to find that first to see if it says "success" or "invalid"
-  const bisectTaskResult = endOutput.match(
-    /Task: Bisect {2}(success|invalid)\s*$/,
-  );
+  const bisectResult = /Task: Bisect {2}(success|invalid)\s*$/.exec(endOutput);
 
-  if (bisectTaskResult === null) {
+  if (bisectResult === null) {
     // TODO: this may start to always happen if the output changes in the
     // future, but that is also just part of the fragility of parsing the
     // output.
     throw new Error('Cannot find bisect task result in fiddle output');
   }
 
-  const success = bisectTaskResult[1] === 'success';
+  const success = bisectResult[1] === 'success';
 
   // If we failed, we're done
   if (!success) {
@@ -39,12 +37,8 @@ export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
   }
 
   // Try to parse out the final bisect versions
-  const passedVersion = endOutput.match(
-    /Runner: autobisect ✅ passed ([^\s]+)/,
-  );
-  const failedVersion = endOutput.match(
-    /Runner: autobisect ❌ failed ([^\s]+)/,
-  );
+  const passedVersion = /Runner: autobisect ✅ passed ([^\s]+)/.exec(endOutput);
+  const failedVersion = /Runner: autobisect ❌ failed ([^\s]+)/.exec(endOutput);
 
   if (passedVersion === null || failedVersion === null) {
     throw new Error('Cannot find bisect task final version(s)');
