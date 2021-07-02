@@ -87,7 +87,7 @@ export class GithubClient {
   public async parseManualCommand(
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug('github-client:parseManualCommand');
+    const d = debug('GitHubClient:parseManualCommand');
     const api = new BrokerAPI({
       authToken: this.authToken,
       baseURL: this.brokerBaseUrl,
@@ -163,7 +163,7 @@ export class GithubClient {
     result: Result,
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug('github-client:commentBisectResult');
+    const d = debug('GitHubClient:commentBisectResult');
     const add_labels = new Set<string>();
     const del_labels = new Set<string>([Labels.BugBot.Running]);
     const paragraphs: string[] = [];
