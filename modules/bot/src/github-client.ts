@@ -18,28 +18,26 @@ const actions = {
 };
 
 export class GithubClient {
+  private readonly broker: BrokerAPI;
   private readonly brokerBaseUrl: string;
   private readonly pollIntervalMs: number;
-  private readonly broker: BrokerAPI;
+  private readonly robot: Probot;
   private isClosed = false;
 
-  constructor(
-    public readonly robot: Probot,
-    opts: {
-      authToken?: string;
-      brokerBaseUrl?: string;
-      pollIntervalMs?: number;
-    } = {},
-  ) {
+  constructor(opts: {
+    authToken: string;
+    brokerBaseUrl: string;
+    pollIntervalMs: number;
+    robot: Probot;
+  }) {
     const d = debug('GithubClient:constructor');
 
-    this.brokerBaseUrl = opts.brokerBaseUrl || env('BUGBOT_BROKER_URL');
+    Object.assign(this, opts);
     d('brokerBaseUrl', this.brokerBaseUrl);
-    const authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
-    this.broker = new BrokerAPI({ authToken, baseURL: this.brokerBaseUrl });
-
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    this.broker = new BrokerAPI({
+      authToken: opts.authToken,
+      baseURL: opts.brokerBaseUrl,
+    });
 
     this.listenToRobot();
   }
@@ -144,13 +142,13 @@ export class GithubClient {
         d(`polling job ${jobId}...`);
         const job = await this.broker.getJob(jobId);
         if (!job.last) {
-          d('job still pending...', { job });
+          d('job still pending...', JSON.stringify(job));
           return;
         }
         d(`job ${jobId} complete`);
-        clearInterval(timer);
         await this.commentBisectResult(jobId, job.last, context);
         await this.broker.completeJob(jobId);
+        return clearInterval(timer);
       }, this.pollIntervalMs);
     }
   }
@@ -230,5 +228,10 @@ export class GithubClient {
 }
 
 export default (robot: Probot): void => {
-  new GithubClient(robot);
+  new GithubClient({
+    authToken: env('BUGBOT_AUTH_TOKEN'),
+    brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+    robot,
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+  });
 };
