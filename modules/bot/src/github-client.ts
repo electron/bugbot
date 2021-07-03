@@ -18,10 +18,10 @@ const actions = {
 };
 
 export class GithubClient {
-  public readonly authToken;
   public readonly brokerBaseUrl;
   public readonly pollIntervalMs;
   public readonly issueIdToJobId = new Map<number, string>();
+  private readonly broker: BrokerAPI;
 
   constructor(
     public readonly robot: Probot,
@@ -33,12 +33,13 @@ export class GithubClient {
   ) {
     const d = debug('GithubClient:constructor');
 
-    // init properties
-    this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerBaseUrl = opts.brokerBaseUrl || env('BUGBOT_BROKER_URL');
+    d('brokerBaseUrl', this.brokerBaseUrl);
+    const authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
+    this.broker = new BrokerAPI({ authToken, baseURL: this.brokerBaseUrl });
+
     this.pollIntervalMs =
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
-    d('brokerBaseUrl', this.brokerBaseUrl);
 
     this.listenToRobot();
   }
@@ -88,10 +89,6 @@ export class GithubClient {
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug('GitHubClient:parseManualCommand');
-    const api = new BrokerAPI({
-      authToken: this.authToken,
-      baseURL: this.brokerBaseUrl,
-    });
 
     const { payload } = context;
     const args = payload.comment.body.split(' ');
@@ -108,12 +105,12 @@ export class GithubClient {
      * const id = 'some-guid';
      * let currentJob;
      * try {
-     *   currentJob = await api.getJob(id);
+     *   currentJob = await this.broker.getJob(id);
      * } catch (e) {
      *    // no-op
      * }
      * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-     *   api.stopJob(id);
+     *   this.broker.stopJob(id);
      * } else if (action === actions.BISECT && !currentJob) {
      */
 
@@ -132,7 +129,7 @@ export class GithubClient {
         return;
       }
 
-      const jobId = await api.queueBisectJob(input);
+      const jobId = await this.broker.queueBisectJob(input);
       d(`Queued bisect job ${jobId}`);
 
       // FIXME: this state info, such as the timer, needs to be a
@@ -140,7 +137,7 @@ export class GithubClient {
       // Poll until the job is complete
       const timer = setInterval(async () => {
         d(`polling job ${jobId}...`);
-        const job = await api.getJob(jobId);
+        const job = await this.broker.getJob(jobId);
         if (!job.last) {
           d('job still pending...', { job });
           return;
@@ -148,7 +145,7 @@ export class GithubClient {
         d(`job ${jobId} complete`);
         clearInterval(timer);
         await this.commentBisectResult(jobId, job.last, context);
-        await api.completeJob(jobId);
+        await this.broker.completeJob(jobId);
       }, this.pollIntervalMs);
     }
   }
