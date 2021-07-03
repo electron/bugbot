@@ -6,7 +6,7 @@ import { inspect } from 'util';
 import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
 
-import BrokerAPI from './api-client';
+import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
 import { FiddleInput, parseIssueBody } from './issue-parser';
 

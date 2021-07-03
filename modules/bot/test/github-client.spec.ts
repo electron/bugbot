@@ -6,13 +6,13 @@ import nock from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types/schema';
 
-import BrokerAPI from '../src/api-client';
+import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.json';
 import { BisectJob, Result } from '@electron/bugbot-shared/lib/interfaces';
 import { Labels } from '../src/github-labels';
 
-jest.mock('../src/api-client');
+jest.mock('../src/broker-client');
 
 describe('github-client', () => {
   let ghclient: GithubClient;
