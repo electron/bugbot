@@ -18,9 +18,8 @@ const actions = {
 };
 
 export class GithubClient {
-  public readonly brokerBaseUrl;
-  public readonly pollIntervalMs;
-  public readonly issueIdToJobId = new Map<number, string>();
+  private readonly brokerBaseUrl: string;
+  private readonly pollIntervalMs: number;
   private readonly broker: BrokerAPI;
 
   constructor(
@@ -85,7 +84,7 @@ export class GithubClient {
    * Takes action based on a comment left on an issue
    * @param context Probot context object
    */
-  public async parseManualCommand(
+  private async parseManualCommand(
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug('GitHubClient:parseManualCommand');

@@ -15,6 +15,8 @@ import { Labels } from '../src/github-labels';
 jest.mock('../src/broker-client');
 
 describe('github-client', () => {
+  const authToken = process.env.BUGBOT_AUTH_TOKEN;
+  const brokerBaseUrl = process.env.BUGBOT_BROKER_URL;
   let ghclient: GithubClient;
   let mockCompleteJob: jest.Mock;
   let mockGetJob: jest.Mock;
@@ -46,7 +48,7 @@ describe('github-client', () => {
       },
     });
 
-    ghclient = new GithubClient(probot);
+    ghclient = new GithubClient(probot, { authToken, brokerBaseUrl });
   });
 
   afterEach(() => {
@@ -234,7 +236,7 @@ describe('github-client', () => {
               expect(body).toBe(
                 `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
                   'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
-                  `For more information, see ${ghclient.brokerBaseUrl}/log/${mockJob.id}`,
+                  `For more information, see ${brokerBaseUrl}/log/${mockJob.id}`,
               );
               return true;
             })
