@@ -52,6 +52,7 @@ describe('github-client', () => {
   });
 
   afterEach(() => {
+    ghclient.close();
     jest.useRealTimers();
   });
 

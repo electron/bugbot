@@ -21,6 +21,7 @@ export class GithubClient {
   private readonly brokerBaseUrl: string;
   private readonly pollIntervalMs: number;
   private readonly broker: BrokerAPI;
+  private isClosed = false;
 
   constructor(
     public readonly robot: Probot,
@@ -41,6 +42,10 @@ export class GithubClient {
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
 
     this.listenToRobot();
+  }
+
+  public close() {
+    this.isClosed = true;
   }
 
   private listenToRobot() {
@@ -135,6 +140,7 @@ export class GithubClient {
       // class property so that '/test stop' could stop the polling.
       // Poll until the job is complete
       const timer = setInterval(async () => {
+        if (this.isClosed) return clearInterval(timer);
         d(`polling job ${jobId}...`);
         const job = await this.broker.getJob(jobId);
         if (!job.last) {
