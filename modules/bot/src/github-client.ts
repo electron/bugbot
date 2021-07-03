@@ -158,7 +158,7 @@ export class GithubClient {
    * @param result The result from a Fiddle bisection
    * @param context Probot context object
    */
-  public async commentBisectResult(
+  private async commentBisectResult(
     jobId: JobId,
     result: Result,
     context: Context<'issue_comment'>,
