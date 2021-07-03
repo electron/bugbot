@@ -2,28 +2,34 @@ process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
 process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
 import { PartialDeep } from 'type-fest';
+import nock from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types/schema';
 
 import BrokerAPI from '../src/api-client';
-
 import { GithubClient } from '../src/github-client';
+import payloadFixture from './fixtures/issue_comment.created.json';
+import { BisectJob, Result } from '@electron/bugbot-shared/lib/interfaces';
+import { Labels } from '../src/github-labels';
 
 jest.mock('../src/api-client');
 
 describe('github-client', () => {
   let ghclient: GithubClient;
+  let mockCompleteJob: jest.Mock;
   let mockGetJob: jest.Mock;
   let mockQueueBisectJob: jest.Mock;
   let mockStopJob: jest.Mock;
   let probot: Probot;
 
   beforeEach(() => {
+    mockCompleteJob = jest.fn();
     mockGetJob = jest.fn();
     mockStopJob = jest.fn();
     mockQueueBisectJob = jest.fn();
     (BrokerAPI as jest.Mock).mockImplementation(() => {
       return {
+        completeJob: mockCompleteJob,
         getJob: mockGetJob,
         queueBisectJob: mockQueueBisectJob,
         stopJob: mockStopJob,
@@ -41,6 +47,10 @@ describe('github-client', () => {
     });
 
     ghclient = new GithubClient(probot);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   describe('GithubClient', () => {
@@ -119,6 +129,142 @@ describe('github-client', () => {
           await probot.receive({ name: 'issue_comment', payload } as any);
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
           expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe('commentBisectResult()', () => {
+      beforeEach(() => {
+        nock.disableNetConnect();
+      });
+
+      afterEach(() => {
+        nock.cleanAll();
+        nock.enableNetConnect();
+      });
+
+      describe('comments and labels', () => {
+        it('...on success', async (done) => {
+          const mockSuccess: Result = {
+            bisect_range: ['10.3.2', '10.4.0'],
+            runner: 'my-runner-id',
+            status: 'success',
+            time_begun: 5,
+            time_ended: 10,
+          };
+          const mockJob: BisectJob = {
+            bisect_range: ['10.1.6', '11.0.2'],
+            gist: 'my-gist-id',
+            history: [mockSuccess],
+            id: 'my-job-id',
+            last: mockSuccess,
+            time_added: 5,
+            type: 'bisect',
+          };
+          mockQueueBisectJob.mockResolvedValue(mockJob.id);
+          mockGetJob.mockResolvedValue(mockJob);
+          jest.useFakeTimers();
+
+          // check for comment created
+          nock('https://api.github.com')
+            .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+              expect(body).toEqual(
+                `It looks like this bug was introduced between ${mockSuccess.bisect_range[0]} and ${mockSuccess.bisect_range[1]}\n` +
+                  '\n' +
+                  `Commits between those versions: https://github.com/electron/electron/compare/v${mockSuccess.bisect_range[0]}...v${mockSuccess.bisect_range[1]}\n` +
+                  '\n' +
+                  `For more information, see ${process.env.BUGBOT_BROKER_URL}/log/${mockJob.id}`,
+              );
+              return true;
+            })
+            .reply(200);
+
+          // check for label deletion
+          nock('https://api.github.com')
+            .delete(
+              '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
+              () => {
+                done();
+                return true;
+              },
+            )
+            .reply(200);
+
+          // check for label additions
+          nock('https://api.github.com')
+            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+              expect(labels).toEqual([Labels.Bug.Regression]);
+              return true;
+            })
+            .reply(200);
+
+          await probot.receive({
+            name: 'issue_comment',
+            payload: payloadFixture,
+          } as any);
+
+          jest.runOnlyPendingTimers();
+        });
+
+        it('...on failure', async (done) => {
+          const mockTestError: Result = {
+            error: 'my-error',
+            runner: 'my-runner-id',
+            status: 'test_error',
+            time_begun: 5,
+            time_ended: 10,
+          };
+          const mockJob: BisectJob = {
+            bisect_range: ['10.1.6', '11.0.2'],
+            gist: 'my-gist-id',
+            history: [mockTestError],
+            id: 'my-job-id',
+            last: mockTestError,
+            time_added: 5,
+            type: 'bisect',
+          };
+
+          mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);
+          mockGetJob.mockResolvedValueOnce(mockJob);
+
+          jest.useFakeTimers();
+          // check for comment created
+          nock('https://api.github.com')
+            .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+              expect(body).toBe(
+                `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
+                  'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
+                  `For more information, see ${ghclient.brokerBaseUrl}/log/${mockJob.id}`,
+              );
+              return true;
+            })
+            .reply(200);
+
+          // check for label deletion
+          nock('https://api.github.com')
+            .delete(
+              '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
+              () => {
+                done();
+                return true;
+              },
+            )
+            .reply(200);
+
+          // check for label additions
+          nock('https://api.github.com')
+            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+              expect(labels).toEqual([Labels.BugBot.MaintainerNeeded]);
+              return true;
+            })
+            .reply(200);
+
+          await probot.receive({
+            name: 'issue_comment',
+            payload: payloadFixture,
+          } as any);
+
+          jest.runOnlyPendingTimers();
         });
       });
     });
