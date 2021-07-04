@@ -238,7 +238,6 @@ export class Runner {
   }
 
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
-    const patchResult = this.patchResult.bind(this);
     const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
 
     return new Promise<void>((resolve) => {
@@ -272,7 +271,7 @@ export class Runner {
       child.stdout.on('data', onStdout);
 
       child.on('error', (err) => {
-        patchResult({
+        void this.patchResult({
           error: err.toString(),
           status: 'system_error',
         });
@@ -290,12 +289,12 @@ export class Runner {
             result.error = 'Failed to narrow test down to two versions';
             result.status = exitCode === 1 ? 'test_error' : 'system_error';
           }
-        } catch (parseErr) {
+        } catch (parseErr: unknown) {
           d('fiddle bisect parse error: %O', parseErr);
           result.status = 'system_error';
           result.error = parseErr.toString();
         } finally {
-          patchResult(result).then(() => resolve());
+          void this.patchResult(result).then(() => resolve());
         }
       });
     });
