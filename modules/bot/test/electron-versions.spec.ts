@@ -8,7 +8,7 @@ import fetch from 'node-fetch';
 const { Response } = jest.requireActual('node-fetch');
 
 describe('electron-versions', () => {
-  const fixtureDir = path.resolve(__dirname, 'fixtures/lite');
+  const fixtureDir = path.resolve(__dirname, 'fixtures/versions');
 
   function mockFetch(basename: string) {
     const filename = path.join(fixtureDir, basename);
