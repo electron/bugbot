@@ -18,9 +18,9 @@ const actions = {
 };
 
 export class GithubClient {
-  public readonly authToken;
-  public readonly brokerBaseUrl;
-  public readonly pollIntervalMs;
+  public readonly authToken: string;
+  public readonly brokerBaseUrl: string;
+  public readonly pollIntervalMs: number;
   public readonly issueIdToJobId = new Map<number, string>();
 
   constructor(
