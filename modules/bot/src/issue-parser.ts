@@ -36,7 +36,7 @@ export function getGistId(input: string): string | null {
     }
     id = input.split('/').pop();
   }
-  if (id && id.match(/[0-9A-Fa-f]{32}/)) {
+  if (id && /[0-9A-Fa-f]{32}/.test(id)) {
     return id;
   }
   return null;

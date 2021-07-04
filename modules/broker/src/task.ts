@@ -133,7 +133,9 @@ export class Task {
 
     for (const [key, value] of Object.entries(props)) {
       if (!Task.canInit(key, value)) {
-        throw new Error(`invalid property: '${key}', '${value}'`);
+        throw new Error(
+          `invalid property: '${key}', '${JSON.stringify(value)}'`,
+        );
       }
     }
 
