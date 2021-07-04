@@ -139,8 +139,8 @@ export class Server {
       task = Task.createBisectTask(req.body);
       this.broker.addTask(task);
       res.status(201).send(escapeHtml(task.id));
-    } catch (error) {
-      res.status(422).send(escapeHtml(error.message));
+    } catch (error: unknown) {
+      res.status(422).send(escapeHtml(error.toString()));
     }
   }
 
@@ -185,7 +185,8 @@ export class Server {
           return;
         }
         const [, prop] = op.path.split('/'); // '/bot_client_data/foo' -> 'bot_client_data'
-        const value = (op as any).value || undefined;
+        const value =
+          op.op === 'add' || op.op === 'replace' ? op.value : undefined;
         if (Task.canSet(prop, value)) {
           return;
         }
@@ -201,9 +202,9 @@ export class Server {
       const { etag } = getTaskBody(task);
       res.header('ETag', etag);
       res.status(200).end();
-    } catch (err) {
+    } catch (err: unknown) {
       d(err);
-      res.status(400).send(escapeHtml(err.message));
+      res.status(400).send(escapeHtml(err.toString()));
     }
   }
 
