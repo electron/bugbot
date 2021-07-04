@@ -238,7 +238,6 @@ export class Runner {
   }
 
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
-    const addLogData = this.addLogData.bind(this);
     const patchResult = this.patchResult.bind(this);
     const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
 
@@ -255,7 +254,7 @@ export class Runner {
       const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      addLogData(
+      this.addLogData(
         [
           `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
           `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
@@ -263,11 +262,15 @@ export class Runner {
         ].join('\n'),
       );
 
-      // TODO(any): could debounce/buffer this data before calling addLogData()
-      const stdout: any[] = [];
-      child.stderr.on('data', (data) => addLogData(data));
-      child.stdout.on('data', (data) => addLogData(data));
-      child.stdout.on('data', (data) => stdout.push(data));
+      // Save stdout locally so we can parse the result.
+      // Report both stdout + stderr to the broker via addLogData().
+      const stdout: string[] = [];
+      const onData = (dat: string | Buffer) => this.addLogData(dat.toString());
+      const onStdout = (dat: string | Buffer) => stdout.push(dat.toString());
+      child.stderr.on('data', onData);
+      child.stdout.on('data', onData);
+      child.stdout.on('data', onStdout);
+
       child.on('error', (err) => {
         patchResult({
           error: err.toString(),
