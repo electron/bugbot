@@ -3,8 +3,8 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
-import { JobId, Result } from '@electron/bugbot-shared/lib/interfaces';
-import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
+import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
