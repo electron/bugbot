@@ -16,8 +16,8 @@ import {
   Platform,
   Result,
   RunnerId,
-} from '@electron/bugbot-shared/lib/interfaces';
-import { env, envInt } from '@electron/bugbot-shared/lib/env-vars';
+} from '@electron/bugbot-shared/build/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 

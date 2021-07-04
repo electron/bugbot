@@ -7,7 +7,7 @@ import create_etag from 'etag';
 import express from 'express';
 import { URL } from 'url';
 
-import { env, getEnvData } from '@electron/bugbot-shared/lib/env-vars';
+import { env, getEnvData } from '@electron/bugbot-shared/build/env-vars';
 
 import { Auth, AuthScope } from './auth';
 import { Broker } from './broker';

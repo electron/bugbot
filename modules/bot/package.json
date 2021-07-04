@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc -b",
     "heroku-postbuild": "yarn build",
-    "start": "probot run ./dist/github-client.js",
+    "start": "probot run ./build/github-client.js",
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --coverage"
   },

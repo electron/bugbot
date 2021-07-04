@@ -7,7 +7,7 @@ import {
   Current,
   Result,
   RunnerId,
-} from '@electron/bugbot-shared/lib/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 
 class LogSection {
   public readonly runner: RunnerId;
