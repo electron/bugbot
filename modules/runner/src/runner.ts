@@ -210,7 +210,7 @@ export class Runner {
     d(`sendLogDataBuffer resp.status ${resp.status}`);
   }
 
-  private addLogData(data: any) {
+  private addLogData(data: string) {
     // save the URL to safeguard against this.jobId being cleared at end-of-job
     const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
     this.logBuffer.push(data);

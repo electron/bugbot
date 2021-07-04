@@ -393,7 +393,7 @@ export class Server {
         .split(arrayFormatSeparator)
         .filter((v) => Boolean(v));
 
-      filtered = filtered.filter((value: any) => {
+      filtered = filtered.filter((value: unknown) => {
         // walk the object tree to the right value
         for (const walk of names) value = value?.[walk];
         value = value === undefined ? 'undefined' : value;
