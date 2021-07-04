@@ -7,7 +7,7 @@ import { Operation as PatchOp } from 'fast-json-patch';
 import { URL, URLSearchParams } from 'url';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
-import { Result, JobId } from '@electron/bugbot-shared/lib/interfaces';
+import { Result, JobId } from '@electron/bugbot-shared/build/interfaces';
 import { Auth, AuthScope } from '../src/auth';
 import { Server } from '../src/server';
 

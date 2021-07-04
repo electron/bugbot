@@ -2,12 +2,12 @@ import fetch, { Response } from 'node-fetch';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
-// import { FiddleBisectResult } from '@electron/bugbot-runner/dist/fiddle-bisect-parser';
+// import { FiddleBisectResult } from '@electron/bugbot-runner/build/fiddle-bisect-parser';
 import {
   AnyJob,
   BisectJob,
   JobId,
-} from '@electron/bugbot-shared/lib/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 
 import { FiddleInput } from './issue-parser';
 
