@@ -1,8 +1,8 @@
 import fetch from 'node-fetch';
 import * as semver from 'semver';
 
-// the format of the fetched lite.json data + added `sem`
 interface Release {
+  // the format of the fetched lite.json data
   deps: Record<string, string>;
   name: string;
   node_id: string;
@@ -13,6 +13,8 @@ interface Release {
   tag_name: string;
   total_downloads: number;
   version: string;
+
+  // added by ElectronVersions for sorting / filtering
   sem: semver.SemVer;
 }
 
@@ -61,7 +63,7 @@ export class ElectronVersions {
     if (!this.releases.size || this.isCacheTooOld()) await this.fetchReleases();
   }
 
-  private getReleasesByMajor(releases: Release[]): Map<number, Release[]> {
+  private groupReleasesByMajor(releases: Release[]): Map<number, Release[]> {
     const majors = [...new Set<number>(releases.map((rel) => rel.sem.major))];
     const byMajor = new Map<number, Release[]>(majors.map((maj) => [maj, []]));
     for (const rel of releases) byMajor.get(rel.sem.major).push(rel);
@@ -72,11 +74,13 @@ export class ElectronVersions {
   public async getVersionsToTest(): Promise<string[]> {
     await this.ensureReleases();
 
-    const byMajor = this.getReleasesByMajor([...this.releases]);
+    const byMajor = this.groupReleasesByMajor([...this.releases]);
     const majors = [...byMajor.keys()].sort((a, b) => a - b);
 
-    const ret: Release[] = [];
+    const versions: Release[] = [];
 
+    // Get the oldest and newest version of each branch we're testing.
+    // If a branch has gone stable, skip its prereleases.
     const SUPPORTED_MAJORS = 3; // https://www.electronjs.org/docs/tutorial/support
     const UNSUPPORTED_MAJORS_TO_TEST = 2;
     const NUM_STABLE_TO_TEST = SUPPORTED_MAJORS + UNSUPPORTED_MAJORS_TO_TEST;
@@ -85,13 +89,13 @@ export class ElectronVersions {
       const major = majors.pop();
       let range = byMajor.get(major);
       if (hasStable(range)) {
-        range = range.filter(isStable);
+        range = range.filter(isStable); // skip its prereleases
         --stable_left;
       }
-      ret.push(range.shift());
-      if (range.length >= 1) ret.push(range.pop());
+      versions.push(range.shift()); // oldest version
+      if (range.length >= 1) versions.push(range.pop()); // newest version
     }
 
-    return ret.sort(releaseCompare).map((ret) => ret.version);
+    return versions.sort(releaseCompare).map((ret) => ret.version);
   }
 }

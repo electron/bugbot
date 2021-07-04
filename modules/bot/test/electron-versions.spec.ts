@@ -41,7 +41,7 @@ describe('electron-versions', () => {
       '13.0.0',
       '13.1.5',
 
-      // all development branches
+      // all pre-stable development branches
       '14.0.0-nightly.20210304',
       '14.0.0-beta.11',
       '15.0.0-nightly.20210527',
@@ -65,7 +65,7 @@ describe('electron-versions', () => {
       '11.4.9',
       '12.0.0',
       '12.0.13',
-      '13.0.0',
+      '13.0.0', // fixture only has one stable release in 13.0.0
     ]);
   });
 
