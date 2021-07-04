@@ -3,7 +3,7 @@ process.env.SPEC_RUNNING = '1';
 module.exports = {
   clearMocks: true,
   collectCoverageFrom: ['**/src/**/*ts'],
-  coveragePathIgnorePatterns: ['/node_modules/', '/lib/'],
+  coveragePathIgnorePatterns: ['/node_modules/', '/build/'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   preset: 'ts-jest',
   projects: [
