@@ -62,13 +62,13 @@ export class ElectronVersions {
     const SUPPORTED_MAJORS = 3; // https://www.electronjs.org/docs/tutorial/support
     const UNSUPPORTED_MAJORS_TO_TEST = 2;
     const NUM_STABLE_TO_TEST = SUPPORTED_MAJORS + UNSUPPORTED_MAJORS_TO_TEST;
-    let stable_left = NUM_STABLE_TO_TEST;
-    while (stable_left > 0) {
+    let stableLeft = NUM_STABLE_TO_TEST;
+    while (stableLeft > 0) {
       const major = majors.pop();
       let range = byMajor.get(major);
       if (hasStable(range)) {
         range = range.filter(isStable); // skip its prereleases
-        --stable_left;
+        --stableLeft;
       }
       versions.push(range.shift()); // oldest version
       if (range.length >= 1) versions.push(range.pop()); // newest version
