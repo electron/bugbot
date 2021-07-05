@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "main": "dist/github-client.js",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b tsconfig.build.json",
     "heroku-postbuild": "yarn build",
     "start": "probot run ./build/github-client.js",
     "test": "jest --runInBand",

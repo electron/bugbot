@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b tsconfig.build.json",
     "start": "node ./build/main.js",
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --coverage"

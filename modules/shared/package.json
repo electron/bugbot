@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b tsconfig.build.json",
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --coverage"
   },
