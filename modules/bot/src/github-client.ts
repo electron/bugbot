@@ -6,7 +6,7 @@ import { inspect } from 'util';
 import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
-import BrokerAPI from './api-client';
+import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
 import { FiddleInput, parseIssueBody } from './issue-parser';
 
@@ -18,29 +18,32 @@ const actions = {
 };
 
 export class GithubClient {
-  public readonly authToken: string;
-  public readonly brokerBaseUrl: string;
-  public readonly pollIntervalMs: number;
-  public readonly issueIdToJobId = new Map<number, string>();
+  private readonly broker: BrokerAPI;
+  private readonly brokerBaseUrl: string;
+  private readonly pollIntervalMs: number;
+  private readonly robot: Probot;
+  private isClosed = false;
 
-  constructor(
-    public readonly robot: Probot,
-    opts: {
-      authToken?: string;
-      brokerBaseUrl?: string;
-      pollIntervalMs?: number;
-    } = {},
-  ) {
+  constructor(opts: {
+    authToken: string;
+    brokerBaseUrl: string;
+    pollIntervalMs: number;
+    robot: Probot;
+  }) {
     const d = debug('GithubClient:constructor');
 
-    // init properties
-    this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
-    this.brokerBaseUrl = opts.brokerBaseUrl || env('BUGBOT_BROKER_URL');
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    Object.assign(this, opts);
     d('brokerBaseUrl', this.brokerBaseUrl);
+    this.broker = new BrokerAPI({
+      authToken: opts.authToken,
+      baseURL: opts.brokerBaseUrl,
+    });
 
     this.listenToRobot();
+  }
+
+  public close() {
+    this.isClosed = true;
   }
 
   private listenToRobot() {
@@ -84,14 +87,10 @@ export class GithubClient {
    * Takes action based on a comment left on an issue
    * @param context Probot context object
    */
-  public async parseManualCommand(
+  private async parseManualCommand(
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug('GitHubClient:parseManualCommand');
-    const api = new BrokerAPI({
-      authToken: this.authToken,
-      baseURL: this.brokerBaseUrl,
-    });
 
     const { payload } = context;
     const args = payload.comment.body.split(' ');
@@ -108,12 +107,12 @@ export class GithubClient {
      * const id = 'some-guid';
      * let currentJob;
      * try {
-     *   currentJob = await api.getJob(id);
+     *   currentJob = await this.broker.getJob(id);
      * } catch (e) {
      *    // no-op
      * }
      * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-     *   api.stopJob(id);
+     *   this.broker.stopJob(id);
      * } else if (action === actions.BISECT && !currentJob) {
      */
 
@@ -132,23 +131,24 @@ export class GithubClient {
         return;
       }
 
-      const jobId = await api.queueBisectJob(input);
+      const jobId = await this.broker.queueBisectJob(input);
       d(`Queued bisect job ${jobId}`);
 
       // FIXME: this state info, such as the timer, needs to be a
       // class property so that '/test stop' could stop the polling.
       // Poll until the job is complete
       const timer = setInterval(async () => {
+        if (this.isClosed) return clearInterval(timer);
         d(`polling job ${jobId}...`);
-        const job = await api.getJob(jobId);
+        const job = await this.broker.getJob(jobId);
         if (!job.last) {
-          d('job still pending...', { job });
+          d('job still pending...', JSON.stringify(job));
           return;
         }
         d(`job ${jobId} complete`);
-        clearInterval(timer);
         await this.commentBisectResult(jobId, job.last, context);
-        await api.completeJob(jobId);
+        await this.broker.completeJob(jobId);
+        return clearInterval(timer);
       }, this.pollIntervalMs);
     }
   }
@@ -228,5 +228,10 @@ export class GithubClient {
 }
 
 export default (robot: Probot): void => {
-  new GithubClient(robot);
+  new GithubClient({
+    authToken: env('BUGBOT_AUTH_TOKEN'),
+    brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+    robot,
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+  });
 };
