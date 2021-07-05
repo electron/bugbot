@@ -6,21 +6,24 @@ import nock from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 import { IssueCommentCreatedEvent } from '@octokit/webhooks-types/schema';
 
-import BrokerAPI from '../src/api-client';
+import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.json';
 import { BisectJob, Result } from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
 
-jest.mock('../src/api-client');
+jest.mock('../src/broker-client');
 
 describe('github-client', () => {
+  const authToken = process.env.BUGBOT_AUTH_TOKEN;
+  const brokerBaseUrl = process.env.BUGBOT_BROKER_URL;
+  const pollIntervalMs = 10;
   let ghclient: GithubClient;
   let mockCompleteJob: jest.Mock;
   let mockGetJob: jest.Mock;
   let mockQueueBisectJob: jest.Mock;
   let mockStopJob: jest.Mock;
-  let probot: Probot;
+  let robot: Probot;
 
   beforeEach(() => {
     mockCompleteJob = jest.fn();
@@ -36,7 +39,7 @@ describe('github-client', () => {
       };
     });
 
-    probot = createProbot({
+    robot = createProbot({
       overrides: {
         Octokit: ProbotOctokit.defaults({
           retry: { enabled: false },
@@ -46,11 +49,16 @@ describe('github-client', () => {
       },
     });
 
-    ghclient = new GithubClient(probot);
+    ghclient = new GithubClient({
+      authToken,
+      brokerBaseUrl,
+      pollIntervalMs,
+      robot,
+    });
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    ghclient.close();
   });
 
   describe('GithubClient', () => {
@@ -80,7 +88,7 @@ describe('github-client', () => {
       it('starts a bisect job if no tests are running for the issue', async () => {
         const { badVersion, gistId, goodVersion, payload } =
           createBisectPayload();
-        await probot.receive({ name: 'issue_comment', payload } as any);
+        await robot.receive({ name: 'issue_comment', payload } as any);
         expect(mockQueueBisectJob).toHaveBeenCalledWith(expect.objectContaining({
           badVersion,
           gistId,
@@ -96,7 +104,7 @@ describe('github-client', () => {
           const { payload } = createBisectPayload();
           payload.comment.body = 'This issue comment has no command';
 
-          await probot.receive({ name: 'issue_comment', payload } as any);
+          await robot.receive({ name: 'issue_comment', payload } as any);
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
           expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
@@ -106,7 +114,7 @@ describe('github-client', () => {
           const { payload } = createBisectPayload();
           payload.comment.body = '/bugbot bisetc';
 
-          await probot.receive({ name: 'issue_comment', payload } as any);
+          await robot.receive({ name: 'issue_comment', payload } as any);
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
           expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
@@ -116,7 +124,7 @@ describe('github-client', () => {
           const { payload } = createBisectPayload();
           payload.comment.user.login = 'fnord';
 
-          await probot.receive({ name: 'issue_comment', payload } as any);
+          await robot.receive({ name: 'issue_comment', payload } as any);
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
           expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
@@ -126,7 +134,7 @@ describe('github-client', () => {
           const { payload } = createBisectPayload();
           payload.issue.body = 'This issue body has no gistId';
 
-          await probot.receive({ name: 'issue_comment', payload } as any);
+          await robot.receive({ name: 'issue_comment', payload } as any);
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
           expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
@@ -152,18 +160,24 @@ describe('github-client', () => {
             time_begun: 5,
             time_ended: 10,
           };
-          const mockJob: BisectJob = {
+          const id = 'my-job-id';
+          const mockJobRunning: BisectJob = {
             bisect_range: ['10.1.6', '11.0.2'],
             gist: 'my-gist-id',
-            history: [mockSuccess],
-            id: 'my-job-id',
-            last: mockSuccess,
+            history: [],
+            id,
             time_added: 5,
             type: 'bisect',
           };
-          mockQueueBisectJob.mockResolvedValue(mockJob.id);
-          mockGetJob.mockResolvedValue(mockJob);
-          jest.useFakeTimers();
+          const mockJobDone: BisectJob = {
+            ...mockJobRunning,
+            history: [mockSuccess],
+            last: mockSuccess,
+          };
+          mockQueueBisectJob.mockResolvedValue(id);
+          mockGetJob
+            .mockResolvedValueOnce(mockJobRunning)
+            .mockResolvedValue(mockJobDone);
 
           // check for comment created
           nock('https://api.github.com')
@@ -173,7 +187,7 @@ describe('github-client', () => {
                   '\n' +
                   `Commits between those versions: https://github.com/electron/electron/compare/v${mockSuccess.bisect_range[0]}...v${mockSuccess.bisect_range[1]}\n` +
                   '\n' +
-                  `For more information, see ${process.env.BUGBOT_BROKER_URL}/log/${mockJob.id}`,
+                  `For more information, see ${process.env.BUGBOT_BROKER_URL}/log/${id}`,
               );
               return true;
             })
@@ -198,12 +212,11 @@ describe('github-client', () => {
             })
             .reply(200);
 
-          await probot.receive({
+          await robot.receive({
             name: 'issue_comment',
             payload: payloadFixture,
           } as any);
 
-          jest.runOnlyPendingTimers();
         });
 
         it('...on failure', async (done) => {
@@ -227,14 +240,13 @@ describe('github-client', () => {
           mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);
           mockGetJob.mockResolvedValueOnce(mockJob);
 
-          jest.useFakeTimers();
           // check for comment created
           nock('https://api.github.com')
             .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
               expect(body).toBe(
                 `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
                   'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
-                  `For more information, see ${ghclient.brokerBaseUrl}/log/${mockJob.id}`,
+                  `For more information, see ${brokerBaseUrl}/log/${mockJob.id}`,
               );
               return true;
             })
@@ -259,12 +271,10 @@ describe('github-client', () => {
             })
             .reply(200);
 
-          await probot.receive({
+          await robot.receive({
             name: 'issue_comment',
             payload: payloadFixture,
           } as any);
-
-          jest.runOnlyPendingTimers();
         });
       });
     });

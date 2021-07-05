@@ -21,8 +21,8 @@ export class APIError extends Error {
 }
 
 export default class BrokerAPI {
-  authToken: string;
-  baseURL: string;
+  private readonly authToken: string;
+  private readonly baseURL: string;
 
   constructor(props: { authToken: string; baseURL: string }) {
     this.authToken = props.authToken;

@@ -6,7 +6,7 @@ import { inspect } from 'util';
 import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
-import BrokerAPI from './api-client';
+import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
 import { BisectCommand, parseIssueCommand } from './issue-parser';
 import { ElectronVersions } from './electron-versions';
@@ -14,30 +14,33 @@ import { ElectronVersions } from './electron-versions';
 const AppName = 'BugBot' as const;
 
 export class GithubClient {
-  public readonly authToken: string;
-  public readonly brokerBaseUrl: string;
-  public readonly pollIntervalMs: number;
-  public readonly issueIdToJobId = new Map<number, string>();
+  private isClosed = false;
+  private readonly broker: BrokerAPI;
+  private readonly brokerBaseUrl: string;
+  private readonly pollIntervalMs: number;
+  private readonly robot: Probot;
   private readonly versions = new ElectronVersions();
 
-  constructor(
-    public readonly robot: Probot,
-    opts: {
-      authToken?: string;
-      brokerBaseUrl?: string;
-      pollIntervalMs?: number;
-    } = {},
-  ) {
+  constructor(opts: {
+    authToken: string;
+    brokerBaseUrl: string;
+    pollIntervalMs: number;
+    robot: Probot;
+  }) {
     const d = debug('GithubClient:constructor');
 
-    // init properties
-    this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
-    this.brokerBaseUrl = opts.brokerBaseUrl || env('BUGBOT_BROKER_URL');
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    Object.assign(this, opts);
     d('brokerBaseUrl', this.brokerBaseUrl);
+    this.broker = new BrokerAPI({
+      authToken: opts.authToken,
+      baseURL: opts.brokerBaseUrl,
+    });
 
     this.listenToRobot();
+  }
+
+  public close() {
+    this.isClosed = true;
   }
 
   private listenToRobot() {
@@ -82,6 +85,7 @@ export class GithubClient {
    * @param context Probot context object
    */
   private async parseManualCommand(context: Context<'issue_comment'>) {
+    const promises: Promise<void>[] = [];
     for (const line of context.payload.comment.body.split('\n')) {
       const cmd = await parseIssueCommand(
         context.payload.issue.body,
@@ -89,9 +93,11 @@ export class GithubClient {
         this.versions,
       );
       if (cmd?.type === 'bisect') {
-        await this.runBisect(context, cmd);
+        promises.push(this.runBisect(context, cmd));
       }
     }
+
+    await Promise.all(promises);
   }
 
   private async runBisect(
@@ -99,12 +105,7 @@ export class GithubClient {
     bisectCmd: BisectCommand,
   ) {
     const d = debug('GithubClient:runBisect');
-    const api = new BrokerAPI({
-      authToken: this.authToken,
-      baseURL: this.brokerBaseUrl,
-    });
-
-    const jobId = await api.queueBisectJob(bisectCmd);
+    const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
     // FIXME: this state info, such as the timer, needs to be a
@@ -112,7 +113,8 @@ export class GithubClient {
     // Poll until the job is complete
     const timer = setInterval(async () => {
       d(`polling job ${jobId}...`);
-      const job = await api.getJob(jobId);
+      if (this.isClosed) return clearInterval(timer);
+      const job = await this.broker.getJob(jobId);
       if (!job.last) {
         d('job still pending...', { job });
         return;
@@ -120,7 +122,7 @@ export class GithubClient {
       d(`job ${jobId} complete`);
       clearInterval(timer);
       await this.commentBisectResult(jobId, job.last, context);
-      await api.completeJob(jobId);
+      await this.broker.completeJob(jobId);
     }, this.pollIntervalMs);
   }
 
@@ -213,5 +215,10 @@ export class GithubClient {
 }
 
 export default (robot: Probot): void => {
-  new GithubClient(robot);
+  new GithubClient({
+    authToken: env('BUGBOT_AUTH_TOKEN'),
+    brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+    robot,
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+  });
 };

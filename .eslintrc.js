@@ -8,6 +8,7 @@ const config = {
     'plugin:@typescript-eslint/recommended-requiring-type-checking',
     'plugin:prettier/recommended'
   ],
+  ignorePatterns: ['.eslintrc.js', 'jest.config.js'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 2020,
