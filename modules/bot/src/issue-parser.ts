@@ -63,6 +63,9 @@ const GOOD_VERSION = 'Last Known Working Electron Version';
 const TESTCASE_URL = 'Testcase Gist URL';
 
 // /bugbot bisect [gistId] [goodVersion [badVersion]]
+// If no `gistId` is given, use TESTCASE_URL.
+// If no `goodVersion` is given, use GOOD_VERSION or an old version.
+// If no `badVersion` is given, use TESTCASE_URL or the latest release.
 async function parseBisectCommand(
   issueBody: string,
   words: string[],

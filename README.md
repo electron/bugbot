@@ -10,9 +10,9 @@ Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#usin
 /bugbot bisect [gistId] [goodVersion [badVersion]]
 ```
 
-- If no `gistId` is given, the issue body's `Testcase Gist URL` is used.
-- If no `goodVersion` is given, an older Electron version is used.
-- If no `badVersion` is given, the issue body's `Electron Version` is used. If that's missing too, the latest release is used.
+- If no `gistId` is given, use the issue body's `Testcase Gist URL`.
+- If no `goodVersion` is given, use the issue body's `Last Known Working Electron Version` or an old version.
+- If no `badVersion` is given, use the issue body's `Electron Version` or the latest release.
 
 
 ## Deployment
