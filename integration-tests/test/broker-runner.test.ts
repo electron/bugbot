@@ -134,11 +134,9 @@ describe('runner', () => {
       expect(task.last.runner).toBe(expected.runner);
       expect(task.last.status).toBe(expected.status);
 
-      const time_begun = Number.parseInt(task.last.time_begun, 10);
+      const { time_begun, time_ended } = task.last;
       expect(time_begun).not.toBeNaN();
       expect(time_begun).toBeGreaterThan(0);
-
-      const time_ended = Number.parseInt(task.last.time_begun, 10);
       expect(time_ended).not.toBeNaN();
       expect(time_ended).toBeGreaterThanOrEqual(time_begun);
     });

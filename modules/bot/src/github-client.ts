@@ -204,7 +204,7 @@ export class GithubClient {
     }
 
     // add commment
-    const promises: Promise<any>[] = [];
+    const promises: Promise<unknown>[] = [];
     const issue = context.issue();
     const body = paragraphs.join('\n\n');
     d('adding comment', body);

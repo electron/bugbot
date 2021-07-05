@@ -210,7 +210,7 @@ export class Runner {
     d(`sendLogDataBuffer resp.status ${resp.status}`);
   }
 
-  private addLogData(data: any) {
+  private addLogData(data: string) {
     // save the URL to safeguard against this.jobId being cleared at end-of-job
     const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
     this.logBuffer.push(data);
@@ -238,8 +238,6 @@ export class Runner {
   }
 
   private runBisect(range: BisectRange, gistId: string): Promise<void> {
-    const addLogData = this.addLogData.bind(this);
-    const patchResult = this.patchResult.bind(this);
     const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
 
     return new Promise<void>((resolve) => {
@@ -255,7 +253,7 @@ export class Runner {
       const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      addLogData(
+      this.addLogData(
         [
           `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
           `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
@@ -263,13 +261,17 @@ export class Runner {
         ].join('\n'),
       );
 
-      // TODO(any): could debounce/buffer this data before calling addLogData()
-      const stdout: any[] = [];
-      child.stderr.on('data', (data) => addLogData(data));
-      child.stdout.on('data', (data) => addLogData(data));
-      child.stdout.on('data', (data) => stdout.push(data));
+      // Save stdout locally so we can parse the result.
+      // Report both stdout + stderr to the broker via addLogData().
+      const stdout: string[] = [];
+      const onData = (dat: string | Buffer) => this.addLogData(dat.toString());
+      const onStdout = (dat: string | Buffer) => stdout.push(dat.toString());
+      child.stderr.on('data', onData);
+      child.stdout.on('data', onData);
+      child.stdout.on('data', onStdout);
+
       child.on('error', (err) => {
-        patchResult({
+        void this.patchResult({
           error: err.toString(),
           status: 'system_error',
         });
@@ -287,12 +289,12 @@ export class Runner {
             result.error = 'Failed to narrow test down to two versions';
             result.status = exitCode === 1 ? 'test_error' : 'system_error';
           }
-        } catch (parseErr) {
+        } catch (parseErr: unknown) {
           d('fiddle bisect parse error: %O', parseErr);
           result.status = 'system_error';
           result.error = parseErr.toString();
         } finally {
-          patchResult(result).then(() => resolve());
+          void this.patchResult(result).then(() => resolve());
         }
       });
     });

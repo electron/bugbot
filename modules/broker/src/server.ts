@@ -139,8 +139,8 @@ export class Server {
       task = Task.createBisectTask(req.body);
       this.broker.addTask(task);
       res.status(201).send(escapeHtml(task.id));
-    } catch (error) {
-      res.status(422).send(escapeHtml(error.message));
+    } catch (error: unknown) {
+      res.status(422).send(escapeHtml(error.toString()));
     }
   }
 
@@ -185,7 +185,8 @@ export class Server {
           return;
         }
         const [, prop] = op.path.split('/'); // '/bot_client_data/foo' -> 'bot_client_data'
-        const value = (op as any).value || undefined;
+        const value =
+          op.op === 'add' || op.op === 'replace' ? op.value : undefined;
         if (Task.canSet(prop, value)) {
           return;
         }
@@ -201,9 +202,9 @@ export class Server {
       const { etag } = getTaskBody(task);
       res.header('ETag', etag);
       res.status(200).end();
-    } catch (err) {
+    } catch (err: unknown) {
       d(err);
-      res.status(400).send(escapeHtml(err.message));
+      res.status(400).send(escapeHtml(err.toString()));
     }
   }
 
@@ -211,7 +212,7 @@ export class Server {
     const d = debug(`${DebugPrefix}:getJobs`);
 
     d(`getJobs: query: ${JSON.stringify(req.query)}`);
-    const tasks = this.broker.getTasks().map((task) => task.publicSubset());
+    const tasks = this.broker.getTasks();
     const ids = Server.filter(tasks, req.query as any).map((task) => task.id);
     d(`getJobs: tasks: [${ids.join(', ')}]`);
     res.status(200).json(ids);
@@ -370,10 +371,10 @@ export class Server {
    * - `foo.bar=baz,qux`  - `o[foo][bar] == baz || o[foo][bar] == qux`
    * - `foo.bar!=baz,qux` - `o[foo][bar] != baz && o[foo][bar] != qux`
    */
-  public static filter(
-    beginning_set: any[],
+  public static filter<T>(
+    beginning_set: T[],
     query: Record<string, string>,
-  ): any[] {
+  ): T[] {
     let filtered = [...beginning_set];
     const arrayFormatSeparator = ',';
 
@@ -392,7 +393,7 @@ export class Server {
         .split(arrayFormatSeparator)
         .filter((v) => Boolean(v));
 
-      filtered = filtered.filter((value: any) => {
+      filtered = filtered.filter((value: unknown) => {
         // walk the object tree to the right value
         for (const walk of names) value = value?.[walk];
         value = value === undefined ? 'undefined' : value;
