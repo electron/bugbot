@@ -6,7 +6,7 @@ I have searched the [issue tracker](https://www.github.com/electron/electron/iss
 
 ### Electron Version
 
-12.0.0
+13.0.0
 
 ### What operating system are you using?
 
@@ -22,7 +22,7 @@ x64
 
 ### Last Known Working Electron Version
 
-13.0.0
+12.0.0
 
 ### Expected Behavior
 

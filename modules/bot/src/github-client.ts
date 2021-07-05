@@ -8,20 +8,17 @@ import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import BrokerAPI from './api-client';
 import { Labels } from './github-labels';
-import { FiddleInput, parseIssueBody } from './issue-parser';
+import { BisectCommand, parseIssueCommand } from './issue-parser';
+import { ElectronVersions } from './electron-versions';
 
 const AppName = 'BugBot' as const;
-
-const actions = {
-  BISECT: 'bisect',
-  STOP: 'stop',
-};
 
 export class GithubClient {
   public readonly authToken: string;
   public readonly brokerBaseUrl: string;
   public readonly pollIntervalMs: number;
   public readonly issueIdToJobId = new Map<number, string>();
+  private readonly versions = new ElectronVersions();
 
   constructor(
     public readonly robot: Probot,
@@ -84,74 +81,62 @@ export class GithubClient {
    * Takes action based on a comment left on an issue
    * @param context Probot context object
    */
-  public async parseManualCommand(
+  private async parseManualCommand(context: Context<'issue_comment'>) {
+    for (const line of context.payload.comment.body.split('\n')) {
+      const cmd = await parseIssueCommand(
+        context.payload.issue.body,
+        line,
+        this.versions,
+      );
+      if (cmd?.type === 'bisect') {
+        await this.runBisect(context, cmd);
+      }
+    }
+  }
+
+  private async runBisect(
     context: Context<'issue_comment'>,
-  ): Promise<void> {
-    const d = debug('GitHubClient:parseManualCommand');
+    bisectCmd: BisectCommand,
+  ) {
+    const d = debug('GithubClient:runBisect');
     const api = new BrokerAPI({
       authToken: this.authToken,
       baseURL: this.brokerBaseUrl,
     });
 
-    const { payload } = context;
-    const args = payload.comment.body.split(' ');
-    const [command, action] = args;
-    d('command', command, 'action', action);
+    const jobId = await api.queueBisectJob(bisectCmd);
+    d(`Queued bisect job ${jobId}`);
 
-    if (command !== '/test') {
-      d(`unexpected command "${command}"; returning`);
-      return;
-    }
-
-    /*
-     * FIXME: this draft implementation needs to be completed
-     * const id = 'some-guid';
-     * let currentJob;
-     * try {
-     *   currentJob = await api.getJob(id);
-     * } catch (e) {
-     *    // no-op
-     * }
-     * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-     *   api.stopJob(id);
-     * } else if (action === actions.BISECT && !currentJob) {
-     */
-
-    if (action === actions.BISECT) {
-      d('Running /test bisect');
-      // Get issue input and fire a bisect job
-      const { body } = payload.issue;
-      let input: FiddleInput;
-
-      try {
-        d(`body: "${body}"`);
-        input = parseIssueBody(body);
-        d(`parseIssueBody returned ${JSON.stringify(input)}`);
-      } catch (e) {
-        d('Unable to parse issue body for bisect', e);
+    // FIXME: this state info, such as the timer, needs to be a
+    // class property so that '/test stop' could stop the polling.
+    // Poll until the job is complete
+    const timer = setInterval(async () => {
+      d(`polling job ${jobId}...`);
+      const job = await api.getJob(jobId);
+      if (!job.last) {
+        d('job still pending...', { job });
         return;
       }
-
-      const jobId = await api.queueBisectJob(input);
-      d(`Queued bisect job ${jobId}`);
-
-      // FIXME: this state info, such as the timer, needs to be a
-      // class property so that '/test stop' could stop the polling.
-      // Poll until the job is complete
-      const timer = setInterval(async () => {
-        d(`polling job ${jobId}...`);
-        const job = await api.getJob(jobId);
-        if (!job.last) {
-          d('job still pending...', { job });
-          return;
-        }
-        d(`job ${jobId} complete`);
-        clearInterval(timer);
-        await this.commentBisectResult(jobId, job.last, context);
-        await api.completeJob(jobId);
-      }, this.pollIntervalMs);
-    }
+      d(`job ${jobId} complete`);
+      clearInterval(timer);
+      await this.commentBisectResult(jobId, job.last, context);
+      await api.completeJob(jobId);
+    }, this.pollIntervalMs);
   }
+
+  /*
+   * FIXME: this draft implementation needs to be completed
+   * const id = 'some-guid';
+   * let currentJob;
+   * try {
+   *   currentJob = await this.broker.getJob(id);
+   * } catch (e) {
+   *    // no-op
+   * }
+   * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
+   *   this.broker.stopJob(id);
+   * } else if (action === actions.BISECT && !currentJob) {
+   */
 
   /**
    * Comments on the issue once a bisect operation is completed

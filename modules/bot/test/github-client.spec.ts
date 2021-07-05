@@ -56,7 +56,7 @@ describe('github-client', () => {
   describe('GithubClient', () => {
     function createBisectPayload({
       badVersion = '11.0.2',
-      comment = '/test bisect',
+      comment = '/bugbot bisect',
       gistId = '59444f92bffd5730944a0de6d85067fd',
       goodVersion = '10.1.6',
       login = 'ckerr',
@@ -81,11 +81,11 @@ describe('github-client', () => {
         const { badVersion, gistId, goodVersion, payload } =
           createBisectPayload();
         await probot.receive({ name: 'issue_comment', payload } as any);
-        expect(mockQueueBisectJob).toHaveBeenCalledWith({
+        expect(mockQueueBisectJob).toHaveBeenCalledWith(expect.objectContaining({
           badVersion,
           gistId,
           goodVersion,
-        });
+        }));
       });
 
       it.todo('stops a test job if one is running');
@@ -104,7 +104,7 @@ describe('github-client', () => {
         it('...the comment has an invalid command', async () => {
           const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
           const { payload } = createBisectPayload();
-          payload.comment.body = '/test bisetc';
+          payload.comment.body = '/bugbot bisetc';
 
           await probot.receive({ name: 'issue_comment', payload } as any);
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);

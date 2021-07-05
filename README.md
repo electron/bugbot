@@ -1,5 +1,34 @@
 # BugBot
 
+## Usage
+
+### Using Issue Comments
+
+Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#using-trop), you can start bugbot with issue comments. To begin bisection, add a comment that looks like this:
+
+```
+/bugbot bisect [gistId] [goodVersion [badVersion]]
+```
+
+- If no `gistId` is given, the issue body's `Testcase Gist URL` is used.
+- If no `goodVersion` is given, an older Electron version is used.
+- If no `badVersion` is given, the issue body's `Electron Version` is used. If that's missing too, the latest release is used.
+
+
+## Deployment
+
+### Environment variables
+
+| Name | Module | Description | Default |
+|---|---|---|---|
+| `BUGBOT_BROKER_CERT` or `BUGBOT_BROKER_CERT_PATH` | Required by Broker if `BUGBOT_BROKER_URL` is https | The data (or the path to it) to use as the `cert` option to [https.createServer()](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener). | None |
+| `BUGBOT_BROKER_KEY` or `BUGBOT_BROKER_KEY_PATH` | Required by Broker if `BUGBOT_BROKER_URL` is https | The data (or the path to it) to use as the `key` option to [https.createServer()](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener). | None |
+| `BUGBOT_BROKER_URL` | Required by all | The base URL for the broker, e.g. `https://bugbot.electronjs.org:8443`. | None |
+| `BUGBOT_CHILD_TIMEOUT_MS` | Runner | When to cancel a hung child | 5 minutes |
+| `BUGBOT_FIDDLE_EXEC` | Runner | Used to invoke electron-fiddle. This can include other space-delimited command-line arguments, e.g. `xvfb-run electron-fiddle` | '[which](https://github.com/npm/node-which) electron-fiddle' |
+| `BUGBOT_POLL_INTERVAL_MS` | Bot, Runner | How frequently to poll the Broker | 20 seconds |
+| `BUGBOT_AUTH_TOKEN` | Bot, Runner | The auth token for communications with the Broker |
+
 ## Development
 
 BugBot is split into multiple modules, connected in development via [Yarn Workspaces](https://classic.yarnpkg.com/en/docs/workspaces/) and [TypeScript Project References](https://www.typescriptlang.org/docs/handbook/project-references.html). Each module can be found within the `modules/` top-level directory.
@@ -11,17 +40,3 @@ $ yarn run build
 ```
 
 **Note**: The latter command is required due to [a caveat with TypeScript Project References](https://www.typescriptlang.org/docs/handbook/project-references.html#caveats-for-project-references) and will hopefully be remedied automatically in the future. If you don't run `yarn run build` then you may see errors in your editor for modules that have not been built (or are not up-to-date and need to be rebuilt).
-
-## Running BugBot
-
-### Envionment variables
-
-| Name | Module | Description | Default |
-|---|---|---|---|
-| `BUGBOT_BROKER_CERT` or `BUGBOT_BROKER_CERT_PATH` | Required by Broker if `BUGBOT_BROKER_URL` is https | The data (or the path to it) to use as the `cert` option to [https.createServer()](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener). | None |
-| `BUGBOT_BROKER_KEY` or `BUGBOT_BROKER_KEY_PATH` | Required by Broker if `BUGBOT_BROKER_URL` is https | The data (or the path to it) to use as the `key` option to [https.createServer()](https://nodejs.org/api/https.html#https_https_createserver_options_requestlistener). | None |
-| `BUGBOT_BROKER_URL` | Required by all | The base URL for the broker, e.g. `https://bugbot.electronjs.org:8443`. | None |
-| `BUGBOT_CHILD_TIMEOUT_MS` | Runner | When to cancel a hung child | 5 minutes |
-| `BUGBOT_FIDDLE_EXEC` | Runner | Used to invoke electron-fiddle. This can include other space-delimited command-line arguments, e.g. `xvfb-run electron-fiddle` | '[which](https://github.com/npm/node-which) electron-fiddle' |
-| `BUGBOT_POLL_INTERVAL_MS` | Bot, Runner | How frequently to poll the Broker | 20 seconds |
-| `BUGBOT_AUTH_TOKEN` | Bot, Runner | The auth token for communications with the Broker |

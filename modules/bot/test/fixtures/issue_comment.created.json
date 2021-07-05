@@ -79,7 +79,7 @@
     "created_at": "2021-05-18T22:57:16Z",
     "updated_at": "2021-05-18T22:57:16Z",
     "author_association": "OWNER",
-    "body": "/test bisect",
+    "body": "/bugbot bisect",
     "performed_via_github_app": null
   },
   "repository": {
