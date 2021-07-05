@@ -68,7 +68,7 @@ export default class BrokerAPI {
     return res.json();
   }
 
-  public async completeJob(jobId: JobId): Promise<any> {
+  public async completeJob(jobId: JobId): Promise<void> {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     await fetch(url.toString(), {
       body: JSON.stringify([

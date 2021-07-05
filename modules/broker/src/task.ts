@@ -30,10 +30,10 @@ export class Task {
   public error: string;
   public etag: string;
   public gist: string;
-  public last: any;
+  public last: Result | undefined = undefined;
   public platform: string;
 
-  constructor(props: Record<string, any>) {
+  constructor(props: Record<string, unknown>) {
     for (const [key, val] of Object.entries(props)) {
       this[key] = val;
     }
@@ -67,7 +67,7 @@ export class Task {
     'type',
   ] as const;
 
-  public publicSubset(): Record<string, any> {
+  public publicSubset(): Record<string, unknown> {
     return Object.fromEntries(
       Object.entries(this).filter(([key]) => Task.PublicFields.includes(key)),
     );
@@ -82,13 +82,13 @@ export class Task {
     type: (value: string) => ['bisect', 'test'].includes(value),
   });
 
-  public static canInit(key: string, value: any): boolean {
+  public static canInit(key: string, value: unknown): boolean {
     if (!Task.KnownFields.includes(key)) return false;
     const test = Task.PropertyTests[key];
     return !test || test(value);
   }
 
-  public static canSet(key: string, value: any): boolean {
+  public static canSet(key: string, value: unknown): boolean {
     return Task.canInit(key, value) && !Task.ReadonlyFields.includes(key);
   }
 

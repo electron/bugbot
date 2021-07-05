@@ -18,9 +18,9 @@ const actions = {
 };
 
 export class GithubClient {
-  public readonly authToken;
-  public readonly brokerBaseUrl;
-  public readonly pollIntervalMs;
+  public readonly authToken: string;
+  public readonly brokerBaseUrl: string;
+  public readonly pollIntervalMs: number;
   public readonly issueIdToJobId = new Map<number, string>();
 
   constructor(
@@ -204,7 +204,7 @@ export class GithubClient {
     }
 
     // add commment
-    const promises: Promise<any>[] = [];
+    const promises: Promise<unknown>[] = [];
     const issue = context.issue();
     const body = paragraphs.join('\n\n');
     d('adding comment', body);

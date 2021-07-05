@@ -21,7 +21,7 @@ export interface Current {
 }
 
 export interface BaseJob {
-  bot_client_data?: any;
+  bot_client_data?: unknown;
   current?: Current;
   gist: string;
   history: Result[];
