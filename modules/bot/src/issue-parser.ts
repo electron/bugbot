@@ -96,9 +96,12 @@ async function parseBisectCommand(
   d('sections', inspect(sections));
   badVersion ||= SemVer.coerce(sections.get(BAD_VERSION))?.version;
   badVersion ||= await versions.getLatestVersion();
-  gistId ||= getGistId(sections.get(TESTCASE_URL));
   goodVersion ||= SemVer.coerce(sections.get(GOOD_VERSION))?.version;
   goodVersion ||= await versions.getDefaultBisectStart();
+  if (!gistId) {
+    const url = sections.get(TESTCASE_URL);
+    if (url) gistId = getGistId(url);
+  }
 
   // ensure goodVersion < badVersion;
   const semGood = SemVer.parse(goodVersion);
