@@ -1,10 +1,27 @@
 # BugBot
 
+## tldr
+
+1. Users [file Electron bug reports](https://github.com/electron/electron/issues/new/choose) with [tests](#for-bug-reporters).
+1. BugBot can run the test on many platforms and Electron versions, then report back in-issue.
+1. BugBot can bisect regressions down to a range of commits, then report back in-issue.
+1. Users and maintainers can see where the bug is reproducible.
+
 ## Usage
 
-### Using Issue Comments
+### by Bug Reporters
 
-Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#using-trop), you can start bugbot with issue comments. To begin bisection, add a comment that looks like this:
+BugBot only needs one thing: a test that exits with `exitCode` 0 if Electron works, or nonzero if Electron has a bug.
+
+One easy way to make a test is with [Electron Fiddle](https://github.com/electron/fiddle). Its "File > New Test" has a [test template](https://github.com/electron/electron-quick-start/tree/test-template) with some [lightweight test helpers](https://github.com/electron/electron-quick-start/blob/test-template/preload.js) and its "Publish" button can upload the test to the [gist.github.com](https://gist.github.com/) [pastebin](https://en.wikipedia.org/wiki/Pastebin).
+
+If you want to do it manually, the only requirement is that 0/1 `exitCode`. You can write it from scratch or use [electron-quickstart](https://github.com/electron/electron-quickstart)'s [`test-template` branch](https://github.com/electron/electron-quick-start/tree/test-template) as a starting point, which is the same template used by Electron Fiddle. You can clone it from the command line with `git clone --branch test-template https://github.com/electron/electron-quickstart`, then use a web browser to upload it to [gist.github.com](https://gist.github.com/).
+
+After uploading your test to gist.github.com, file an [Electron bug report](https://github.com/electron/electron/issues/new/choose). The bug report template will ask for a "Testcase Gist URL", which is where you'll provide the Gist URL.
+
+### by Maintainers
+
+Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#using-trop), you can start BugBot with issue comments. To begin bisection, add a comment that looks like this:
 
 ```
 /bugbot bisect [gistId] [goodVersion [badVersion]]
