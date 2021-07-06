@@ -1,3 +1,5 @@
+import debug from 'debug';
+
 export type FiddleBisectResult =
   | { success: false }
   | {
@@ -7,6 +9,7 @@ export type FiddleBisectResult =
     };
 
 export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
+  const d = debug('runner:parseFiddleBisectOutput');
   // In an attempt to guard against any output from the fiddles, only take the
   // last few lines of the output to parse
   const OUTPUT_END_LINES = 8;
@@ -14,6 +17,7 @@ export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
     .split('\n')
     .splice(-OUTPUT_END_LINES, OUTPUT_END_LINES)
     .join('\n');
+  d('endOutput', endOutput);
 
   // There should be an output line at the end that looks like this:
   //
@@ -21,6 +25,7 @@ export function parseFiddleBisectOutput(stdout: string): FiddleBisectResult {
   //
   // Try to find that first to see if it says "success" or "invalid"
   const bisectResult = /Task: Bisect {2}(success|invalid)\s*$/.exec(endOutput);
+  d('bisectResult', bisectResult);
 
   if (bisectResult === null) {
     // TODO: this may start to always happen if the output changes in the

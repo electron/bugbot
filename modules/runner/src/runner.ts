@@ -243,11 +243,11 @@ export class Runner {
     return new Promise<void>((resolve) => {
       const args = [
         ...fiddleArgv,
-        'bisect',
-        range[0],
-        range[1],
-        '--fiddle',
-        gistId,
+        ...['bisect', range[0], range[1]],
+        '--betas',
+        ...['--fiddle', gistId],
+        '--nightlies',
+        '--obsolete',
       ];
       const opts = { timeout: childTimeoutMs };
       const child = spawn(fiddleExec, args, opts);
