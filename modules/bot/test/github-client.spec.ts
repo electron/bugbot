@@ -1,18 +1,20 @@
 process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
+process.env.BUGBOT_BOT_NAME = 'erick-bugbot';
 process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
-import { PartialDeep } from 'type-fest';
 import nock from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
-import { IssueCommentCreatedEvent } from '@octokit/webhooks-types/schema';
 
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.json';
 import { BisectJob, Result } from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
+import { parseIssueBody } from '../src/issue-parser';
 
 jest.mock('../src/broker-client');
+
+const noop = () => {};
 
 describe('github-client', () => {
   const authToken = process.env.BUGBOT_AUTH_TOKEN;
@@ -55,104 +57,76 @@ describe('github-client', () => {
       pollIntervalMs,
       robot,
     });
+
+    nock.disableNetConnect();
   });
 
   afterEach(() => {
     ghclient.close();
+
+    nock.cleanAll();
+    nock.enableNetConnect();
   });
 
   describe('GithubClient', () => {
-    function createBisectPayload({
-      badVersion = '11.0.2',
-      comment = '/test bisect',
-      gistId = '59444f92bffd5730944a0de6d85067fd',
-      goodVersion = '10.1.6',
-      login = 'ckerr',
-    } = {}) {
-      const payload: PartialDeep<IssueCommentCreatedEvent> = {
-        action: 'created',
-        comment: {
-          body: comment,
-          user: {
-            login,
-          },
-        },
-        issue: {
-          body: `### Electron Version\r\n\r\n${badVersion}\r\n\r\n### What operating system are you using?\r\n\r\nWindows\r\n\r\n### Operating System Version\r\n\r\n10\r\n\r\n### What arch are you using?\r\n\r\nx64\r\n\r\n### Last Known Working Electron Version\r\n\r\n${goodVersion}\r\n\r\n### Testcase Gist URL\r\n\r\n${gistId}`,
-        },
-      };
-      return { badVersion, comment, gistId, goodVersion, login, payload };
-    }
-
-    describe('onIssueComment()', () => {
-      it('starts a bisect job if no tests are running for the issue', async () => {
-        const { badVersion, gistId, goodVersion, payload } =
-          createBisectPayload();
-        await robot.receive({ name: 'issue_comment', payload } as any);
-        expect(mockQueueBisectJob).toHaveBeenCalledWith({
-          badVersion,
-          gistId,
-          goodVersion,
+    describe('on `/test bisect` command', () => {
+      describe('handleManualCommand()', () => {
+        it('starts a bisect job if no tests are running for the issue', async () => {
+          const runBisectJobSpy = jest.spyOn(GithubClient.prototype as any, 'runBisectJob')
+            .mockImplementationOnce(noop);
+  
+          const input = parseIssueBody(payloadFixture.issue.body);
+          await robot.receive({ name: 'issue_comment', payload: payloadFixture } as any);
+          expect(runBisectJobSpy).toHaveBeenCalledWith(input, expect.any(Object))
+        });
+  
+        it.todo('stops a test job if one is running');
+  
+        describe('does nothing if', () => {
+          it('...the comment does not have a command', async () => {
+            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+            const noCommandFixture = JSON.parse(JSON.stringify(payloadFixture));
+            noCommandFixture.comment.body = 'This issue comment has no command';
+  
+            await robot.receive({ name: 'issue_comment', payload: noCommandFixture } as any);
+            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+            expect(mockQueueBisectJob).not.toHaveBeenCalled();
+          });
+  
+          it('...the comment has an invalid command', async () => {
+            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+            const invalidCommandFixture = JSON.parse(JSON.stringify(payloadFixture));
+            invalidCommandFixture.comment.body = '/test bisetc';
+  
+            await robot.receive({ name: 'issue_comment', payload: invalidCommandFixture } as any);
+            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+            expect(mockQueueBisectJob).not.toHaveBeenCalled();
+          });
+  
+          it('...the commenter is not a maintainer', async () => {
+            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+            const unauthorizedUserFixture = JSON.parse(JSON.stringify(payloadFixture));
+            unauthorizedUserFixture.comment.user.login = 'fnord';
+  
+            await robot.receive({ name: 'issue_comment', payload: unauthorizedUserFixture } as any);
+            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+            expect(mockQueueBisectJob).not.toHaveBeenCalled();
+          });
+  
+          it('...the issue body has no gistId', async () => {
+            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+            const noGistFixture = JSON.parse(JSON.stringify(payloadFixture));
+            noGistFixture.issue.body = 'This issue body has no gistId';
+  
+            await robot.receive({ name: 'issue_comment', payload: noGistFixture } as any);
+            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+            expect(mockQueueBisectJob).not.toHaveBeenCalled();
+          });
         });
       });
 
-      it.todo('stops a test job if one is running');
-
-      describe('does nothing if', () => {
-        it('...the comment does not have a command', async () => {
-          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-          const { payload } = createBisectPayload();
-          payload.comment.body = 'This issue comment has no command';
-
-          await robot.receive({ name: 'issue_comment', payload } as any);
-          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-          expect(mockQueueBisectJob).not.toHaveBeenCalled();
-        });
-
-        it('...the comment has an invalid command', async () => {
-          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-          const { payload } = createBisectPayload();
-          payload.comment.body = '/test bisetc';
-
-          await robot.receive({ name: 'issue_comment', payload } as any);
-          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-          expect(mockQueueBisectJob).not.toHaveBeenCalled();
-        });
-
-        it('...the commenter is not a maintainer', async () => {
-          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-          const { payload } = createBisectPayload();
-          payload.comment.user.login = 'fnord';
-
-          await robot.receive({ name: 'issue_comment', payload } as any);
-          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-          expect(mockQueueBisectJob).not.toHaveBeenCalled();
-        });
-
-        it('...the issue body has no gistId', async () => {
-          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-          const { payload } = createBisectPayload();
-          payload.issue.body = 'This issue body has no gistId';
-
-          await robot.receive({ name: 'issue_comment', payload } as any);
-          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-          expect(mockQueueBisectJob).not.toHaveBeenCalled();
-        });
-      });
-    });
-
-    describe('handleBisectResult()', () => {
-      beforeEach(() => {
-        nock.disableNetConnect();
-      });
-
-      afterEach(() => {
-        nock.cleanAll();
-        nock.enableNetConnect();
-      });
-
-      describe('comments and labels', () => {
-        it('...on success', async (done) => {
+      describe('runBisectJob()', () => {
+        it('queues a bisect job and comments the result', async () => {
           const mockSuccess: Result = {
             bisect_range: ['10.3.2', '10.4.0'],
             runner: 'my-runner-id',
@@ -179,9 +153,32 @@ describe('github-client', () => {
             .mockResolvedValueOnce(mockJobRunning)
             .mockResolvedValueOnce(mockJobDone);
 
-          // check for comment created
+          
           nock('https://api.github.com')
+            // No comments yet...
+            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+            .reply(200, [])
+
+            // ...so we create a new comment
             .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+              expect(body).toEqual('Queuing bisect job...');
+              return true;
+            })
+            .reply(200)
+
+            // Add bugbot/test-running label
+            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+              expect(labels).toEqual([Labels.BugBot.Running]);
+              return true;
+            })
+            .reply(200)
+
+            // Now, the comment from above should exist...
+            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+            .reply(200, [{id: 1, user: {login: `${process.env.BUGBOT_BOT_NAME}[bot]`}}])
+            
+            // ...so we update it with the bisect info.
+            .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
               expect(body).toEqual(
                 `It looks like this bug was introduced between ${mockSuccess.bisect_range[0]} and ${mockSuccess.bisect_range[1]}\n` +
                   '\n' +
@@ -191,21 +188,16 @@ describe('github-client', () => {
               );
               return true;
             })
-            .reply(200);
+            .reply(200)
 
-          // check for label deletion
-          nock('https://api.github.com')
+            // delete the `bugbot/test-running` label and add `bug/regression`
             .delete(
               '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
               () => {
-                done();
                 return true;
               },
             )
-            .reply(200);
-
-          // check for label additions
-          nock('https://api.github.com')
+            .reply(200)
             .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
               expect(labels).toEqual([Labels.Bug.Regression]);
               return true;
@@ -219,7 +211,7 @@ describe('github-client', () => {
 
         });
 
-        it('...on failure', async (done) => {
+        it('handles failures gracefully', async () => {
           const mockTestError: Result = {
             error: 'my-error',
             runner: 'my-runner-id',
@@ -240,8 +232,29 @@ describe('github-client', () => {
           mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);
           mockGetJob.mockResolvedValueOnce(mockJob);
 
-          // check for comment created
           nock('https://api.github.com')
+            // No comments yet...
+            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+            .reply(200, [])
+
+            // ...so we create a new comment
+            .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+              expect(body).toEqual('Queuing bisect job...');
+              return true;
+            })
+            .reply(200)
+
+            // Add bugbot/test-running label
+            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+              expect(labels).toEqual([Labels.BugBot.Running]);
+              return true;
+            })
+            .reply(200)
+
+            // Now, the comment from above should exist...
+            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+            .reply(200, [{id: 1, user: {login: `${process.env.BUGBOT_BOT_NAME}[bot]`}}])
+            // ...so we update the comment with an error message.
             .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
               expect(body).toBe(
                 `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
@@ -250,21 +263,16 @@ describe('github-client', () => {
               );
               return true;
             })
-            .reply(200);
+            .reply(200)
 
-          // check for label deletion
-          nock('https://api.github.com')
+            // delete the `bugbot/test-running` label and add `bugbot/maintainer-needed`
             .delete(
               '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
               () => {
-                done();
                 return true;
               },
             )
-            .reply(200);
-
-          // check for label additions
-          nock('https://api.github.com')
+            .reply(200)
             .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
               expect(labels).toEqual([Labels.BugBot.MaintainerNeeded]);
               return true;
