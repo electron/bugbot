@@ -130,24 +130,28 @@ export class GithubClient {
         return;
       }
 
-      const promises: Promise<unknown>[] = [];
-      promises.push(this.setIssueComment('Queuing bisect job...', context));
-      promises.push(
-        context.octokit.issues.addLabels({
-          ...context.issue(),
-          labels: [Labels.BugBot.Running],
-        }),
-      );
-
-      await Promise.all(promises);
       await this.runBisectJob(input, context);
     }
   }
 
-  private async runBisectJob(input: FiddleInput, context) {
+  private async runBisectJob(
+    input: FiddleInput,
+    context: Context<'issue_comment'>,
+  ) {
     const d = debug('GitHubClient:runBisectJob');
-    const jobId = await this.broker.queueBisectJob(input);
 
+    d(`Updating GitHub issue #${context.payload.issue.id}`);
+    const promises: Promise<unknown>[] = [];
+    promises.push(this.setIssueComment('Queuing bisect job...', context));
+    promises.push(
+      context.octokit.issues.addLabels({
+        ...context.issue(),
+        labels: [Labels.BugBot.Running],
+      }),
+    );
+    await Promise.all(promises);
+
+    const jobId = await this.broker.queueBisectJob(input);
     d(`Queued bisect job ${jobId}`);
 
     // FIXME: this state info, such as the timer, needs to be a
@@ -256,7 +260,7 @@ export class GithubClient {
     const lastBotComment = comments.reverse().find((comment) => {
       const { user } = comment;
       const botName = env('BUGBOT_BOT_NAME');
-      return user.type === 'Bot' && user.login === `${botName}[bot]`;
+      return user.login === `${botName}[bot]`;
     });
 
     if (lastBotComment) {
