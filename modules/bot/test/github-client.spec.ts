@@ -141,7 +141,7 @@ describe('github-client', () => {
       });
     });
 
-    describe('commentBisectResult()', () => {
+    describe('handleBisectResult()', () => {
       beforeEach(() => {
         nock.disableNetConnect();
       });
