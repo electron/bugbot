@@ -141,7 +141,14 @@ export async function parseIssueCommand(
   cmd: string,
   versions: ElectronVersions,
 ): Promise<IssueCommand | undefined> {
-  const words = cmd.split(' ').map((word) => word.trim().toLocaleLowerCase());
+  const d = debug('issue-parser:parseIssueCommand');
+
+  const words = cmd
+    .split(' ')
+    .map((word) => word.trim().toLocaleLowerCase())
+    .filter((word) => word.length > 0);
+  d('words', inspect(words));
+
   if (words.length < 2) return undefined;
   if (words[0] !== '/bugbot') return undefined;
   switch (words[1]) {

@@ -104,6 +104,12 @@ describe('issue-parser', () => {
         expect(command).toMatchObject(expectedCommand);
       });
 
+      it('is not confused by extra whitespace in the comment body', async () => {
+        const issueBody = getIssueBody('issue.md');
+        const command = await parseIssueCommand(issueBody, `\n  \n  /bugbot   bisect \n\n\n `, versions);
+        expect(command).toMatchObject(expectedCommand);
+      });
+
       it('coerces version numbers into semver', async () => {
         const issueBody = getIssueBody('issue-versions-non-semantic.md');
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
