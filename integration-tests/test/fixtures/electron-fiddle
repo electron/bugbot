@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // This script will play back electron-fiddle sessions that were
-// recorded with ./electron-fiddle-record
+// recorded with `./electron-fiddle-record`
 
 const fs = require('fs');
 const hash = require('object-hash');

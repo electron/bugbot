@@ -8,8 +8,7 @@
 // where ${hash} is a hash of the params electron-fiddle was called with
 // and ${suffix} is ['log' | 'code'].
 //
-// These files are loaded and "played back" by the electron-fiddle mock
-// in this directory.
+// These files are loaded and "played back" by `./electron-fiddle`.
 
 const { spawn } = require('child_process');
 const fs = require('fs');
