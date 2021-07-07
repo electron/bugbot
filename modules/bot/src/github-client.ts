@@ -90,7 +90,7 @@ export class GithubClient {
   private async handleManualCommand(
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug('GitHubClient:handleManualCommand');
+    const d = debug('GithubClient:handleManualCommand');
 
     const { payload } = context;
     const args = payload.comment.body.split(' ');
@@ -138,9 +138,9 @@ export class GithubClient {
     input: FiddleInput,
     context: Context<'issue_comment'>,
   ) {
-    const d = debug('GitHubClient:runBisectJob');
+    const d = debug('GithubClient:runBisectJob');
 
-    d(`Updating GitHub issue #${context.payload.issue.id}`);
+    d(`Updating GitHub issue id ${context.payload.issue.id}`);
     const promises: Promise<unknown>[] = [];
     promises.push(this.setIssueComment('Queuing bisect job...', context));
     promises.push(
@@ -157,6 +157,7 @@ export class GithubClient {
     // FIXME: this state info, such as the timer, needs to be a
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
+    d(`Polling every ${this.pollIntervalMs}ms`);
     const timer = setInterval(async () => {
       if (this.isClosed) return clearInterval(timer);
       d(`polling job ${jobId}...`);

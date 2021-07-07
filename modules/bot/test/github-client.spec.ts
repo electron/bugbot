@@ -64,6 +64,8 @@ describe('github-client', () => {
   afterEach(() => {
     ghclient.close();
 
+    console.log('isDone:', nock.isDone());
+
     nock.cleanAll();
     nock.enableNetConnect();
   });
@@ -211,7 +213,7 @@ describe('github-client', () => {
 
         });
 
-        it('handles failures gracefully', async () => {
+        it.only('handles failures gracefully', async (done) => {
           const mockTestError: Result = {
             error: 'my-error',
             runner: 'my-runner-id',
@@ -255,12 +257,13 @@ describe('github-client', () => {
             .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
             .reply(200, [{id: 1, user: {login: `${process.env.BUGBOT_BOT_NAME}[bot]`}}])
             // ...so we update the comment with an error message.
-            .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+            .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
               expect(body).toBe(
                 `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
                   'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
                   `For more information, see ${brokerBaseUrl}/log/${mockJob.id}`,
               );
+              done();
               return true;
             })
             .reply(200)
@@ -283,6 +286,8 @@ describe('github-client', () => {
             name: 'issue_comment',
             payload: payloadFixture,
           } as any);
+
+          expect(mockCompleteJob).not.toHaveBeenCalled();
         });
       });
     });
