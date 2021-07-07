@@ -141,9 +141,7 @@ describe('github-client', () => {
           // delete the `bugbot/test-running` label and add `bug/regression`
           .delete(
             '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
-            () => {
-              return true;
-            },
+            () => true,
           )
           .reply(200)
           .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
@@ -219,9 +217,7 @@ describe('github-client', () => {
           // delete the `bugbot/test-running` label and add `bugbot/maintainer-needed`
           .delete(
             '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
-            () => {
-              return true;
-            },
+            () => true,
           )
           .reply(200)
           .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
