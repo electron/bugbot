@@ -158,19 +158,32 @@ export class GithubClient {
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
     d(`Polling every ${this.pollIntervalMs}ms`);
-    const timer = setInterval(async () => {
-      if (this.isClosed) return clearInterval(timer);
-      d(`polling job ${jobId}...`);
-      const job = await this.broker.getJob(jobId);
-      if (!job.last) {
-        d('job still pending...', JSON.stringify(job));
-        return;
-      }
-      d(`job ${jobId} complete`);
-      await this.handleBisectResult(jobId, job.last, context);
-      await this.broker.completeJob(jobId);
-      return clearInterval(timer);
-    }, this.pollIntervalMs);
+
+    return new Promise<void>((resolve, reject) => {
+      const pollBroker = setInterval(async () => {
+        if (this.isClosed) {
+          clearInterval(pollBroker);
+          resolve();
+        }
+
+        d(`polling job ${jobId}...`);
+        const job = await this.broker.getJob(jobId);
+        if (!job.last) {
+          d('job still pending...', JSON.stringify(job));
+          return;
+        }
+        d(`job ${jobId} complete`);
+
+        try {
+          await this.handleBisectResult(jobId, job.last, context);
+          await this.broker.completeJob(jobId);
+        } catch (e) {
+          reject(e);
+        }
+        clearInterval(pollBroker);
+        resolve();
+      }, this.pollIntervalMs);
+    });
   }
 
   /**
