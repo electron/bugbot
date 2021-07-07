@@ -274,7 +274,7 @@ export class GithubClient {
 
     const lastBotComment = comments.reverse().find((comment) => {
       const { user } = comment;
-      const botName = env('BUGBOT_BOT_NAME');
+      const botName = env('BUGBOT_GITHUB_LOGIN');
       return user.login === `${botName}[bot]`;
     });
 

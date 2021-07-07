@@ -1,5 +1,5 @@
 process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
-process.env.BUGBOT_BOT_NAME = 'erick-bugbot';
+process.env.BUGBOT_GITHUB_LOGIN = 'erick-bugbot';
 process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
 import nock from 'nock';
@@ -122,7 +122,10 @@ describe('github-client', () => {
           // Now, the comment from above should exist...
           .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
           .reply(200, [
-            { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
+            {
+              id: 1,
+              user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` },
+            },
           ])
 
           // ...so we update it with the bisect info.
@@ -201,7 +204,10 @@ describe('github-client', () => {
           // Now, the comment from above should exist...
           .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
           .reply(200, [
-            { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
+            {
+              id: 1,
+              user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` },
+            },
           ])
           // ...so we update the comment with an error message.
           .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
