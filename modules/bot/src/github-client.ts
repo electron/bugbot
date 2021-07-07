@@ -125,12 +125,11 @@ export class GithubClient {
       try {
         input = parseIssueBody(body);
         d(`parseIssueBody returned ${JSON.stringify(input)}`);
+        await this.runBisectJob(input, context);
       } catch (e) {
-        d('Unable to parse issue body for bisect', e);
+        d('Unable to run bisect job', e);
         return;
       }
-
-      await this.runBisectJob(input, context);
     }
   }
 
@@ -177,7 +176,7 @@ export class GithubClient {
             await this.handleBisectResult(jobId, job.last, context);
             await this.broker.completeJob(jobId);
           } catch (e) {
-            reject(e);
+            return reject(e);
           }
           return resolve();
         }
