@@ -10,11 +10,8 @@ import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.json';
 import { BisectJob, Result } from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
-import { parseIssueBody } from '../src/issue-parser';
 
 jest.mock('../src/broker-client');
-
-const noop = () => {};
 
 describe('github-client', () => {
   const authToken = process.env.BUGBOT_AUTH_TOKEN;
@@ -76,248 +73,228 @@ describe('github-client', () => {
 
   describe('GithubClient', () => {
     describe('on `/test bisect` command', () => {
-      describe('handleManualCommand()', () => {
-        it('starts a bisect job if no tests are running for the issue', async () => {
-          const runBisectJobSpy = jest
-            .spyOn(GithubClient.prototype as any, 'runBisectJob')
-            .mockImplementationOnce(noop);
+      it('queues a bisect job and comments the result', async () => {
+        const mockSuccess: Result = {
+          bisect_range: ['10.3.2', '10.4.0'],
+          runner: 'my-runner-id',
+          status: 'success',
+          time_begun: 5,
+          time_ended: 10,
+        };
+        const id = 'my-job-id';
+        const mockJobRunning: BisectJob = {
+          bisect_range: ['10.1.6', '11.0.2'],
+          gist: 'my-gist-id',
+          history: [],
+          id,
+          time_added: 5,
+          type: 'bisect',
+        };
+        const mockJobDone: BisectJob = {
+          ...mockJobRunning,
+          history: [mockSuccess],
+          last: mockSuccess,
+        };
+        mockQueueBisectJob.mockResolvedValue(id);
+        mockGetJob
+          .mockResolvedValueOnce(mockJobRunning)
+          .mockResolvedValueOnce(mockJobDone);
 
-          const input = parseIssueBody(payloadFixture.issue.body);
-          await robot.receive({
-            name: 'issue_comment',
-            payload: payloadFixture,
-          } as any);
-          expect(runBisectJobSpy).toHaveBeenCalledWith(
-            input,
-            expect.any(Object),
-          );
-        });
+        nock('https://api.github.com')
+          // No comments yet...
+          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+          .reply(200, [])
 
-        it.todo('stops a test job if one is running');
+          // ...so we create a new comment
+          .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+            expect(body).toEqual('Queuing bisect job...');
+            return true;
+          })
+          .reply(200)
 
-        describe('does nothing if', () => {
-          it('...the comment does not have a command', async () => {
-            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-            const noCommandFixture = JSON.parse(JSON.stringify(payloadFixture));
-            noCommandFixture.comment.body = 'This issue comment has no command';
+          // Add bugbot/test-running label
+          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+            expect(labels).toEqual([Labels.BugBot.Running]);
+            return true;
+          })
+          .reply(200)
 
-            await robot.receive({
-              name: 'issue_comment',
-              payload: noCommandFixture,
-            } as any);
-            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-            expect(mockQueueBisectJob).not.toHaveBeenCalled();
-          });
+          // Now, the comment from above should exist...
+          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+          .reply(200, [
+            { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
+          ])
 
-          it('...the comment has an invalid command', async () => {
-            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-            const invalidCommandFixture = JSON.parse(
-              JSON.stringify(payloadFixture),
+          // ...so we update it with the bisect info.
+          .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
+            expect(body).toEqual(
+              `It looks like this bug was introduced between ${mockSuccess.bisect_range[0]} and ${mockSuccess.bisect_range[1]}\n` +
+                '\n' +
+                `Commits between those versions: https://github.com/electron/electron/compare/v${mockSuccess.bisect_range[0]}...v${mockSuccess.bisect_range[1]}\n` +
+                '\n' +
+                `For more information, see ${process.env.BUGBOT_BROKER_URL}/log/${id}`,
             );
-            invalidCommandFixture.comment.body = '/test bisetc';
+            return true;
+          })
+          .reply(200)
 
-            await robot.receive({
-              name: 'issue_comment',
-              payload: invalidCommandFixture,
-            } as any);
-            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-            expect(mockQueueBisectJob).not.toHaveBeenCalled();
-          });
+          // delete the `bugbot/test-running` label and add `bug/regression`
+          .delete(
+            '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
+            () => {
+              return true;
+            },
+          )
+          .reply(200)
+          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+            expect(labels).toEqual([Labels.Bug.Regression]);
+            return true;
+          })
+          .reply(200);
 
-          it('...the commenter is not a maintainer', async () => {
-            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-            const unauthorizedUserFixture = JSON.parse(
-              JSON.stringify(payloadFixture),
-            );
-            unauthorizedUserFixture.comment.user.login = 'fnord';
+        await robot.receive({
+          name: 'issue_comment',
+          payload: payloadFixture,
+        } as any);
 
-            await robot.receive({
-              name: 'issue_comment',
-              payload: unauthorizedUserFixture,
-            } as any);
-            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-            expect(mockQueueBisectJob).not.toHaveBeenCalled();
-          });
-
-          it('...the issue body has no gistId', async () => {
-            const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-            const noGistFixture = JSON.parse(JSON.stringify(payloadFixture));
-            noGistFixture.issue.body = 'This issue body has no gistId';
-
-            await robot.receive({
-              name: 'issue_comment',
-              payload: noGistFixture,
-            } as any);
-            expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-            expect(mockQueueBisectJob).not.toHaveBeenCalled();
-          });
-        });
+        expect(mockCompleteJob).toHaveBeenCalledWith(id);
       });
 
-      describe('runBisectJob()', () => {
-        it('queues a bisect job and comments the result', async () => {
-          const mockSuccess: Result = {
-            bisect_range: ['10.3.2', '10.4.0'],
-            runner: 'my-runner-id',
-            status: 'success',
-            time_begun: 5,
-            time_ended: 10,
-          };
-          const id = 'my-job-id';
-          const mockJobRunning: BisectJob = {
-            bisect_range: ['10.1.6', '11.0.2'],
-            gist: 'my-gist-id',
-            history: [],
-            id,
-            time_added: 5,
-            type: 'bisect',
-          };
-          const mockJobDone: BisectJob = {
-            ...mockJobRunning,
-            history: [mockSuccess],
-            last: mockSuccess,
-          };
-          mockQueueBisectJob.mockResolvedValue(id);
-          mockGetJob
-            .mockResolvedValueOnce(mockJobRunning)
-            .mockResolvedValueOnce(mockJobDone);
+      it('handles failures gracefully', async () => {
+        const mockTestError: Result = {
+          error: 'my-error',
+          runner: 'my-runner-id',
+          status: 'test_error',
+          time_begun: 5,
+          time_ended: 10,
+        };
+        const mockJob: BisectJob = {
+          bisect_range: ['10.1.6', '11.0.2'],
+          gist: 'my-gist-id',
+          history: [mockTestError],
+          id: 'my-job-id',
+          last: mockTestError,
+          time_added: 5,
+          type: 'bisect',
+        };
 
-          nock('https://api.github.com')
-            // No comments yet...
-            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-            .reply(200, [])
+        mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);
+        mockGetJob.mockResolvedValueOnce(mockJob);
 
-            // ...so we create a new comment
-            .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
-              expect(body).toEqual('Queuing bisect job...');
+        nock('https://api.github.com')
+          // No comments yet...
+          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+          .reply(200, [])
+
+          // ...so we create a new comment
+          .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+            expect(body).toEqual('Queuing bisect job...');
+            return true;
+          })
+          .reply(200)
+
+          // Add bugbot/test-running label
+          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+            expect(labels).toEqual([Labels.BugBot.Running]);
+            return true;
+          })
+          .reply(200)
+
+          // Now, the comment from above should exist...
+          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+          .reply(200, [
+            { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
+          ])
+          // ...so we update the comment with an error message.
+          .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
+            expect(body).toBe(
+              `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
+                'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
+                `For more information, see ${brokerBaseUrl}/log/${mockJob.id}`,
+            );
+            return true;
+          })
+          .reply(200)
+
+          // delete the `bugbot/test-running` label and add `bugbot/maintainer-needed`
+          .delete(
+            '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
+            () => {
               return true;
-            })
-            .reply(200)
+            },
+          )
+          .reply(200)
+          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+            expect(labels).toEqual([Labels.BugBot.MaintainerNeeded]);
+            return true;
+          })
+          .reply(200);
 
-            // Add bugbot/test-running label
-            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
-              expect(labels).toEqual([Labels.BugBot.Running]);
-              return true;
-            })
-            .reply(200)
+        await robot.receive({
+          name: 'issue_comment',
+          payload: payloadFixture,
+        } as any);
 
-            // Now, the comment from above should exist...
-            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-            .reply(200, [
-              { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
-            ])
+        expect(mockCompleteJob).toHaveBeenCalledWith(mockJob.id);
+      });
 
-            // ...so we update it with the bisect info.
-            .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
-              expect(body).toEqual(
-                `It looks like this bug was introduced between ${mockSuccess.bisect_range[0]} and ${mockSuccess.bisect_range[1]}\n` +
-                  '\n' +
-                  `Commits between those versions: https://github.com/electron/electron/compare/v${mockSuccess.bisect_range[0]}...v${mockSuccess.bisect_range[1]}\n` +
-                  '\n' +
-                  `For more information, see ${process.env.BUGBOT_BROKER_URL}/log/${id}`,
-              );
-              return true;
-            })
-            .reply(200)
+      it.todo('stops a test job if one is running');
 
-            // delete the `bugbot/test-running` label and add `bug/regression`
-            .delete(
-              '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
-              () => {
-                return true;
-              },
-            )
-            .reply(200)
-            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
-              expect(labels).toEqual([Labels.Bug.Regression]);
-              return true;
-            })
-            .reply(200);
+      describe('does nothing if', () => {
+        it('...the comment does not have a command', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const noCommandFixture = JSON.parse(JSON.stringify(payloadFixture));
+          noCommandFixture.comment.body = 'This issue comment has no command';
 
           await robot.receive({
             name: 'issue_comment',
-            payload: payloadFixture,
+            payload: noCommandFixture,
           } as any);
-
-          expect(mockCompleteJob).toHaveBeenCalledWith('my-job-id');
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
 
-        it('handles failures gracefully', async () => {
-          const mockTestError: Result = {
-            error: 'my-error',
-            runner: 'my-runner-id',
-            status: 'test_error',
-            time_begun: 5,
-            time_ended: 10,
-          };
-          const mockJob: BisectJob = {
-            bisect_range: ['10.1.6', '11.0.2'],
-            gist: 'my-gist-id',
-            history: [mockTestError],
-            id: 'my-job-id',
-            last: mockTestError,
-            time_added: 5,
-            type: 'bisect',
-          };
-
-          mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);
-          mockGetJob.mockResolvedValueOnce(mockJob);
-
-          nock('https://api.github.com')
-            // No comments yet...
-            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-            .reply(200, [])
-
-            // ...so we create a new comment
-            .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
-              expect(body).toEqual('Queuing bisect job...');
-              return true;
-            })
-            .reply(200)
-
-            // Add bugbot/test-running label
-            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
-              expect(labels).toEqual([Labels.BugBot.Running]);
-              return true;
-            })
-            .reply(200)
-
-            // Now, the comment from above should exist...
-            .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-            .reply(200, [
-              { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
-            ])
-            // ...so we update the comment with an error message.
-            .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
-              expect(body).toBe(
-                `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
-                  'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
-                  `For more information, see ${brokerBaseUrl}/log/${mockJob.id}`,
-              );
-              return true;
-            })
-            .reply(200)
-
-            // delete the `bugbot/test-running` label and add `bugbot/maintainer-needed`
-            .delete(
-              '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
-              () => {
-                return true;
-              },
-            )
-            .reply(200)
-            .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
-              expect(labels).toEqual([Labels.BugBot.MaintainerNeeded]);
-              return true;
-            })
-            .reply(200);
+        it('...the comment has an invalid command', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const invalidCommandFixture = JSON.parse(
+            JSON.stringify(payloadFixture),
+          );
+          invalidCommandFixture.comment.body = '/test bisetc';
 
           await robot.receive({
             name: 'issue_comment',
-            payload: payloadFixture,
+            payload: invalidCommandFixture,
           } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
 
-          expect(mockCompleteJob).toHaveBeenCalledWith('my-job-id');
+        it('...the commenter is not a maintainer', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const unauthorizedUserFixture = JSON.parse(
+            JSON.stringify(payloadFixture),
+          );
+          unauthorizedUserFixture.comment.user.login = 'fnord';
+
+          await robot.receive({
+            name: 'issue_comment',
+            payload: unauthorizedUserFixture,
+          } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
+        });
+
+        it('...the issue body has no gistId', async () => {
+          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
+          const noGistFixture = JSON.parse(JSON.stringify(payloadFixture));
+          noGistFixture.issue.body = 'This issue body has no gistId';
+
+          await robot.receive({
+            name: 'issue_comment',
+            payload: noGistFixture,
+          } as any);
+          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
+          expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
       });
     });
