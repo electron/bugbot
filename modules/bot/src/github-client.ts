@@ -76,16 +76,17 @@ export class GithubClient {
       return;
     }
 
-    d('calling parseManualCommand');
-    return this.parseManualCommand(context);
+    d('calling handleManualCommand');
+    return this.handleManualCommand(context);
   }
 
   /**
    * Takes action based on a comment left on an issue
    * @param context Probot context object
    */
-  private async parseManualCommand(context: Context<'issue_comment'>) {
+  private async handleManualCommand(context: Context<'issue_comment'>) {
     const promises: Promise<void>[] = [];
+
     for (const line of context.payload.comment.body.split('\n')) {
       const cmd = await parseIssueCommand(
         context.payload.issue.body,
@@ -93,37 +94,64 @@ export class GithubClient {
         this.versions,
       );
       if (cmd?.type === 'bisect') {
-        promises.push(this.runBisect(context, cmd));
+        promises.push(this.runBisectJob(cmd, context));
       }
     }
 
     await Promise.all(promises);
   }
 
-  private async runBisect(
-    context: Context<'issue_comment'>,
+  private async runBisectJob(
     bisectCmd: BisectCommand,
+    context: Context<'issue_comment'>,
   ) {
-    const d = debug('GithubClient:runBisect');
+    const d = debug('GithubClient:runBisectJob');
+
+    d(`Updating GitHub issue id ${context.payload.issue.id}`);
+    const promises: Promise<unknown>[] = [];
+    promises.push(this.setIssueComment('Queuing bisect job...', context));
+    promises.push(
+      context.octokit.issues.addLabels({
+        ...context.issue(),
+        labels: [Labels.BugBot.Running],
+      }),
+    );
+    await Promise.all(promises);
+
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
     // FIXME: this state info, such as the timer, needs to be a
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
-    const timer = setInterval(async () => {
-      d(`polling job ${jobId}...`);
-      if (this.isClosed) return clearInterval(timer);
-      const job = await this.broker.getJob(jobId);
-      if (!job.last) {
-        d('job still pending...', { job });
-        return;
-      }
-      d(`job ${jobId} complete`);
-      clearInterval(timer);
-      await this.commentBisectResult(jobId, job.last, context);
-      await this.broker.completeJob(jobId);
-    }, this.pollIntervalMs);
+    d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
+
+    return new Promise<void>((resolve, reject) => {
+      const pollBroker = async () => {
+        if (this.isClosed) {
+          return resolve();
+        }
+
+        d(`${jobId}: polling job...`);
+        const job = await this.broker.getJob(jobId);
+        if (!job.last) {
+          d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
+          setTimeout(pollBroker, this.pollIntervalMs);
+        } else {
+          d(`${jobId}: complete 🚀 `);
+
+          try {
+            await this.handleBisectResult(jobId, job.last, context);
+            await this.broker.completeJob(jobId);
+          } catch (e) {
+            return reject(e);
+          }
+          return resolve();
+        }
+      };
+
+      setTimeout(pollBroker, this.pollIntervalMs);
+    });
   }
 
   /*
@@ -145,7 +173,7 @@ export class GithubClient {
    * @param result The result from a Fiddle bisection
    * @param context Probot context object
    */
-  private async commentBisectResult(
+  private async handleBisectResult(
     jobId: JobId,
     result: Result,
     context: Context<'issue_comment'>,
@@ -195,7 +223,7 @@ export class GithubClient {
     const issue = context.issue();
     const body = paragraphs.join('\n\n');
     d('adding comment', body);
-    promises.push(context.octokit.issues.createComment({ ...issue, body }));
+    promises.push(this.setIssueComment(body, context));
 
     // maybe remove labels
     for (const name of del_labels.values()) {
@@ -211,6 +239,38 @@ export class GithubClient {
     }
 
     await Promise.all(promises);
+  }
+
+  private async setIssueComment(
+    markdownComment: string,
+    context: Context<'issue_comment'>,
+  ): Promise<void> {
+    const issue = context.issue();
+
+    // FIXME(any): iterate through all pages to get full comment set
+    const { data: comments } = await context.octokit.issues.listComments({
+      ...issue,
+      per_page: 100, // max
+    });
+
+    const lastBotComment = comments.reverse().find((comment) => {
+      const { user } = comment;
+      const botName = env('BUGBOT_GITHUB_LOGIN');
+      return user.login === `${botName}[bot]`;
+    });
+
+    if (lastBotComment) {
+      await context.octokit.issues.updateComment({
+        ...issue,
+        comment_id: lastBotComment.id,
+        body: markdownComment,
+      });
+    } else {
+      await context.octokit.issues.createComment({
+        ...issue,
+        body: markdownComment,
+      });
+    }
   }
 }
 
