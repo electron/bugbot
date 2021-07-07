@@ -65,7 +65,9 @@ describe('github-client', () => {
     ghclient.close();
 
     if (!nock.isDone()) {
-      throw new Error(`Unused nock interceptors: "${expect.getState().currentTestName}"`)
+      throw new Error(
+        `Unused nock interceptors: "${expect.getState().currentTestName}"`,
+      );
     }
 
     nock.cleanAll();
@@ -76,53 +78,76 @@ describe('github-client', () => {
     describe('on `/test bisect` command', () => {
       describe('handleManualCommand()', () => {
         it('starts a bisect job if no tests are running for the issue', async () => {
-          const runBisectJobSpy = jest.spyOn(GithubClient.prototype as any, 'runBisectJob')
+          const runBisectJobSpy = jest
+            .spyOn(GithubClient.prototype as any, 'runBisectJob')
             .mockImplementationOnce(noop);
-  
+
           const input = parseIssueBody(payloadFixture.issue.body);
-          await robot.receive({ name: 'issue_comment', payload: payloadFixture } as any);
-          expect(runBisectJobSpy).toHaveBeenCalledWith(input, expect.any(Object))
+          await robot.receive({
+            name: 'issue_comment',
+            payload: payloadFixture,
+          } as any);
+          expect(runBisectJobSpy).toHaveBeenCalledWith(
+            input,
+            expect.any(Object),
+          );
         });
-  
+
         it.todo('stops a test job if one is running');
-  
+
         describe('does nothing if', () => {
           it('...the comment does not have a command', async () => {
             const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
             const noCommandFixture = JSON.parse(JSON.stringify(payloadFixture));
             noCommandFixture.comment.body = 'This issue comment has no command';
-  
-            await robot.receive({ name: 'issue_comment', payload: noCommandFixture } as any);
+
+            await robot.receive({
+              name: 'issue_comment',
+              payload: noCommandFixture,
+            } as any);
             expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
             expect(mockQueueBisectJob).not.toHaveBeenCalled();
           });
-  
+
           it('...the comment has an invalid command', async () => {
             const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-            const invalidCommandFixture = JSON.parse(JSON.stringify(payloadFixture));
+            const invalidCommandFixture = JSON.parse(
+              JSON.stringify(payloadFixture),
+            );
             invalidCommandFixture.comment.body = '/test bisetc';
-  
-            await robot.receive({ name: 'issue_comment', payload: invalidCommandFixture } as any);
+
+            await robot.receive({
+              name: 'issue_comment',
+              payload: invalidCommandFixture,
+            } as any);
             expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
             expect(mockQueueBisectJob).not.toHaveBeenCalled();
           });
-  
+
           it('...the commenter is not a maintainer', async () => {
             const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-            const unauthorizedUserFixture = JSON.parse(JSON.stringify(payloadFixture));
+            const unauthorizedUserFixture = JSON.parse(
+              JSON.stringify(payloadFixture),
+            );
             unauthorizedUserFixture.comment.user.login = 'fnord';
-  
-            await robot.receive({ name: 'issue_comment', payload: unauthorizedUserFixture } as any);
+
+            await robot.receive({
+              name: 'issue_comment',
+              payload: unauthorizedUserFixture,
+            } as any);
             expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
             expect(mockQueueBisectJob).not.toHaveBeenCalled();
           });
-  
+
           it('...the issue body has no gistId', async () => {
             const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
             const noGistFixture = JSON.parse(JSON.stringify(payloadFixture));
             noGistFixture.issue.body = 'This issue body has no gistId';
-  
-            await robot.receive({ name: 'issue_comment', payload: noGistFixture } as any);
+
+            await robot.receive({
+              name: 'issue_comment',
+              payload: noGistFixture,
+            } as any);
             expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
             expect(mockQueueBisectJob).not.toHaveBeenCalled();
           });
@@ -157,7 +182,6 @@ describe('github-client', () => {
             .mockResolvedValueOnce(mockJobRunning)
             .mockResolvedValueOnce(mockJobDone);
 
-          
           nock('https://api.github.com')
             // No comments yet...
             .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
@@ -179,8 +203,10 @@ describe('github-client', () => {
 
             // Now, the comment from above should exist...
             .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-            .reply(200, [{id: 1, user: {login: `${process.env.BUGBOT_BOT_NAME}[bot]`}}])
-            
+            .reply(200, [
+              { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
+            ])
+
             // ...so we update it with the bisect info.
             .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
               expect(body).toEqual(
@@ -214,7 +240,6 @@ describe('github-client', () => {
           } as any);
 
           expect(mockCompleteJob).toHaveBeenCalledWith('my-job-id');
-
         });
 
         it('handles failures gracefully', async () => {
@@ -259,7 +284,9 @@ describe('github-client', () => {
 
             // Now, the comment from above should exist...
             .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-            .reply(200, [{id: 1, user: {login: `${process.env.BUGBOT_BOT_NAME}[bot]`}}])
+            .reply(200, [
+              { id: 1, user: { login: `${process.env.BUGBOT_BOT_NAME}[bot]` } },
+            ])
             // ...so we update the comment with an error message.
             .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
               expect(body).toBe(
