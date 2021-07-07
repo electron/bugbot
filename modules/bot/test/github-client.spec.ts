@@ -64,7 +64,9 @@ describe('github-client', () => {
   afterEach(() => {
     ghclient.close();
 
-    console.log('isDone:', nock.isDone());
+    if (!nock.isDone()) {
+      throw new Error(`Unused nock interceptors: "${expect.getState().currentTestName}"`)
+    }
 
     nock.cleanAll();
     nock.enableNetConnect();
@@ -211,9 +213,11 @@ describe('github-client', () => {
             payload: payloadFixture,
           } as any);
 
+          expect(mockCompleteJob).toHaveBeenCalledWith('my-job-id');
+
         });
 
-        it.only('handles failures gracefully', async (done) => {
+        it('handles failures gracefully', async () => {
           const mockTestError: Result = {
             error: 'my-error',
             runner: 'my-runner-id',
@@ -263,7 +267,6 @@ describe('github-client', () => {
                   'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
                   `For more information, see ${brokerBaseUrl}/log/${mockJob.id}`,
               );
-              done();
               return true;
             })
             .reply(200)
@@ -287,7 +290,7 @@ describe('github-client', () => {
             payload: payloadFixture,
           } as any);
 
-          expect(mockCompleteJob).not.toHaveBeenCalled();
+          expect(mockCompleteJob).toHaveBeenCalledWith('my-job-id');
         });
       });
     });
