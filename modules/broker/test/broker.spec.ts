@@ -296,6 +296,11 @@ describe('broker', () => {
       expect(job.platform).toBe(platform);
     });
 
+    it('gives a 404 for unknown jobs', async () => {
+      const { response } = await getJob(mkuuid());
+      expect(response.status).toBe(404);
+    });
+
     it.todo('may include job.current');
     it.todo('may include job.last');
   });
