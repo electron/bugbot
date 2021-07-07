@@ -49,7 +49,7 @@ export function buildLog(task: Readonly<Task>): string {
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="refresh" content="${task.current ? 5 : 30}">
+  <meta http-equiv="refresh" content="${task.job.current ? 5 : 30}">
   <style>
     body {
       background: #282828;

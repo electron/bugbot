@@ -9,6 +9,7 @@ import { Server as BrokerServer } from '../../modules/broker/src/server';
 import { Runner } from '../../modules/runner/src/runner';
 
 import {
+  BisectJob,
   BisectRange,
   Current,
   Platform,
@@ -66,11 +67,14 @@ describe('runner', () => {
   }
 
   function createBisectTask(opts: Record<string, any> = {}) {
-    const bisect_range: Readonly<BisectRange> = ['10.0.0', '11.2.0'];
-    const gist = '8c5fc0c6a5153d49b5a4a56d3ed9da8f' as const;
+    const bisect_range: BisectRange = ['10.0.0', '11.2.0'];
+    const gist = '8c5fc0c6a5153d49b5a4a56d3ed9da8f';
+    const id = mkuuid();
+    const time_added = Date.now();
     const type = 'bisect' as const;
-    const defaults = { bisect_range, gist, platform, type } as const;
-    return Task.createBisectTask({ ...defaults, ...opts });
+    const defaults: BisectJob = { bisect_range, gist, history: [], id, platform, time_added, type };
+    const bisectJob = { ...defaults, ...opts };
+    return new Task(bisectJob);
   }
 
   describe('does not claim tasks', () => {
@@ -119,8 +123,9 @@ describe('runner', () => {
 
     beforeAll(async () => {
       task = createBisectTask();
-      expect(task.last).toBeUndefined();
-      expect(task.history).toHaveLength(0);
+      const { job } = task;
+      expect(job.last).toBeUndefined();
+      expect(job.history).toHaveLength(0);
       await runTask(task);
     });
 
@@ -130,11 +135,12 @@ describe('runner', () => {
         runner: runner.uuid,
         status: 'success',
       } as const;
-      expect(task.last.bisect_range).toStrictEqual(expected.bisect_range);
-      expect(task.last.runner).toBe(expected.runner);
-      expect(task.last.status).toBe(expected.status);
+      const { last } = task.job;
+      expect(last.bisect_range).toStrictEqual(expected.bisect_range);
+      expect(last.runner).toBe(expected.runner);
+      expect(last.status).toBe(expected.status);
 
-      const { time_begun, time_ended } = task.last;
+      const { time_begun, time_ended } = last;
       expect(time_begun).not.toBeNaN();
       expect(time_begun).toBeGreaterThan(0);
       expect(time_ended).not.toBeNaN();
@@ -142,11 +148,13 @@ describe('runner', () => {
     });
 
     it('appends job.history', () => {
-      expect(task.history).toStrictEqual([task.last]);
+      const { job } = task;
+      expect(job.history).toStrictEqual([job.last]);
     });
 
     it('clears job.current', () => {
-      expect(task.current).toBeFalsy();
+      const { job } = task;
+      expect(job.current).toBeFalsy();
     });
 
     it('includes the commit range to job.log', () => {
