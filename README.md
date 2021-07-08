@@ -29,7 +29,7 @@ Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#usin
 
 - If no `gist` is given, use the issue body's `Testcase Gist URL`.
 - If no `platforms` are given, test on Linux, Mac, and Windows.
-- If no `versions` are given, test the first version and latest vesion of each prerelease branch, of each supported branch, and of the two branches before that.
+- If no `versions` are given, test the first version and latest version of each prerelease branch, of each supported branch, and of the two branches before that.
 
 
 ```
