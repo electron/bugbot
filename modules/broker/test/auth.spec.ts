@@ -14,6 +14,13 @@ describe('auth', () => {
     expect(auth.tokenHasScopes(tokenId, [])).toBe(true);
   });
 
+  it('uses given token values', () => {
+    const TOKEN = 'my super real token';
+    const auth = new Auth();
+    auth.createToken([], TOKEN);
+    expect(auth.tokenHasScopes(TOKEN, [])).toBe(true);
+  });
+
   it('fails to revoke unknown tokens', () => {
     const auth = new Auth();
     expect(auth.revokeToken(FAKE_TOKEN)).toBe(false);
