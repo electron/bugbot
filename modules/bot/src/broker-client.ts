@@ -7,6 +7,7 @@ import {
   BisectJob,
   Job,
   JobId,
+  JobType,
 } from '@electron/bugbot-shared/build/interfaces';
 
 import { FiddleInput } from './issue-parser';
@@ -38,7 +39,7 @@ export default class BrokerAPI {
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
-      type: 'bisect',
+      type: JobType.bisect,
     };
 
     const res = await fetch(url.toString(), {

@@ -8,7 +8,7 @@ import { createProbot, Probot, ProbotOctokit } from 'probot';
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.json';
-import { BisectJob, Result } from '@electron/bugbot-shared/build/interfaces';
+import { BisectJob, JobType, Result } from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
 
 jest.mock('../src/broker-client');
@@ -88,7 +88,7 @@ describe('github-client', () => {
           history: [],
           id,
           time_added: 5,
-          type: 'bisect',
+          type: JobType.bisect,
         };
         const mockJobDone: BisectJob = {
           ...mockJobRunning,
@@ -176,7 +176,7 @@ describe('github-client', () => {
           id: 'my-job-id',
           last: mockTestError,
           time_added: 5,
-          type: 'bisect',
+          type: JobType.bisect,
         };
 
         mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);

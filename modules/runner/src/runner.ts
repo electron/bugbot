@@ -13,6 +13,7 @@ import {
   Current,
   Job,
   JobId,
+  JobType,
   Platform,
   Result,
   RunnerId,
@@ -113,7 +114,7 @@ export class Runner {
     await this.patchJob([{ op: 'replace', path: '/current', value: current }]);
 
     switch (job.type) {
-      case 'bisect':
+      case JobType.bisect:
         await this.runBisect(job.bisect_range, job.gist);
         break;
       default:
@@ -141,7 +142,7 @@ export class Runner {
     // ...and which have never been run
     jobs_url.searchParams.append('last.status', 'undefined');
     // FIXME: currently only support bisect but we should support others too
-    jobs_url.searchParams.append('type', 'bisect');
+    jobs_url.searchParams.append('type', JobType.bisect);
 
     // Make the request and return its response
     return await fetch(jobs_url, {
@@ -243,7 +244,7 @@ export class Runner {
     return new Promise<void>((resolve) => {
       const args = [
         ...fiddleArgv,
-        ...['bisect', range[0], range[1]],
+        ...[JobType.bisect, range[0], range[1]],
         '--betas',
         ...['--fiddle', gistId],
         '--nightlies',

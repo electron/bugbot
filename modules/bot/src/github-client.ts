@@ -3,7 +3,11 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
-import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
+import {
+  JobId,
+  JobType,
+  Result,
+} from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import BrokerAPI from './broker-client';
@@ -13,7 +17,7 @@ import { FiddleInput, parseIssueBody } from './issue-parser';
 const AppName = 'BugBot' as const;
 
 const actions = {
-  BISECT: 'bisect',
+  BISECT: JobType.bisect,
   STOP: 'stop',
 };
 

@@ -76,13 +76,18 @@ interface BaseJob {
   time_added: number;
 }
 
+export enum JobType {
+  bisect = 'bisect',
+  test = 'test',
+}
+
 export interface BisectJob extends BaseJob {
   bisect_range: BisectRange;
-  type: 'bisect';
+  type: JobType.bisect;
 }
 
 export interface TestJob extends BaseJob {
-  type: 'test';
+  type: JobType.test;
   version: Version;
 }
 
@@ -96,7 +101,7 @@ const BisectJobPredicate = ow.object.exactShape({
   last: ow.optional.any(ResultPredicate),
   platform: ow.optional.any(PlatformPredicate),
   time_added: ow.number,
-  type: ow.string.equals('bisect'),
+  type: ow.string.equals(JobType.bisect),
 });
 
 const TestJobPredicate = ow.object.exactShape({
@@ -108,7 +113,7 @@ const TestJobPredicate = ow.object.exactShape({
   last: ow.optional.any(ResultPredicate),
   platform: ow.optional.any(PlatformPredicate),
   time_added: ow.number,
-  type: ow.string.equals('test'),
+  type: ow.string.equals(JobType.test),
   version: VersionPredicate,
 });
 

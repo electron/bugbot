@@ -12,6 +12,7 @@ import {
   BisectJob,
   BisectRange,
   Current,
+  JobType,
   Platform,
   Result,
 } from '@electron/bugbot-shared/build/interfaces';
@@ -71,7 +72,7 @@ describe('runner', () => {
     const gist = '8c5fc0c6a5153d49b5a4a56d3ed9da8f';
     const id = mkuuid();
     const time_added = Date.now();
-    const type = 'bisect' as const;
+    const type = JobType.bisect as const;
     const defaults: BisectJob = { bisect_range, gist, history: [], id, platform, time_added, type };
     const bisectJob = { ...defaults, ...opts };
     return new Task(bisectJob);

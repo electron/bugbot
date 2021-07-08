@@ -7,7 +7,7 @@ import { Operation as PatchOp } from 'fast-json-patch';
 import { URL, URLSearchParams } from 'url';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
-import { Result, JobId } from '@electron/bugbot-shared/build/interfaces';
+import { Result, JobId, JobType } from '@electron/bugbot-shared/build/interfaces';
 import { Auth, AuthScope } from '../src/auth';
 import { Server } from '../src/server';
 
@@ -126,7 +126,7 @@ describe('broker', () => {
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
-      type: 'bisect',
+      type: JobType.bisect,
       ...params,
     };
 
@@ -216,7 +216,7 @@ describe('broker', () => {
       const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
       const platform = 'linux';
       const required = ['gist', 'type'];
-      const type = 'bisect';
+      const type = JobType.bisect;
 
       for (const name of required) {
         const body = { gist, platform, type };
@@ -234,7 +234,7 @@ describe('broker', () => {
     const bot_client_data = Math.random().toString();
     const gist = 'fabaceae';
     const platform = 'linux';
-    const type = 'bisect';
+    const type = JobType.bisect;
     let id: string;
 
     beforeEach(async () => {
