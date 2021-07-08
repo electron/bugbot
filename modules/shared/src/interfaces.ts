@@ -47,8 +47,8 @@ const ResultPredicate = ow.object.exactShape({
   error: ow.optional.string,
   runner: RunnerIdPredicate,
   status: ow.string.oneOf(['failure', 'success', 'system_error', 'test_error']),
-  time_begun: ow.number,
-  time_ended: ow.number,
+  time_begun: ow.number.positive,
+  time_ended: ow.number.positive,
 });
 
 ///
@@ -60,7 +60,7 @@ export interface Current {
 
 const CurrentPredicate = ow.object.exactShape({
   runner: RunnerIdPredicate,
-  time_begun: ow.number,
+  time_begun: ow.number.positive,
 });
 
 /// Jobs
@@ -100,7 +100,7 @@ const BisectJobPredicate = ow.object.exactShape({
   id: JobIdPredicate,
   last: ow.optional.any(ResultPredicate),
   platform: ow.optional.any(PlatformPredicate),
-  time_added: ow.number,
+  time_added: ow.number.positive,
   type: ow.string.equals(JobType.bisect),
 });
 
@@ -112,7 +112,7 @@ const TestJobPredicate = ow.object.exactShape({
   id: JobIdPredicate,
   last: ow.optional.any(ResultPredicate),
   platform: ow.optional.any(PlatformPredicate),
-  time_added: ow.number,
+  time_added: ow.number.positive,
   type: ow.string.equals(JobType.test),
   version: VersionPredicate,
 });
@@ -121,4 +121,8 @@ export type Job = BisectJob | TestJob;
 
 export function assertJob(value: unknown): asserts value is Job {
   ow(value, ow.any(BisectJobPredicate, TestJobPredicate));
+}
+
+export function assertBisectJob(value: unknown): asserts value is BisectJob {
+  ow(value, ow.any(BisectJobPredicate));
 }

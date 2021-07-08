@@ -9,7 +9,6 @@ import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  BisectRange,
   Current,
   Job,
   JobId,
@@ -17,12 +16,79 @@ import {
   Platform,
   Result,
   RunnerId,
+  assertJob,
+  assertBisectJob,
 } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 
 const d = debug('runner');
+
+class Task {
+  private logTimer: ReturnType<typeof setTimeout>;
+  public readonly logBuffer: string[] = [];
+  public readonly timeBegun = Date.now();
+
+  constructor(
+    public readonly job: Job,
+    public etag: string,
+    private readonly authToken: string,
+    private readonly brokerUrl: string,
+    private readonly logIntervalMs: number,
+  ) {}
+
+  private async sendLogDataBuffer(url: URL) {
+    delete this.logTimer;
+
+    const lines = this.logBuffer.splice(0);
+    const body = lines.join('\n');
+    d(`sendLogDataBuffer sending ${lines.length} lines`, body);
+    const resp = await fetch(url, {
+      body,
+      headers: {
+        Authorization: `Bearer ${this.authToken}`,
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
+      method: 'PUT',
+    });
+    d(`sendLogDataBuffer resp.status ${resp.status}`);
+  }
+
+  public addLogData(data: string) {
+    // save the URL to safeguard against this.jobId being cleared at end-of-job
+    const log_url = new URL(`api/jobs/${this.job.id}/log`, this.brokerUrl);
+    this.logBuffer.push(data);
+    if (!this.logTimer) {
+      this.logTimer = setTimeout(
+        () => this.sendLogDataBuffer(log_url),
+        this.logIntervalMs,
+      );
+    }
+  }
+
+  public async sendPatch(patches: Readonly<PatchOp>[]) {
+    d('task: %O', this);
+    d('patches: %O', patches);
+
+    // Send the patch
+    const job_url = new URL(`api/jobs/${this.job.id}`, this.brokerUrl);
+    const resp = await fetch(job_url, {
+      body: JSON.stringify(patches),
+      headers: {
+        Authorization: `Bearer ${this.authToken}`,
+        'Content-Type': 'application/json',
+        ETag: this.etag,
+      },
+      method: 'PATCH',
+    });
+
+    // Extract the etag header & make sure it was defined
+    const etag = resp.headers.get('etag');
+    if (!etag) throw new Error('missing etag in broker job response');
+    this.etag = etag;
+  }
+}
 
 export class Runner {
   public readonly platform: Platform;
@@ -35,12 +101,7 @@ export class Runner {
   private readonly fiddleArgv: string[];
   private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
-  private logBuffer: string[] = [];
-  private logTimer: ReturnType<typeof setTimeout>;
-  private etag: string;
-  private interval: ReturnType<typeof setInterval>;
-  private jobId: JobId;
-  private timeBegun: number;
+  private pollInterval: ReturnType<typeof setInterval>;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -78,13 +139,16 @@ export class Runner {
   public start(): void {
     this.stop();
     d('runner:start', `interval is ${this.pollIntervalMs}`);
-    this.interval = setInterval(() => this.pollSafely(), this.pollIntervalMs);
+    this.pollInterval = setInterval(
+      () => this.pollSafely(),
+      this.pollIntervalMs,
+    );
     this.pollSafely();
   }
 
   public stop(): void {
-    clearInterval(this.interval);
-    this.interval = undefined;
+    clearInterval(this.pollInterval);
+    this.pollInterval = undefined;
     d('runner:stop', 'interval cleared');
   }
 
@@ -101,31 +165,24 @@ export class Runner {
 
     // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
     // help reduce any possible contention?
-    const [job, initialEtag] = await this.fetchJobAndEtag(jobId);
-    this.etag = initialEtag;
-    this.jobId = job.id;
-    this.timeBegun = Date.now();
+    const task = await this.fetchTask(jobId);
 
     // Claim the job
     const current: Current = {
       runner: this.uuid,
-      time_begun: this.timeBegun,
+      time_begun: task.timeBegun,
     };
-    await this.patchJob([{ op: 'replace', path: '/current', value: current }]);
+    await task.sendPatch([{ op: 'replace', path: '/current', value: current }]);
 
-    switch (job.type) {
+    switch (task.job.type) {
       case JobType.bisect:
-        await this.runBisect(job.bisect_range, job.gist);
+        await this.runBisect(task);
         break;
       default:
-        d('unexpected job $O', job);
+        d('unexpected job $O', task);
         break;
     }
 
-    // cleanup
-    delete this.etag;
-    delete this.jobId;
-    delete this.timeBegun;
     d('runner:poll done');
   }
 
@@ -152,7 +209,7 @@ export class Runner {
     }).then((res) => res.json());
   }
 
-  private async fetchJobAndEtag(id: string): Promise<[Job, string]> {
+  private async fetchTask(id: JobId): Promise<Task> {
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
     const resp = await fetch(job_url, {
       headers: {
@@ -166,82 +223,40 @@ export class Runner {
       throw new Error('missing etag in broker job response');
     }
 
-    const body = await resp.text();
-    return [JSON.parse(body), etag];
+    const job = await resp.json();
+    d('job %O', job);
+    assertJob(job);
+    return new Task(
+      job,
+      etag,
+      this.authToken,
+      this.brokerUrl,
+      this.logIntervalMs,
+    );
   }
 
-  private async patchJob(patches: Readonly<PatchOp>[]): Promise<void> {
-    d('patches: %O', patches);
-
-    // Send the patch
-    const job_url = new URL(`api/jobs/${this.jobId}`, this.brokerUrl);
-    const resp = await fetch(job_url, {
-      body: JSON.stringify(patches),
-      headers: {
-        Authorization: `Bearer ${this.authToken}`,
-        'Content-Type': 'application/json',
-        ETag: this.etag,
-      },
-      method: 'PATCH',
-    });
-
-    // Extract the etag header & make sure it was defined
-    const etag = resp.headers.get('etag');
-    if (!etag) {
-      throw new Error('missing etag in broker job response');
-    }
-
-    this.etag = etag;
-  }
-
-  private async sendLogDataBuffer(url: URL) {
-    delete this.logTimer;
-
-    const lines = this.logBuffer.splice(0);
-    const body = lines.join('\n');
-    d(`sendLogDataBuffer sending ${lines.length} lines`, body);
-    const resp = await fetch(url, {
-      body,
-      headers: {
-        Authorization: `Bearer ${this.authToken}`,
-        'Content-Type': 'text/plain; charset=utf-8',
-      },
-      method: 'PUT',
-    });
-    d(`sendLogDataBuffer resp.status ${resp.status}`);
-  }
-
-  private addLogData(data: string) {
-    // save the URL to safeguard against this.jobId being cleared at end-of-job
-    const log_url = new URL(`api/jobs/${this.jobId}/log`, this.brokerUrl);
-    this.logBuffer.push(data);
-    if (!this.logTimer) {
-      this.logTimer = setTimeout(
-        () => this.sendLogDataBuffer(log_url),
-        this.logIntervalMs,
-      );
-    }
-  }
-
-  private patchResult(result: Partial<Result>): Promise<void> {
-    const defaults: Result = {
+  private patchResult(task: Task, resultIn: Partial<Result>): Promise<void> {
+    const result: Result = {
       runner: this.uuid,
       status: 'system_error',
-      time_begun: this.timeBegun,
+      time_begun: task.timeBegun,
       time_ended: Date.now(),
+      ...resultIn,
     };
-    result = Object.assign(defaults, result);
-    return this.patchJob([
+    return task.sendPatch([
       { op: 'add', path: '/history/-', value: result },
       { op: 'replace', path: '/last', value: result },
       { op: 'remove', path: '/current' },
     ]);
   }
 
-  private runBisect(range: BisectRange, gistId: string): Promise<void> {
+  private async runBisect(task: Task) {
     const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
 
     return new Promise<void>((resolve) => {
+      const { job } = task;
+      assertBisectJob(job);
+
       const args = [
         ...fiddleArgv,
         ...[JobType.bisect, range[0], range[1]],
@@ -254,7 +269,7 @@ export class Runner {
       const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      this.addLogData(
+      task.addLogData(
         [
           `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
           `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
@@ -265,14 +280,14 @@ export class Runner {
       // Save stdout locally so we can parse the result.
       // Report both stdout + stderr to the broker via addLogData().
       const stdout: string[] = [];
-      const onData = (dat: string | Buffer) => this.addLogData(dat.toString());
+      const onData = (dat: string | Buffer) => task.addLogData(dat.toString());
       const onStdout = (dat: string | Buffer) => stdout.push(dat.toString());
       child.stderr.on('data', onData);
       child.stdout.on('data', onData);
       child.stdout.on('data', onStdout);
 
       child.on('error', (err) => {
-        void this.patchResult({
+        void this.patchResult(task, {
           error: err.toString(),
           status: 'system_error',
         });
@@ -295,7 +310,7 @@ export class Runner {
           result.status = 'system_error';
           result.error = parseErr.toString();
         } finally {
-          void this.patchResult(result).then(() => resolve());
+          void this.patchResult(task, result).then(() => resolve());
         }
       });
     });
