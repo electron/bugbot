@@ -244,10 +244,8 @@ export class Runner {
       const args = [
         ...fiddleArgv,
         ...['bisect', range[0], range[1]],
-        '--betas',
         ...['--fiddle', gistId],
-        '--nightlies',
-        '--obsolete',
+        '--full',
       ];
       const opts = { timeout: childTimeoutMs };
       const child = spawn(fiddleExec, args, opts);
