@@ -122,7 +122,7 @@ async function parseBisectCommand(
     : undefined;
 }
 
-const allPlatforms = ['darwin', 'linux', 'win32'];
+const ALL_PLATFORMS = ['darwin', 'linux', 'win32'];
 
 // /bugbot test [gistId | platform... | version...]
 // If no `gistId` is given, use TESTCASE_URL.
