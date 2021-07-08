@@ -5,6 +5,7 @@ import which from 'which';
 import { Operation as PatchOp } from 'fast-json-patch';
 import { URL } from 'url';
 import { inspect } from 'util';
+import { randomInt } from 'crypto';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -168,17 +169,11 @@ export class Runner {
   public async poll(): Promise<void> {
     const d = debug(`${DebugPrefix}:poll`);
 
-    // find the first available job
-    const jobs = await this.fetchAvailableJobs();
-    d('jobs %O', jobs);
-    const jobId = jobs.shift();
+    const jobId = await this.pickNextJob();
     if (!jobId) return;
 
-    // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
-    // help reduce any possible contention?
-    const task = await this.fetchTask(jobId);
-
     // Claim the job
+    const task = await this.fetchTask(jobId);
     const current: Current = {
       runner: this.uuid,
       time_begun: task.timeBegun,
@@ -202,10 +197,21 @@ export class Runner {
     d('runner:poll done');
   }
 
+  private async pickNextJob(): Promise<JobId | undefined> {
+    const d = debug(`${DebugPrefix}:pickNextJob`);
+
+    const ids = await this.fetchAvailableJobIds();
+    if (!ids.length) return;
+    const idx = randomInt(0, ids.length);
+    const [id] = ids.splice(idx, 1);
+    d('jobs %o picked %s', ids, id);
+    return id;
+  }
+
   /**
    * Polls the broker for a list of unclaimed job IDs.
    */
-  private async fetchAvailableJobs(): Promise<JobId[]> {
+  private async fetchAvailableJobIds(): Promise<JobId[]> {
     // Craft the url to the broker
     const jobs_url = new URL('api/jobs', this.brokerUrl);
     // find jobs compatible with this runner...
@@ -322,7 +328,7 @@ export class Runner {
       result.status = 'failure';
       result.error = 'The test ran and failed.';
     } else {
-      result.status = 'system_error';
+      result.status = 'test_error';
       result.error = 'Electron Fiddle was unable to complete the test.';
     }
     await this.patchResult(task, result);
