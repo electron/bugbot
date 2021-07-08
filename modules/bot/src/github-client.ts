@@ -6,7 +6,7 @@ import { inspect } from 'util';
 import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
-import BrokerAPI from './api-client';
+import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
 import { FiddleInput, parseIssueBody } from './issue-parser';
 
@@ -18,29 +18,32 @@ const actions = {
 };
 
 export class GithubClient {
-  public readonly authToken: string;
-  public readonly brokerBaseUrl: string;
-  public readonly pollIntervalMs: number;
-  public readonly issueIdToJobId = new Map<number, string>();
+  private readonly broker: BrokerAPI;
+  private readonly brokerBaseUrl: string;
+  private readonly pollIntervalMs: number;
+  private readonly robot: Probot;
+  private isClosed = false;
 
-  constructor(
-    public readonly robot: Probot,
-    opts: {
-      authToken?: string;
-      brokerBaseUrl?: string;
-      pollIntervalMs?: number;
-    } = {},
-  ) {
+  constructor(opts: {
+    authToken: string;
+    brokerBaseUrl: string;
+    pollIntervalMs: number;
+    robot: Probot;
+  }) {
     const d = debug('GithubClient:constructor');
 
-    // init properties
-    this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
-    this.brokerBaseUrl = opts.brokerBaseUrl || env('BUGBOT_BROKER_URL');
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    Object.assign(this, opts);
     d('brokerBaseUrl', this.brokerBaseUrl);
+    this.broker = new BrokerAPI({
+      authToken: opts.authToken,
+      baseURL: opts.brokerBaseUrl,
+    });
 
     this.listenToRobot();
+  }
+
+  public close() {
+    this.isClosed = true;
   }
 
   private listenToRobot() {
@@ -76,22 +79,18 @@ export class GithubClient {
       return;
     }
 
-    d('calling parseManualCommand');
-    return this.parseManualCommand(context);
+    d('calling handleManualCommand');
+    return this.handleManualCommand(context);
   }
 
   /**
    * Takes action based on a comment left on an issue
    * @param context Probot context object
    */
-  public async parseManualCommand(
+  private async handleManualCommand(
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug('GitHubClient:parseManualCommand');
-    const api = new BrokerAPI({
-      authToken: this.authToken,
-      baseURL: this.brokerBaseUrl,
-    });
+    const d = debug('GithubClient:handleManualCommand');
 
     const { payload } = context;
     const args = payload.comment.body.split(' ');
@@ -108,12 +107,12 @@ export class GithubClient {
      * const id = 'some-guid';
      * let currentJob;
      * try {
-     *   currentJob = await api.getJob(id);
+     *   currentJob = await this.broker.getJob(id);
      * } catch (e) {
      *    // no-op
      * }
      * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-     *   api.stopJob(id);
+     *   this.broker.stopJob(id);
      * } else if (action === actions.BISECT && !currentJob) {
      */
 
@@ -124,33 +123,67 @@ export class GithubClient {
       let input: FiddleInput;
 
       try {
-        d(`body: "${body}"`);
         input = parseIssueBody(body);
         d(`parseIssueBody returned ${JSON.stringify(input)}`);
+        await this.runBisectJob(input, context);
       } catch (e) {
-        d('Unable to parse issue body for bisect', e);
+        d('Unable to run bisect job', e);
         return;
       }
-
-      const jobId = await api.queueBisectJob(input);
-      d(`Queued bisect job ${jobId}`);
-
-      // FIXME: this state info, such as the timer, needs to be a
-      // class property so that '/test stop' could stop the polling.
-      // Poll until the job is complete
-      const timer = setInterval(async () => {
-        d(`polling job ${jobId}...`);
-        const job = await api.getJob(jobId);
-        if (!job.last) {
-          d('job still pending...', { job });
-          return;
-        }
-        d(`job ${jobId} complete`);
-        clearInterval(timer);
-        await this.commentBisectResult(jobId, job.last, context);
-        await api.completeJob(jobId);
-      }, this.pollIntervalMs);
     }
+  }
+
+  private async runBisectJob(
+    input: FiddleInput,
+    context: Context<'issue_comment'>,
+  ) {
+    const d = debug('GithubClient:runBisectJob');
+
+    d(`Updating GitHub issue id ${context.payload.issue.id}`);
+    const promises: Promise<unknown>[] = [];
+    promises.push(this.setIssueComment('Queuing bisect job...', context));
+    promises.push(
+      context.octokit.issues.addLabels({
+        ...context.issue(),
+        labels: [Labels.BugBot.Running],
+      }),
+    );
+    await Promise.all(promises);
+
+    const jobId = await this.broker.queueBisectJob(input);
+    d(`Queued bisect job ${jobId}`);
+
+    // FIXME: this state info, such as the timer, needs to be a
+    // class property so that '/test stop' could stop the polling.
+    // Poll until the job is complete
+    d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
+
+    return new Promise<void>((resolve, reject) => {
+      const pollBroker = async () => {
+        if (this.isClosed) {
+          return resolve();
+        }
+
+        d(`${jobId}: polling job...`);
+        const job = await this.broker.getJob(jobId);
+        if (!job.last) {
+          d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
+          setTimeout(pollBroker, this.pollIntervalMs);
+        } else {
+          d(`${jobId}: complete 🚀 `);
+
+          try {
+            await this.handleBisectResult(jobId, job.last, context);
+            await this.broker.completeJob(jobId);
+          } catch (e) {
+            return reject(e);
+          }
+          return resolve();
+        }
+      };
+
+      setTimeout(pollBroker, this.pollIntervalMs);
+    });
   }
 
   /**
@@ -158,7 +191,7 @@ export class GithubClient {
    * @param result The result from a Fiddle bisection
    * @param context Probot context object
    */
-  private async commentBisectResult(
+  private async handleBisectResult(
     jobId: JobId,
     result: Result,
     context: Context<'issue_comment'>,
@@ -208,7 +241,7 @@ export class GithubClient {
     const issue = context.issue();
     const body = paragraphs.join('\n\n');
     d('adding comment', body);
-    promises.push(context.octokit.issues.createComment({ ...issue, body }));
+    promises.push(this.setIssueComment(body, context));
 
     // maybe remove labels
     for (const name of del_labels.values()) {
@@ -225,8 +258,45 @@ export class GithubClient {
 
     await Promise.all(promises);
   }
+
+  private async setIssueComment(
+    markdownComment: string,
+    context: Context<'issue_comment'>,
+  ): Promise<void> {
+    const issue = context.issue();
+
+    // FIXME(any): iterate through all pages to get full comment set
+    const { data: comments } = await context.octokit.issues.listComments({
+      ...issue,
+      per_page: 100, // max
+    });
+
+    const lastBotComment = comments.reverse().find((comment) => {
+      const { user } = comment;
+      const botName = env('BUGBOT_GITHUB_LOGIN');
+      return user.login === `${botName}[bot]`;
+    });
+
+    if (lastBotComment) {
+      await context.octokit.issues.updateComment({
+        ...issue,
+        comment_id: lastBotComment.id,
+        body: markdownComment,
+      });
+    } else {
+      await context.octokit.issues.createComment({
+        ...issue,
+        body: markdownComment,
+      });
+    }
+  }
 }
 
 export default (robot: Probot): void => {
-  new GithubClient(robot);
+  new GithubClient({
+    authToken: env('BUGBOT_AUTH_TOKEN'),
+    brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+    robot,
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+  });
 };
