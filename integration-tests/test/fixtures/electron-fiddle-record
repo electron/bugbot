@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+
+// This is a utility to record an Electron Fiddle session for playback
+// during integration tests. The session's stdout and stderr are saved
+// together in a logfile and the exitCode is saved in a separate file.
+// 
+// These are kept in fixtures/electron-fiddle-sessions/${hash}.${suffix}
+// where ${hash} is a hash of the params electron-fiddle was called with
+// and ${suffix} is ['log' | 'code'].
+//
+// These files are loaded and "played back" by `./electron-fiddle`.
+
+const { spawn } = require('child_process');
+const fs = require('fs');
+
+const getFilenames = require('./electron-fiddle');
+
+let args = [...process.argv];
+
+const fiddleExecIdx = args.findIndex((arg) => arg.endsWith('electron-fiddle'));
+const fiddleExec = args.splice(fiddleExecIdx, 1).pop();
+console.log('fiddleExec', fiddleExec);
+if (!fiddleExec || args.length <= 2) {
+  console.log('Usage: electron-fiddle-record /path/to/electron-fiddle fiddle-command-line-args');
+  process.exit(1);
+}
+
+args = [...args].map((arg) => arg.replace('electron-fiddle-record', 'electron-fiddle'));
+const files = getFilenames(args);
+console.log('hashing args:', files.args.join(' '));
+const child = spawn(fiddleExec, files.args);
+
+const out = [];
+const onData = (data) => out.push(data.toString());
+child.stderr.on('data', onData);
+child.stdout.on('data', onData);
+child.on('close', (exitCode) => {
+  fs.writeFileSync(files.logFile, out.join(''), { encoding: 'utf8' });
+  console.log(`saved "${files.logFile}"`);
+
+  fs.writeFileSync(files.exitFile, `${exitCode}\n`, { encoding: 'utf8' });
+  console.log(`saved "${files.exitFile}"`);
+});
