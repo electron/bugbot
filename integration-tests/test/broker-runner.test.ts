@@ -15,6 +15,7 @@ import {
   JobType,
   Platform,
   Result,
+  TestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60 * 1000);
@@ -67,15 +68,17 @@ describe('runner', () => {
     await runner.poll();
   }
 
-  function createBisectTask(opts: Record<string, any> = {}) {
-    const bisect_range: BisectRange = ['10.0.0', '11.2.0'];
-    const gist = '8c5fc0c6a5153d49b5a4a56d3ed9da8f';
-    const id = mkuuid();
-    const time_added = Date.now();
-    const type = JobType.bisect as const;
-    const defaults: BisectJob = { bisect_range, gist, history: [], id, platform, time_added, type };
-    const bisectJob = { ...defaults, ...opts };
-    return new Task(bisectJob);
+  function createBisectTask(job: Partial<BisectJob> = {}) {
+    return new Task({
+      bisect_range: ['10.0.0', '11.2.0'],
+      gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
+      id: mkuuid(),
+      history: [],
+      platform,
+      time_added: Date.now(),
+      type: JobType.bisect,
+      ...job,
+    });
   }
 
   describe('does not claim tasks', () => {
@@ -136,6 +139,7 @@ describe('runner', () => {
         runner: runner.uuid,
         status: 'success',
       } as const;
+
       const { last } = task.job;
       expect(last.bisect_range).toStrictEqual(expected.bisect_range);
       expect(last.runner).toBe(expected.runner);
@@ -163,6 +167,77 @@ describe('runner', () => {
       const [a, b] = bisect_range;
       const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
       expect(log).toMatch(url);
+    });
+  });
+
+  function createTestTask(job: Partial<TestJob> = {}) {
+    return new Task({
+      gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
+      history: [],
+      id: mkuuid(),
+      platform,
+      time_added: Date.now(),
+      type: JobType.test,
+      version: '10.0.0',
+      ...job,
+    });
+  }
+
+  describe('handles test that pass', () => {
+    let task: Task;
+
+    beforeAll(async () => {
+      task = createTestTask();
+      const { job } = task;
+      expect(job.last).toBeUndefined();
+      expect(job.history).toHaveLength(0);
+      await runTask(task);
+    });
+
+    it('sets job.last', () => {
+      const expected = {
+        runner: runner.uuid,
+        status: 'success',
+      } as const;
+
+      const { last } = task.job;
+      expect(last.runner).toBe(expected.runner);
+      expect(last.status).toBe(expected.status);
+
+      const { time_begun, time_ended } = last;
+      expect(time_begun).not.toBeNaN();
+      expect(time_begun).toBeGreaterThan(0);
+      expect(time_ended).not.toBeNaN();
+      expect(time_ended).toBeGreaterThanOrEqual(time_begun);
+    });
+  });
+
+  describe('handles tests that fail', () => {
+    let task: Task;
+
+    beforeAll(async () => {
+      task = createTestTask({ version: '11.0.2' });
+      const { job } = task;
+      expect(job.last).toBeUndefined();
+      expect(job.history).toHaveLength(0);
+      await runTask(task);
+    });
+
+    it('sets job.last', () => {
+      const expected = {
+        runner: runner.uuid,
+        status: 'failure',
+      } as const;
+
+      const { last } = task.job;
+      expect(last.runner).toBe(expected.runner);
+      expect(last.status).toBe(expected.status);
+
+      const { time_begun, time_ended } = last;
+      expect(time_begun).not.toBeNaN();
+      expect(time_begun).toBeGreaterThan(0);
+      expect(time_ended).not.toBeNaN();
+      expect(time_ended).toBeGreaterThanOrEqual(time_begun);
     });
   });
 });

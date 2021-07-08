@@ -104,6 +104,10 @@ const BisectJobPredicate = ow.object.exactShape({
   type: ow.string.equals(JobType.bisect),
 });
 
+export function assertBisectJob(value: unknown): asserts value is BisectJob {
+  ow(value, ow.any(BisectJobPredicate));
+}
+
 const TestJobPredicate = ow.object.exactShape({
   bot_client_data: ow.optional.any(ow.string, ow.number, ow.object),
   current: ow.optional.any(CurrentPredicate),
@@ -117,12 +121,12 @@ const TestJobPredicate = ow.object.exactShape({
   version: VersionPredicate,
 });
 
+export function assertTestJob(value: unknown): asserts value is TestJob {
+  ow(value, ow.any(TestJobPredicate));
+}
+
 export type Job = BisectJob | TestJob;
 
 export function assertJob(value: unknown): asserts value is Job {
   ow(value, ow.any(BisectJobPredicate, TestJobPredicate));
-}
-
-export function assertBisectJob(value: unknown): asserts value is BisectJob {
-  ow(value, ow.any(BisectJobPredicate));
 }

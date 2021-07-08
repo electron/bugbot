@@ -18,12 +18,13 @@ import {
   RunnerId,
   assertJob,
   assertBisectJob,
+  assertTestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 
-const d = debug('runner');
+const DebugPrefix = 'runner' as const;
 
 class Task {
   private logTimer: ReturnType<typeof setTimeout>;
@@ -39,6 +40,7 @@ class Task {
   ) {}
 
   private async sendLogDataBuffer(url: URL) {
+    const d = debug(`${DebugPrefix}:sendLogDataBuffer`);
     delete this.logTimer;
 
     const lines = this.logBuffer.splice(0);
@@ -68,6 +70,7 @@ class Task {
   }
 
   public async sendPatch(patches: Readonly<PatchOp>[]) {
+    const d = debug(`${DebugPrefix}:sendPatch`);
     d('task: %O', this);
     d('patches: %O', patches);
 
@@ -137,6 +140,8 @@ export class Runner {
   }
 
   public start(): void {
+    const d = debug(`${DebugPrefix}:start`);
+
     this.stop();
     d('runner:start', `interval is ${this.pollIntervalMs}`);
     this.pollInterval = setInterval(
@@ -147,21 +152,27 @@ export class Runner {
   }
 
   public stop(): void {
+    const d = debug(`${DebugPrefix}:stop`);
+
     clearInterval(this.pollInterval);
     this.pollInterval = undefined;
     d('runner:stop', 'interval cleared');
   }
 
   public pollSafely(): void {
+    const d = debug(`${DebugPrefix}:pollSafely`);
+
     this.poll().catch((err) => d('error while polling broker:', inspect(err)));
   }
 
   public async poll(): Promise<void> {
+    const d = debug(`${DebugPrefix}:poll`);
+
     // find the first available job
-    const jobId = (await this.fetchAvailableJobs()).shift();
-    if (!jobId) {
-      return;
-    }
+    const jobs = await this.fetchAvailableJobs();
+    d('jobs %O', jobs);
+    const jobId = jobs.shift();
+    if (!jobId) return;
 
     // TODO(clavin): would adding jitter (e.g. claim first OR second randomly)
     // help reduce any possible contention?
@@ -178,6 +189,11 @@ export class Runner {
       case JobType.bisect:
         await this.runBisect(task);
         break;
+
+      case JobType.test:
+        await this.runTest(task);
+        break;
+
       default:
         d('unexpected job $O', task);
         break;
@@ -198,8 +214,7 @@ export class Runner {
     jobs_url.searchParams.append('current.runner', 'undefined');
     // ...and which have never been run
     jobs_url.searchParams.append('last.status', 'undefined');
-    // FIXME: currently only support bisect but we should support others too
-    jobs_url.searchParams.append('type', JobType.bisect);
+    jobs_url.searchParams.append('type', `${JobType.bisect},${JobType.test}`);
 
     // Make the request and return its response
     return await fetch(jobs_url, {
@@ -210,6 +225,8 @@ export class Runner {
   }
 
   private async fetchTask(id: JobId): Promise<Task> {
+    const d = debug(`${DebugPrefix}:fetchTask`);
+
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
     const resp = await fetch(job_url, {
       headers: {
@@ -251,31 +268,86 @@ export class Runner {
   }
 
   private async runBisect(task: Task) {
-    const { childTimeoutMs, fiddleExec, fiddleArgv } = this;
+    const d = debug(`${DebugPrefix}:runBisect`);
 
-    return new Promise<void>((resolve) => {
-      const { job } = task;
-      assertBisectJob(job);
+    const { job } = task;
+    assertBisectJob(job);
 
-      const args = [
-        ...fiddleArgv,
-        ...[JobType.bisect, range[0], range[1]],
-        '--betas',
-        ...['--fiddle', gistId],
-        '--nightlies',
-        '--obsolete',
-      ];
+    const { code, error, out } = await this.runFiddle(task, [
+      ...this.fiddleArgv,
+      ...[JobType.bisect, job.bisect_range[0], job.bisect_range[1]],
+      '--betas',
+      ...['--fiddle', job.gist],
+      '--nightlies',
+      '--obsolete',
+    ]);
+
+    const result: Partial<Result> = {};
+    try {
+      const res = parseFiddleBisectOutput(out);
+      if (res.success) {
+        result.status = 'success';
+        result.bisect_range = [res.goodVersion, res.badVersion];
+      } else {
+        // TODO(clavin): ^ better wording
+        result.error = `Failed to narrow test down to two versions: ${error}`;
+        result.status = code === 1 ? 'test_error' : 'system_error';
+      }
+    } catch (parseErr: unknown) {
+      d('fiddle bisect parse error: %O', parseErr);
+      result.status = 'system_error';
+      result.error = parseErr.toString();
+    } finally {
+      await this.patchResult(task, result);
+    }
+  }
+
+  private async runTest(task: Task) {
+    const { job } = task;
+    assertTestJob(job);
+    const { code, error } = await this.runFiddle(task, [
+      ...this.fiddleArgv,
+      JobType.test,
+      ...['--version', job.version],
+      ...['--fiddle', job.gist],
+    ]);
+
+    const result: Partial<Result> = {};
+    if (error) {
+      result.status = 'system_error';
+      result.error = `Unable to run Electron Fiddle: ${error}`;
+    } else if (code === 0) {
+      result.status = 'success';
+    } else if (code === 1) {
+      result.status = 'failure';
+      result.error = 'The test ran and failed.';
+    } else {
+      result.status = 'system_error';
+      result.error = 'Electron Fiddle was unable to complete the test.';
+    }
+    await this.patchResult(task, result);
+  }
+
+  private async runFiddle(
+    task: Task,
+    args: string[],
+  ): Promise<{ code?: number; error?: string; out: string }> {
+    return new Promise((resolve) => {
+      const d = debug(`${DebugPrefix}:runFiddle`);
+      const ret = { code: null, out: '', error: null };
+
+      const { childTimeoutMs, fiddleExec } = this;
       const opts = { timeout: childTimeoutMs };
+      d(`${fiddleExec} ${args.join(' ')}`);
       const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      task.addLogData(
-        [
-          `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
-          `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
-          `${prefix}   ... with opts ${inspect(opts)}`,
-        ].join('\n'),
-      );
+      const startupLog = [
+        `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
+        `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
+        `${prefix}   ... with opts ${inspect(opts)}`,
+      ] as const;
+      task.addLogData(startupLog.join('\n'));
 
       // Save stdout locally so we can parse the result.
       // Report both stdout + stderr to the broker via addLogData().
@@ -286,32 +358,13 @@ export class Runner {
       child.stdout.on('data', onData);
       child.stdout.on('data', onStdout);
 
-      child.on('error', (err) => {
-        void this.patchResult(task, {
-          error: err.toString(),
-          status: 'system_error',
-        });
-      });
-      child.on('close', (exitCode) => {
-        const result: Partial<Result> = {};
-        try {
-          const output = stdout.map((buf) => buf.toString()).join('');
-          const res = parseFiddleBisectOutput(output);
-          if (res.success) {
-            result.status = 'success';
-            result.bisect_range = [res.goodVersion, res.badVersion];
-          } else {
-            // TODO(clavin): ^ better wording
-            result.error = 'Failed to narrow test down to two versions';
-            result.status = exitCode === 1 ? 'test_error' : 'system_error';
-          }
-        } catch (parseErr: unknown) {
-          d('fiddle bisect parse error: %O', parseErr);
-          result.status = 'system_error';
-          result.error = parseErr.toString();
-        } finally {
-          void this.patchResult(task, result).then(() => resolve());
-        }
+      child.on('error', (err) => (ret.error = err.toString()));
+
+      child.on('close', (code) => {
+        ret.code = code;
+        ret.out = stdout.join('');
+        d('resolve %O', ret);
+        resolve(ret);
       });
     });
   }
