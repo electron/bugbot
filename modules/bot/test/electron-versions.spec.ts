@@ -68,6 +68,7 @@ describe('electron-versions', () => {
       '13.0.0', // fixture only has one stable release in 13.0.0
     ]);
 
+    expect(await electronVersions.getDefaultBisectStart()).toBe(versions[0]);
     expect(await electronVersions.isVersion('fnord')).toBe(false);
     expect(await electronVersions.getLatestVersion()).toBe('13.0.0');
     for (const version of versions) {

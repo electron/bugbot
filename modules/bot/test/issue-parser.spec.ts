@@ -17,7 +17,7 @@ describe('issue-parser', () => {
   };
   const versions = (versionsMock as undefined) as ElectronVersions;
   const fakeLatestVersion = '13.0.0' as const;
-  const fakeBisectStart = '10.0.0' as const;
+  const fakeBisectStart = '3.1.4' as const;
 
   beforeEach(() => {
     versionsMock.getLatestVersion.mockResolvedValue(fakeLatestVersion);
@@ -65,7 +65,7 @@ describe('issue-parser', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} https://gist.github.com/${otherGistId}/`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           gistId: otherGistId,
         });
@@ -74,7 +74,7 @@ describe('issue-parser', () => {
       it('finds a gist from the issue body', async () => {
         const issueBody = getIssueBody('issue.md');
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it('returns undefined if it has an invalid gist', async () => {
@@ -88,7 +88,7 @@ describe('issue-parser', () => {
         const versionNumbers = ['10.0.0', '10.1.0', '9.0.0', '12.0.0'];
         const comment = `${COMMENT} ${versionNumbers.join(' ')}`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           versions: versionNumbers,
         });
@@ -99,14 +99,14 @@ describe('issue-parser', () => {
         const platforms = ['darwin', 'linux'];
         const comment = `${COMMENT} ${platforms.join(' ')}`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({ ...expectedCommand, platforms });
+        expect(command).toStrictEqual({ ...expectedCommand, platforms });
       });
 
       it('ignores garbage inputs', async () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} gromble frotz splart`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it('returns undefined if it has an invalid gist', async () => {
@@ -143,32 +143,32 @@ describe('issue-parser', () => {
       it('finds a gist and version range', async () => {
         const issueBody = getIssueBody('issue.md');
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it('is not confused by extra whitespace in the comment body', async () => {
         const issueBody = getIssueBody('issue.md');
         const command = await parseIssueCommand(issueBody, `\n  \n  /bugbot   bisect \n\n\n `, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it('coerces version numbers into semver', async () => {
         const issueBody = getIssueBody('issue-versions-non-semantic.md');
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it('handles a trailing slash at the end of the gist URL', async () => {
         const issueBody = getIssueBody('issue-gist-trailing-slash.md');
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it('reads a gist from the issue comment', async () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} ${otherGistId}`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           gistId: otherGistId,
         });
@@ -179,7 +179,7 @@ describe('issue-parser', () => {
         expect(otherGoodVersion).not.toBe(expectedCommand.goodVersion);
         const comment = `${COMMENT} ${otherGoodVersion}`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: otherGoodVersion,
         });
@@ -189,7 +189,7 @@ describe('issue-parser', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} ${otherGoodVersion} ${otherBadVersion}`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: otherGoodVersion,
           badVersion: otherBadVersion,
@@ -200,7 +200,7 @@ describe('issue-parser', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} ${otherBadVersion} ${otherGoodVersion}`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: otherGoodVersion,
           badVersion: otherBadVersion,
@@ -211,23 +211,33 @@ describe('issue-parser', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} fnord`;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject(expectedCommand);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('it uses ElectronVersions defaults if the issue has no version info', async () => {
+      it('uses ElectronVersions defaults if the issue has no version info', async () => {
         const issueBody = getIssueBody('issue-versions-invalid.md');
         const comment = COMMENT;
         const command = await parseIssueCommand(issueBody, comment, versions);
-        expect(command).toMatchObject({
+        expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: fakeBisectStart,
           badVersion: fakeLatestVersion,
         });
       });
 
+      it('falls back to ElectronVersions for bisect start point', async () => {
+        const issueBody = getIssueBody('issue-missing-info.md');
+        const comment = `${COMMENT} ${fixtureGistId}`;
+        const command = await parseIssueCommand(issueBody, comment, versions);
+        expect(command).toStrictEqual({
+          ...expectedCommand,
+          goodVersion: fakeBisectStart,
+        });
+      });
+
       it.each([
-        ['it has an invalid gist', 'issue-gist-invalid.md'],
-        ['it does not have all necessary information', 'issue-missing-info.md'],
+        ['has an invalid gist', 'issue-gist-invalid.md'],
+        ['does not have all necessary information', 'issue-missing-info.md'],
       ])('returns undefined if %s', async (name: string, fixture: string) => {
         const issueBody = getIssueBody(fixture);
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
