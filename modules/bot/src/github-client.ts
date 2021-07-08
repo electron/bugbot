@@ -208,7 +208,7 @@ export class GithubClient {
 
     switch (result.status) {
       case 'success': {
-        const [a, b] = result.bisect_range;
+        const [a, b] = result.version_range;
         paragraphs.push(
           `It looks like this bug was introduced between ${a} and ${b}`,
           `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,

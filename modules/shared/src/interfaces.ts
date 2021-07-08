@@ -23,32 +23,39 @@ export type RunnerId = string;
 const RunnerIdPredicate = ow.string;
 
 type Version = string;
-const VersionPredicate = ow.string.validate((str) => ({
-  validator: Boolean(semver.valid(str)),
-  message: `Expected value to be semver; got ${str}`,
-}));
+const VersionPredicate = ow.string.is((str) => {
+  if (!semver.valid(str)) return `Expected ${str} to be semver`;
+  return true;
+});
 
-export type BisectRange = [Version, Version];
-const BisectRangePredicate = ow.array.length(2).ofType(VersionPredicate);
+export type VersionRange = [Version, Version];
+const VersionRangePredicate = ow.array
+  .ofType(VersionPredicate)
+  .length(2)
+  .is((arr) => {
+    const [v1, v2] = arr;
+    if (semver.gte(v1, v2)) return `expected ${v1} to be less than ${v2}`;
+    return true;
+  });
 
 ///
 
 export interface Result {
-  bisect_range?: BisectRange;
   error?: string;
   runner: RunnerId;
   status: 'failure' | 'success' | 'system_error' | 'test_error';
   time_begun: number;
   time_ended: number;
+  version_range?: VersionRange;
 }
 
 const ResultPredicate = ow.object.exactShape({
-  bisect_range: ow.optional.any(BisectRangePredicate),
   error: ow.optional.string,
   runner: RunnerIdPredicate,
   status: ow.string.oneOf(['failure', 'success', 'system_error', 'test_error']),
   time_begun: ow.number.positive,
   time_ended: ow.number.positive,
+  version_range: ow.optional.any(VersionRangePredicate),
 });
 
 ///
@@ -82,8 +89,8 @@ export enum JobType {
 }
 
 export interface BisectJob extends BaseJob {
-  bisect_range: BisectRange;
   type: JobType.bisect;
+  version_range: VersionRange;
 }
 
 export interface TestJob extends BaseJob {
@@ -92,7 +99,6 @@ export interface TestJob extends BaseJob {
 }
 
 const BisectJobPredicate = ow.object.exactShape({
-  bisect_range: BisectRangePredicate,
   bot_client_data: ow.optional.any(ow.string, ow.number, ow.object),
   current: ow.optional.any(CurrentPredicate),
   gist: GistPredicate,
@@ -102,6 +108,7 @@ const BisectJobPredicate = ow.object.exactShape({
   platform: ow.optional.any(PlatformPredicate),
   time_added: ow.number.positive,
   type: ow.string.equals(JobType.bisect),
+  version_range: VersionRangePredicate,
 });
 
 export function assertBisectJob(value: unknown): asserts value is BisectJob {

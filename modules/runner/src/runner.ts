@@ -281,7 +281,7 @@ export class Runner {
 
     const { code, error, out } = await this.runFiddle(task, [
       ...this.fiddleArgv,
-      ...[JobType.bisect, job.bisect_range[0], job.bisect_range[1]],
+      ...[JobType.bisect, job.version_range[0], job.version_range[1]],
       '--betas',
       ...['--fiddle', job.gist],
       '--nightlies',
@@ -293,7 +293,7 @@ export class Runner {
       const res = parseFiddleBisectOutput(out);
       if (res.success) {
         result.status = 'success';
-        result.bisect_range = [res.goodVersion, res.badVersion];
+        result.version_range = [res.goodVersion, res.badVersion];
       } else {
         // TODO(clavin): ^ better wording
         result.error = `Failed to narrow test down to two versions: ${error}`;

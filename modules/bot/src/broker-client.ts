@@ -34,12 +34,12 @@ export default class BrokerAPI {
     const url = new URL('/api/jobs', this.baseURL);
 
     const bisectJob: BisectJob = {
-      bisect_range: [fiddle.goodVersion, fiddle.badVersion],
       gist: fiddle.gistId,
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
       type: JobType.bisect,
+      version_range: [fiddle.goodVersion, fiddle.badVersion],
     };
 
     const res = await fetch(url.toString(), {

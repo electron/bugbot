@@ -15,7 +15,7 @@ Payload is a JSON object that contains
 
 | Name | Datatype | Job | Mutability | Description |
 |---|---|---|---|---|
-| bisect_range | BisectRange | bisect | readonly | The starting bisection range |
+| version_range | VersionRange | bisect | readonly | The starting bisection range |
 | bot_client_data | any | all | | opaque data structure only used by the Probot bot
 | current? | { runner, time_begun } | all | | Subset of a Result. Exists if there is a current runner |
 | gist | string | all | readonly | Hex string identifying a GitHub gist |
@@ -29,12 +29,12 @@ Payload is a JSON object that contains
 
 ### Types
 
-* BisectRange: `Version[2]`
+* VersionRange: `Version[2]`
 * Platform: `['darwin' | 'linux' | 'win32']`
 * Result:
   | Name | Datatype | Job | Description |
   |---|---|---|---|
-  | bisect_range? | BisectRange | bisect | The ending bisection range |
+  | version_range? | VersionRange | bisect | The ending bisection range |
   | error? | string | all | Human-readable error message |
   | runner | string | all | UUID of the runner |
   | status | Status | all | Outcome of a Runner session |

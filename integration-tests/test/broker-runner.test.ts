@@ -10,12 +10,12 @@ import { Runner } from '../../modules/runner/src/runner';
 
 import {
   BisectJob,
-  BisectRange,
   Current,
   JobType,
   Platform,
   Result,
   TestJob,
+  VersionRange,
 } from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60 * 1000);
@@ -70,13 +70,13 @@ describe('runner', () => {
 
   function createBisectTask(job: Partial<BisectJob> = {}) {
     return new Task({
-      bisect_range: ['10.0.0', '11.2.0'],
       gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
-      id: mkuuid(),
       history: [],
+      id: mkuuid(),
       platform,
       time_added: Date.now(),
       type: JobType.bisect,
+      version_range: ['10.0.0', '11.2.0'],
       ...job,
     });
   }
@@ -120,7 +120,7 @@ describe('runner', () => {
   describe('handles successful bisection', () => {
     let task: Task;
 
-    const bisect_range: Readonly<BisectRange> = [
+    const version_range: Readonly<VersionRange> = [
       '11.0.0-nightly.20200724',
       '11.0.0-nightly.20200729',
     ];
@@ -135,15 +135,15 @@ describe('runner', () => {
 
     it('sets job.last', () => {
       const expected = {
-        bisect_range,
         runner: runner.uuid,
         status: 'success',
+        version_range,
       } as const;
 
       const { last } = task.job;
-      expect(last.bisect_range).toStrictEqual(expected.bisect_range);
       expect(last.runner).toBe(expected.runner);
       expect(last.status).toBe(expected.status);
+      expect(last.version_range).toStrictEqual(expected.version_range);
 
       const { time_begun, time_ended } = last;
       expect(time_begun).not.toBeNaN();
@@ -164,7 +164,7 @@ describe('runner', () => {
 
     it('includes the commit range to job.log', () => {
       const log = task.getRawLog();
-      const [a, b] = bisect_range;
+      const [a, b] = version_range;
       const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
       expect(log).toMatch(url);
     });
