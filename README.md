@@ -24,13 +24,21 @@ After uploading your test to gist.github.com, file an [Electron bug report](http
 Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#using-trop), you can start BugBot with issue comments. To begin bisection, add a comment that looks like this:
 
 ```
-/bugbot bisect [gistId] [goodVersion [badVersion]]
+/ bugbot test [gist] [platforms...] [versions...]
 ```
 
-- If no `gistId` is given, use the issue body's `Testcase Gist URL`.
+- If no `gist` is given, use the issue body's `Testcase Gist URL`.
+- If no `platforms` are given, test on Linux, Mac, and Windows.
+- If no `versions` are given, test the first version and latest vesion of each prerelease branch, of each supported branch, and of the two branches before that.
+
+
+```
+/bugbot bisect [gist] [goodVersion [badVersion]]
+```
+
+- If no `gist` is given, use the issue body's `Testcase Gist URL`.
 - If no `goodVersion` is given, use the issue body's `Last Known Working Electron Version` or an old version.
 - If no `badVersion` is given, use the issue body's `Electron Version` or the latest release.
-
 
 ## Deployment
 

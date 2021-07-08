@@ -6,6 +6,7 @@ import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
 import { ElectronVersions, releaseCompare } from './electron-versions';
+import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 // no types exist for this module
 //eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -20,7 +21,9 @@ export type BisectCommand = {
 
 export type TestCommand = {
   gistId: string;
+  platforms: Platform[];
   type: 'test';
+  versions: string[];
 };
 
 export type IssueCommand = BisectCommand | TestCommand;
@@ -65,7 +68,7 @@ const TESTCASE_URL = 'Testcase Gist URL';
 // /bugbot bisect [gistId] [goodVersion [badVersion]]
 // If no `gistId` is given, use TESTCASE_URL.
 // If no `goodVersion` is given, use GOOD_VERSION or an old version.
-// If no `badVersion` is given, use TESTCASE_URL or the latest release.
+// If no `badVersion` is given, use BAD_VERSION or the latest release.
 async function parseBisectCommand(
   issueBody: string,
   words: string[],
@@ -119,21 +122,61 @@ async function parseBisectCommand(
     : undefined;
 }
 
-function parseTestCommand(
+const allPlatforms = ['darwin', 'linux', 'win32'];
+
+// /bugbot test [gistId | platform... | version...]
+// If no `gistId` is given, use TESTCASE_URL.
+// If no `platform`s are given, use `allPlatforms`
+// If no `version`s are given, use BAD_VERSION or the latest release.
+async function parseTestCommand(
   issueBody: string,
   words: string[],
-): TestCommand | undefined {
+  versions: ElectronVersions,
+): Promise<TestCommand | undefined> {
   const d = debug('issue-parser:parseTestCommand');
   const sections = splitMarkdownByHeader(issueBody);
-  const gistUrl = words[0] || sections.get(TESTCASE_URL);
 
-  const gistId = getGistId(gistUrl);
-  if (!gistId) {
-    d('Invalid gist', gistUrl);
-    return undefined;
+  const ret: TestCommand = {
+    gistId: '',
+    platforms: [],
+    type: 'test',
+    versions: [],
+  };
+
+  // user-provided values
+  for (const word of words) {
+    const id = getGistId(word);
+    if (id) {
+      ret.gistId = id;
+      continue;
+    }
+    const ver = SemVer.coerce(word);
+    if (ver) {
+      ret.versions.push(ver.version);
+      continue;
+    }
+    if (allPlatforms.includes(word)) {
+      ret.platforms.push(word as Platform);
+      continue;
+    }
+  }
+  d('user-provided: %o', ret);
+
+  // fallback values
+  if (ret.versions.length === 0) {
+    ret.versions.push(...(await versions.getVersionsToTest()));
+  }
+  if (ret.platforms.length === 0) {
+    ret.platforms.push(...(allPlatforms as Platform[]));
+  }
+  if (!ret.gistId) {
+    ret.gistId = getGistId(sections.get(TESTCASE_URL));
   }
 
-  return { type: 'test', gistId };
+  d('after filling in defaults: %o', ret);
+  return ret.platforms.length > 0 && ret.versions.length > 0 && ret.gistId
+    ? ret
+    : undefined;
 }
 
 export async function parseIssueCommand(
@@ -153,9 +196,9 @@ export async function parseIssueCommand(
   if (words[0] !== '/bugbot') return undefined;
   switch (words[1]) {
     case 'bisect':
-      return parseBisectCommand(issueBody, words.slice(2), versions);
+      return await parseBisectCommand(issueBody, words.slice(2), versions);
     case 'test':
-      return parseTestCommand(issueBody, words.slice(2));
+      return await parseTestCommand(issueBody, words.slice(2), versions);
     default:
       return undefined;
   }

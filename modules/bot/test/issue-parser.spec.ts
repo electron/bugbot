@@ -10,8 +10,9 @@ import { ElectronVersions } from '../src/electron-versions';
 
 describe('issue-parser', () => {
   const versionsMock = {
-    getLatestVersion: jest.fn(),
     getDefaultBisectStart: jest.fn(),
+    getLatestVersion: jest.fn(),
+    getVersionsToTest: jest.fn(),
     isVersion: jest.fn(),
   };
   const versions = (versionsMock as undefined) as ElectronVersions;
@@ -22,6 +23,7 @@ describe('issue-parser', () => {
     versionsMock.getLatestVersion.mockResolvedValue(fakeLatestVersion);
     versionsMock.getDefaultBisectStart.mockResolvedValue(fakeBisectStart);
     versionsMock.isVersion.mockResolvedValue(true);
+    versionsMock.getVersionsToTest.mockResolvedValue([fakeBisectStart, fakeLatestVersion]);
   });
 
   describe('await parseIssueCommand()', () => {
@@ -55,6 +57,8 @@ describe('issue-parser', () => {
       const expectedCommand: TestCommand = {
         gistId: fixtureGistId,
         type: 'test',
+        platforms: ['darwin', 'linux', 'win32'],
+        versions: [fakeBisectStart, fakeLatestVersion],
       };
 
       it('uses a gist from the comment, if provided', async () => {
@@ -75,6 +79,44 @@ describe('issue-parser', () => {
 
       it('returns undefined if it has an invalid gist', async () => {
         const issueBody = getIssueBody('issue-gist-invalid.md');
+        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        expect(command).toBeUndefined();
+      });
+
+      it('finds versions provided in the command', async () => {
+        const issueBody = getIssueBody('issue.md');
+        const versionNumbers = ['10.0.0', '10.1.0', '9.0.0', '12.0.0'];
+        const comment = `${COMMENT} ${versionNumbers.join(' ')}`;
+        const command = await parseIssueCommand(issueBody, comment, versions);
+        expect(command).toMatchObject({
+          ...expectedCommand,
+          versions: versionNumbers,
+        });
+      });
+
+      it('finds platforms provided in the command', async () => {
+        const issueBody = getIssueBody('issue.md');
+        const platforms = ['darwin', 'linux'];
+        const comment = `${COMMENT} ${platforms.join(' ')}`;
+        const command = await parseIssueCommand(issueBody, comment, versions);
+        expect(command).toMatchObject({ ...expectedCommand, platforms });
+      });
+
+      it('ignores garbage inputs', async () => {
+        const issueBody = getIssueBody('issue.md');
+        const comment = `${COMMENT} gromble frotz splart`;
+        const command = await parseIssueCommand(issueBody, comment, versions);
+        expect(command).toMatchObject(expectedCommand);
+      });
+
+      it('returns undefined if it has an invalid gist', async () => {
+        const issueBody = getIssueBody('issue-gist-invalid.md');
+        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        expect(command).toBeUndefined();
+      });
+
+      it('returns undefined if it has a missing gist', async () => {
+        const issueBody = getIssueBody('issue-missing-info.md');
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toBeUndefined();
       });
