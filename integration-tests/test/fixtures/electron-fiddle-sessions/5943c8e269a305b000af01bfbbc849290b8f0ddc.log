@@ -1,0 +1,101 @@
+Creating main window
+[3:45:25 PM] Console ready 🔬
+[3:45:25 PM] Task: Show channels Beta, Nightly, Stable
+[3:45:25 PM] Task: Open fiddle "{"gistId":"8c5fc0c6a5153d49b5a4a56d3ed9da8f"}"
+[3:45:26 PM] Task: Bisect  [10.0.0, 10.0.1, 10.1.0, 10.1.1, 10.1.2, 10.1.3, 10.1.4, 10.1.5, 10.1.6, 10.1.7, 10.2.0, 10.3.0, 10.3.1, 10.3.2, 10.4.0, 10.4.1, 10.4.2, 10.4.3, 10.4.4, 10.4.5, 10.4.6, 10.4.7, 11.0.0-nightly.20200525, 11.0.0-nightly.20200526, 11.0.0-nightly.20200529, 11.0.0-nightly.20200602, 11.0.0-nightly.20200603, 11.0.0-nightly.20200604, 11.0.0-nightly.20200609, 11.0.0-nightly.20200610, 11.0.0-nightly.20200611, 11.0.0-nightly.20200615, 11.0.0-nightly.20200616, 11.0.0-nightly.20200617, 11.0.0-nightly.20200618, 11.0.0-nightly.20200619, 11.0.0-nightly.20200701, 11.0.0-nightly.20200702, 11.0.0-nightly.20200703, 11.0.0-nightly.20200706, 11.0.0-nightly.20200707, 11.0.0-nightly.20200708, 11.0.0-nightly.20200709, 11.0.0-nightly.20200716, 11.0.0-nightly.20200717, 11.0.0-nightly.20200720, 11.0.0-nightly.20200721, 11.0.0-nightly.20200723, 11.0.0-nightly.20200724, 11.0.0-nightly.20200729, 11.0.0-nightly.20200730, 11.0.0-nightly.20200731, 11.0.0-nightly.20200803, 11.0.0-nightly.20200804, 11.0.0-nightly.20200805, 11.0.0-nightly.20200811, 11.0.0-nightly.20200812, 11.0.0-nightly.20200822, 11.0.0-nightly.20200824, 11.0.0-nightly.20200825, 11.0.0-nightly.20200826, 11.0.0-beta.1, 11.0.0-beta.3, 11.0.0-beta.4, 11.0.0-beta.5, 11.0.0-beta.6, 11.0.0-beta.7, 11.0.0-beta.8, 11.0.0-beta.9, 11.0.0-beta.11, 11.0.0-beta.12, 11.0.0-beta.13, 11.0.0-beta.16, 11.0.0-beta.17, 11.0.0-beta.18, 11.0.0-beta.19, 11.0.0-beta.20, 11.0.0-beta.22, 11.0.0-beta.23, 11.0.0, 11.0.1, 11.0.2, 11.0.3, 11.0.4, 11.0.5, 11.1.0, 11.1.1, 11.2.0]
+[3:45:26 PM] Runner: autobisect Electron 11.0.0-nightly.20200716 - setting version
+[3:45:26 PM] Runner: autobisect Electron 11.0.0-nightly.20200716 - starting test
+[3:45:26 PM] Saving files to temp directory...
+[3:45:26 PM] Saved files to /tmp/tmp-1315838-JY0gNJJh4wdi
+[3:45:26 PM] Electron v11.0.0-nightly.20200716 started.
+[3:45:26 PM] Starting inspector on 127.0.0.1:9229 failed: address already in use
+[3:45:26 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[3:45:26 PM] test passed
+[3:45:27 PM] 
+[3:45:27 PM] Electron exited with code 0.
+[3:45:27 PM] Runner: autobisect Electron 11.0.0-nightly.20200716 - finished test ✅ passed
+[3:45:27 PM] Runner: autobisect Electron 11.0.0-beta.6 - setting version
+[3:45:27 PM] Runner: autobisect Electron 11.0.0-beta.6 - starting test
+[3:45:27 PM] Saving files to temp directory...
+[3:45:27 PM] Saved files to /tmp/tmp-1315838-U0xDYJx5Nrf6
+[3:45:27 PM] Electron v11.0.0-beta.6 started.
+[3:45:27 PM] Starting inspector on 127.0.0.1:9229 failed: address already in use
+[3:45:27 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[3:45:27 PM] test failed
+[3:45:27 PM] Error: test failed
+    at Object.done (/tmp/tmp-1315838-U0xDYJx5Nrf6/preload.js:11:32)
+    at Object.fail (/tmp/tmp-1315838-U0xDYJx5Nrf6/preload.js:9:27)
+    at file:///tmp/tmp-1315838-U0xDYJx5Nrf6/renderer.js:17:8
+TypeError: remote.screen.getPrimaryDisplay is not a function
+    at file:///tmp/tmp-1315838-U0xDYJx5Nrf6/renderer.js:11:40
+[3:45:27 PM] 
+[3:45:27 PM] Electron exited with code 1.
+[3:45:27 PM] Runner: autobisect Electron 11.0.0-beta.6 - finished test ❌ failed
+[3:45:27 PM] Runner: autobisect Electron 11.0.0-nightly.20200805 - setting version
+[3:45:27 PM] Runner: autobisect Electron 11.0.0-nightly.20200805 - starting test
+[3:45:27 PM] Saving files to temp directory...
+[3:45:27 PM] Saved files to /tmp/tmp-1315838-Q3z2Ux0Ogv2g
+[3:45:27 PM] Electron v11.0.0-nightly.20200805 started.
+[3:45:27 PM] Starting inspector on 127.0.0.1:9229 failed: address already in use
+[3:45:27 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[3:45:27 PM] test failed
+[3:45:28 PM] Error: test failed
+    at Object.done (/tmp/tmp-1315838-Q3z2Ux0Ogv2g/preload.js:11:32)
+    at Object.fail (/tmp/tmp-1315838-Q3z2Ux0Ogv2g/preload.js:9:27)
+    at file:///tmp/tmp-1315838-Q3z2Ux0Ogv2g/renderer.js:17:8
+TypeError: remote.screen.getPrimaryDisplay is not a function
+    at file:///tmp/tmp-1315838-Q3z2Ux0Ogv2g/renderer.js:11:40
+[3:45:28 PM] 
+[3:45:28 PM] Electron exited with code 1.
+[3:45:28 PM] Runner: autobisect Electron 11.0.0-nightly.20200805 - finished test ❌ failed
+[3:45:28 PM] Runner: autobisect Electron 11.0.0-nightly.20200724 - setting version
+[3:45:28 PM] Runner: autobisect Electron 11.0.0-nightly.20200724 - starting test
+[3:45:28 PM] Saving files to temp directory...
+[3:45:28 PM] Saved files to /tmp/tmp-1315838-MGWUZIRkA7I7
+[3:45:28 PM] Electron v11.0.0-nightly.20200724 started.
+[3:45:28 PM] Starting inspector on 127.0.0.1:9229 failed: address already in use
+[3:45:28 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[3:45:28 PM] test passed
+[3:45:28 PM] 
+[3:45:28 PM] Electron exited with code 0.
+[3:45:28 PM] Runner: autobisect Electron 11.0.0-nightly.20200724 - finished test ✅ passed
+[3:45:28 PM] Runner: autobisect Electron 11.0.0-nightly.20200731 - setting version
+[3:45:28 PM] Runner: autobisect Electron 11.0.0-nightly.20200731 - starting test
+[3:45:28 PM] Saving files to temp directory...
+[3:45:28 PM] Saved files to /tmp/tmp-1315838-b39L8UU4F35q
+[3:45:28 PM] Electron v11.0.0-nightly.20200731 started.
+[3:45:28 PM] Starting inspector on 127.0.0.1:9229 failed: address already in use
+[3:45:28 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[3:45:29 PM] test failed
+[3:45:29 PM] Error: test failed
+    at Object.done (/tmp/tmp-1315838-b39L8UU4F35q/preload.js:11:32)
+    at Object.fail (/tmp/tmp-1315838-b39L8UU4F35q/preload.js:9:27)
+    at file:///tmp/tmp-1315838-b39L8UU4F35q/renderer.js:17:8
+TypeError: remote.screen.getPrimaryDisplay is not a function
+    at file:///tmp/tmp-1315838-b39L8UU4F35q/renderer.js:11:40
+[3:45:29 PM] 
+[3:45:29 PM] Electron exited with code 1.
+[3:45:29 PM] Runner: autobisect Electron 11.0.0-nightly.20200731 - finished test ❌ failed
+[3:45:29 PM] Runner: autobisect Electron 11.0.0-nightly.20200729 - setting version
+[3:45:29 PM] Runner: autobisect Electron 11.0.0-nightly.20200729 - starting test
+[3:45:29 PM] Saving files to temp directory...
+[3:45:29 PM] Saved files to /tmp/tmp-1315838-oHJqepudB8Is
+[3:45:29 PM] Electron v11.0.0-nightly.20200729 started.
+[3:45:29 PM] Starting inspector on 127.0.0.1:9229 failed: address already in use
+[3:45:29 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[3:45:29 PM] test failed
+[3:45:29 PM] Error: test failed
+    at Object.done (/tmp/tmp-1315838-oHJqepudB8Is/preload.js:11:32)
+    at Object.fail (/tmp/tmp-1315838-oHJqepudB8Is/preload.js:9:27)
+    at file:///tmp/tmp-1315838-oHJqepudB8Is/renderer.js:17:8
+TypeError: remote.screen.getPrimaryDisplay is not a function
+    at file:///tmp/tmp-1315838-oHJqepudB8Is/renderer.js:11:40
+[3:45:29 PM] 
+[3:45:29 PM] Electron exited with code 1.
+[3:45:29 PM] Runner: autobisect Electron 11.0.0-nightly.20200729 - finished test ❌ failed
+[3:45:29 PM] Runner: autobisect complete
+[3:45:29 PM] Runner: autobisect ✅ passed 11.0.0-nightly.20200724
+[3:45:29 PM] Runner: autobisect ❌ failed 11.0.0-nightly.20200729
+[3:45:29 PM] Runner: autobisect Commits between versions:
+[3:45:29 PM] https://github.com/electron/electron/compare/v11.0.0-nightly.20200724...v11.0.0-nightly.20200729
+[3:45:29 PM] Task: Bisect  success

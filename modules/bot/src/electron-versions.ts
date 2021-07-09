@@ -65,7 +65,7 @@ export class ElectronVersions {
     const UNSUPPORTED_MAJORS_TO_TEST = 2;
     const NUM_STABLE_TO_TEST = SUPPORTED_MAJORS + UNSUPPORTED_MAJORS_TO_TEST;
     let stableLeft = NUM_STABLE_TO_TEST;
-    while (stableLeft > 0) {
+    while (majors.length > 0 && stableLeft > 0) {
       const major = majors.pop();
       let range = byMajor.get(major);
       if (hasStable(range)) {
