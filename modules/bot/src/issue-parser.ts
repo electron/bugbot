@@ -104,10 +104,7 @@ async function parseBisectCommand(
   badVersion ||= await versions.getLatestVersion();
   goodVersion ||= SemVer.coerce(sections.get(GOOD_VERSION))?.version;
   goodVersion ||= await versions.getDefaultBisectStart();
-  if (!gistId) {
-    const url = sections.get(TESTCASE_URL);
-    if (url) gistId = getGistId(url);
-  }
+  gistId ||= getGistId(sections.get(TESTCASE_URL));
 
   // ensure goodVersion < badVersion;
   const semGood = SemVer.parse(goodVersion);
@@ -126,7 +123,7 @@ const ALL_PLATFORMS = ['darwin', 'linux', 'win32'];
 
 // /bugbot test [gistId | platform... | version...]
 // If no `gistId` is given, use TESTCASE_URL.
-// If no `platform`s are given, use `allPlatforms`
+// If no `platform`s are given, use `ALL_PLATFORMS`
 // If no `version`s are given, use BAD_VERSION or the latest release.
 async function parseTestCommand(
   issueBody: string,
@@ -155,7 +152,7 @@ async function parseTestCommand(
       ret.versions.push(ver.version);
       continue;
     }
-    if (allPlatforms.includes(word)) {
+    if (ALL_PLATFORMS.includes(word)) {
       ret.platforms.push(word as Platform);
       continue;
     }
@@ -167,7 +164,7 @@ async function parseTestCommand(
     ret.versions.push(...(await versions.getVersionsToTest()));
   }
   if (ret.platforms.length === 0) {
-    ret.platforms.push(...(allPlatforms as Platform[]));
+    ret.platforms.push(...(ALL_PLATFORMS as Platform[]));
   }
   if (!ret.gistId) {
     ret.gistId = getGistId(sections.get(TESTCASE_URL));
