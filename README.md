@@ -2,7 +2,7 @@
 
 ## tldr
 
-1. Users [file Electron bug reports](https://github.com/electron/electron/issues/new/choose) with [tests](#for-bug-reporters).
+1. Users [file Electron bug reports](https://github.com/electron/electron/issues/new/choose) with [tests](#by-bug-reporters).
 1. BugBot can run the test on many platforms and Electron versions, then report back in-issue.
 1. BugBot can bisect regressions down to a range of commits, then report back in-issue.
 1. Users and maintainers can see where the bug is reproducible.
