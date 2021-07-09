@@ -46,7 +46,7 @@ class Task {
 
     const lines = this.logBuffer.splice(0);
     const body = lines.join('\n');
-    d(`sendLogDataBuffer sending ${lines.length} lines`, body);
+    d(`sending ${lines.length} lines`, body);
     const resp = await fetch(url, {
       body,
       headers: {
@@ -55,7 +55,7 @@ class Task {
       },
       method: 'PUT',
     });
-    d(`sendLogDataBuffer resp.status ${resp.status}`);
+    d(`resp.status ${resp.status}`);
   }
 
   public addLogData(data: string) {
@@ -64,7 +64,7 @@ class Task {
     this.logBuffer.push(data);
     if (!this.logTimer) {
       this.logTimer = setTimeout(
-        () => this.sendLogDataBuffer(log_url),
+        () => void this.sendLogDataBuffer(log_url),
         this.logIntervalMs,
       );
     }
@@ -188,10 +188,6 @@ export class Runner {
       case JobType.test:
         await this.runTest(task);
         break;
-
-      default:
-        d('unexpected job $O', task);
-        break;
     }
 
     d('runner:poll done');
@@ -202,6 +198,7 @@ export class Runner {
 
     const ids = await this.fetchAvailableJobIds();
     if (!ids.length) return;
+
     const idx = randomInt(0, ids.length);
     const [id] = ids.splice(idx, 1);
     d('jobs %o picked %s', ids, id);
@@ -322,7 +319,7 @@ export class Runner {
     const result: Partial<Result> = {};
     if (error) {
       result.status = 'system_error';
-      result.error = `Unable to run Electron Fiddle: ${error}`;
+      result.error = `Unable to run Electron Fiddle. ${error}`;
     } else if (code === 0) {
       result.status = 'success';
     } else if (code === 1) {
@@ -345,8 +342,6 @@ export class Runner {
 
       const { childTimeoutMs, fiddleExec } = this;
       const opts = { timeout: childTimeoutMs };
-      d(`${fiddleExec} ${args.join(' ')}`);
-      const child = spawn(fiddleExec, args, opts);
 
       const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
       const startupLog = [
@@ -355,6 +350,11 @@ export class Runner {
         `${prefix}   ... with opts ${inspect(opts)}`,
       ] as const;
       task.addLogData(startupLog.join('\n'));
+
+      d('exec: %s', fiddleExec);
+      d('args: %o', args);
+      d('opts: %o', opts);
+      const child = spawn(fiddleExec, args, opts);
 
       // Save stdout locally so we can parse the result.
       // Report both stdout + stderr to the broker via addLogData().

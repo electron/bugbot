@@ -37,7 +37,7 @@ describe('runner', () => {
     return brokerServer.start();
   }
 
-  function createRunner(opts: Record<string, any> = {}) {
+  function createRunner(opts: Record<string, unknown> = {}) {
     runner = new Runner({
       authToken,
       brokerUrl,
@@ -49,7 +49,7 @@ describe('runner', () => {
   }
 
   afterEach(async () => {
-    brokerServer.stop();
+    await brokerServer.stop();
     await runner.stop();
   });
 
@@ -61,10 +61,10 @@ describe('runner', () => {
     expect(runner.platform).toBe(platform);
   });
 
-  async function runTask(task: Task) {
+  async function runTask(task: Task, runnerOpts: Record<string, any> = {}) {
     await startBroker();
     broker.addTask(task);
-    createRunner();
+    createRunner(runnerOpts);
     await runner.poll();
   }
 
@@ -238,6 +238,19 @@ describe('runner', () => {
       expect(time_begun).toBeGreaterThan(0);
       expect(time_ended).not.toBeNaN();
       expect(time_ended).toBeGreaterThanOrEqual(time_begun);
+    });
+  });
+
+  it('returns a system error if electron-fiddle cannot start', async () => {
+    const childTimeoutMs = 200;
+    const fiddleExec = '/dev/null';
+    const task = createTestTask();
+
+    await runTask(task, { childTimeoutMs, fiddleExec });
+    const { last } = task.job;
+    expect(last).toMatchObject({
+      error: expect.stringMatching(fiddleExec),
+      status: 'system_error',
     });
   });
 });
