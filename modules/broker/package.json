@@ -17,6 +17,7 @@
     "etag": "^1.8.1",
     "express": "^4.17.1",
     "fast-json-patch": "^3.0.0-1",
+    "klona": "^2.0.4",
     "node-fetch": "^2.6.1",
     "semver": "^7.3.5",
     "uuid": "^8.3.2"

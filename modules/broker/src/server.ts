@@ -6,6 +6,7 @@ import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
 import { URL } from 'url';
+import { klona } from 'klona/json';
 
 import { assertJob } from '@electron/bugbot-shared/build/interfaces';
 import { env, getEnvData } from '@electron/bugbot-shared/build/env-vars';
@@ -179,7 +180,7 @@ export class Server {
 
     try {
       d('patch body', req.body);
-      const scratch = JSON.parse(JSON.stringify(task.job)); // deep copy
+      const scratch = klona(task.job); // deep copy
       d('before patch', JSON.stringify(scratch));
       jsonpatch.applyPatch(scratch, req.body);
       d('after  patch', JSON.stringify(scratch));
