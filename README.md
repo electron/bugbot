@@ -9,7 +9,7 @@
 
 ## Usage
 
-### by Bug Reporters
+### By bug reporters
 
 BugBot only needs one thing: a test that exits with `exitCode` 0 if Electron works, or nonzero if Electron has a bug.
 
