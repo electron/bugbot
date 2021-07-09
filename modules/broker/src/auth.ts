@@ -20,7 +20,18 @@ export enum AuthScope {
 
   /** Ability to update existing jobs. */
   UpdateJobs = 'jobs:update',
+
+  // NOTE: when adding more scopes, make sure to include them in the
+  // `ALL_SCOPES` array below.
 }
+
+// TODO: perhaps having a "glob" matching system would help, e.g. `jobs:*` or
+// simply `*`
+export const ALL_SCOPES = [
+  AuthScope.ControlTokens,
+  AuthScope.CreateJobs,
+  AuthScope.UpdateJobs,
+];
 
 /**
  * Data about an authorization through the security layer.
@@ -47,9 +58,9 @@ export class Auth {
    * Generates a new auth data object with the supplied scopes, adds it to the
    * token store, then returns the token.
    */
-  public createToken(scopes: AuthScope[]): string {
-    // Generate a token
-    const token = randomToken();
+  public createToken(scopes: AuthScope[], authToken?: string): string {
+    // Use the given token or generate one
+    const token = authToken ?? randomToken();
 
     // Add a token object to the token store
     this.tokens.set(token, {

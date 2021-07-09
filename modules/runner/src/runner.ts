@@ -220,7 +220,10 @@ export class Runner {
     jobs_url.searchParams.append('current.runner', 'undefined');
     // ...and which have never been run
     jobs_url.searchParams.append('last.status', 'undefined');
-    jobs_url.searchParams.append('type', `${JobType.bisect},${JobType.test}`);
+    jobs_url.searchParams.append(
+      'type',
+      `${JobType.bisect as string},${JobType.test as string}`,
+    );
 
     // Make the request and return its response
     return await fetch(jobs_url, {
@@ -282,10 +285,8 @@ export class Runner {
     const { code, error, out } = await this.runFiddle(task, [
       ...this.fiddleArgv,
       ...[JobType.bisect, job.version_range[0], job.version_range[1]],
-      '--betas',
       ...['--fiddle', job.gist],
-      '--nightlies',
-      '--obsolete',
+      '--full',
     ]);
 
     const result: Partial<Result> = {};

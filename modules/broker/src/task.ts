@@ -46,7 +46,7 @@ export class Task {
     return this.log.map((section) => section.lines.join('\n')).join();
   }
 
-  constructor(job: unknown) {
+  constructor(job: Job) {
     assertJob(job);
     this.job = job;
   }
