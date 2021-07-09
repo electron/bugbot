@@ -76,9 +76,9 @@ async function parseBisectCommand(
 ): Promise<BisectCommand | undefined> {
   const d = debug('issue-parser:parseBisectCommand');
 
-  let badVersion: string;
-  let gistId: string;
-  let goodVersion: string;
+  let badVersion: string | undefined;
+  let gistId: string | undefined;
+  let goodVersion: string | undefined;
 
   for (const word of words) {
     const id = getGistId(word);
