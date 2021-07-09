@@ -19,7 +19,7 @@ If you want to do it manually, the only requirement is that 0/1 `exitCode`. You 
 
 After uploading your test to gist.github.com, file an [Electron bug report](https://github.com/electron/electron/issues/new/choose). The bug report template will ask for a "Testcase Gist URL", which is where you'll provide the Gist URL.
 
-### by Maintainers
+### By maintainers
 
 Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#using-trop), you can start BugBot with issue comments. To begin bisection, add a comment that looks like this:
 
