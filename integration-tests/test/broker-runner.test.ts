@@ -66,15 +66,16 @@ describe('runner', () => {
     await runner.poll();
   }
 
-  function createBisectTask(opts: Record<string, any> = {}) {
-    const bisect_range: BisectRange = ['10.0.0', '11.2.0'];
-    const gist = '8c5fc0c6a5153d49b5a4a56d3ed9da8f';
-    const id = mkuuid();
-    const time_added = Date.now();
-    const type = 'bisect' as const;
-    const defaults: BisectJob = { bisect_range, gist, history: [], id, platform, time_added, type };
-    const bisectJob = { ...defaults, ...opts };
-    return new Task(bisectJob);
+  function createBisectTask(opts: Partial<BisectJob> = {}) {
+    return new Task({
+      bisect_range: ['10.0.0', '11.2.0'],
+      gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
+      history: [],
+      id: mkuuid(),
+      time_added: Date.now(),
+      type: 'bisect',
+      ...opts
+    });
   }
 
   describe('does not claim tasks', () => {
