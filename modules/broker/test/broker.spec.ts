@@ -104,6 +104,7 @@ describe('broker', () => {
     process.env.BUGBOT_BROKER_URL = 'https://localhost';
     process.env.BUGBOT_BROKER_CERT_PATH = fixturePath('test.cert');
     process.env.BUGBOT_BROKER_KEY_PATH = fixturePath('test.key');
+    process.env.BUGBOT_AUTH_TOKEN = 'test';
 
     const https_server = new Server();
     expect(https_server.brokerUrl).toStrictEqual(
@@ -116,6 +117,7 @@ describe('broker', () => {
     delete process.env.BUGBOT_BROKER_URL;
     delete process.env.BUGBOT_BROKER_CERT_PATH;
     delete process.env.BUGBOT_BROKER_KEY_PATH;
+    delete process.env.BUGBOT_AUTH_TOKEN;
   });
 
   async function postNewBisectJob(params = {}) {

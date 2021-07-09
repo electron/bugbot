@@ -11,7 +11,7 @@ import { klona } from 'klona/json';
 import { assertJob } from '@electron/bugbot-shared/build/interfaces';
 import { env, getEnvData } from '@electron/bugbot-shared/build/env-vars';
 
-import { Auth, AuthScope } from './auth';
+import { ALL_SCOPES, Auth, AuthScope } from './auth';
 import { Broker } from './broker';
 import { Task } from './task';
 import { buildLog } from './log';
@@ -58,10 +58,16 @@ export class Server {
       this.key = opts.key || getEnvData('BUGBOT_BROKER_KEY');
     }
 
-    // Initialize auth either from being passed in or by creating a new auth
-    // with a control token that is printed out
+    // Initialize auth from being passed in as an object, as an environment
+    // variable, or by creating a new auth with a control token that is printed
+    // out
     if (opts.auth !== undefined) {
       this.auth = opts.auth;
+    } else if (process.env.BUGBOT_AUTH_TOKEN !== undefined) {
+      this.auth = new Auth();
+
+      // Create a token with all scopes using the environment value
+      this.auth.createToken(ALL_SCOPES, process.env.BUGBOT_AUTH_TOKEN);
     } else {
       this.auth = new Auth();
 
