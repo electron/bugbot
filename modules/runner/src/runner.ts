@@ -9,9 +9,9 @@ import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  AnyJob,
   BisectRange,
   Current,
+  Job,
   JobId,
   Platform,
   Result,
@@ -151,7 +151,7 @@ export class Runner {
     }).then((res) => res.json());
   }
 
-  private async fetchJobAndEtag(id: string): Promise<[AnyJob, string]> {
+  private async fetchJobAndEtag(id: string): Promise<[Job, string]> {
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
     const resp = await fetch(job_url, {
       headers: {

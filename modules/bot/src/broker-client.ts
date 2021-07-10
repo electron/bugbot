@@ -4,8 +4,8 @@ import { v4 as mkuuid } from 'uuid';
 
 // import { FiddleBisectResult } from '@electron/bugbot-runner/build/fiddle-bisect-parser';
 import {
-  AnyJob,
   BisectJob,
+  Job,
   JobId,
 } from '@electron/bugbot-shared/build/interfaces';
 
@@ -58,7 +58,7 @@ export default class BrokerAPI {
     console.log('stopping job', { url });
   }
 
-  public async getJob(jobId: JobId): Promise<AnyJob> {
+  public async getJob(jobId: JobId): Promise<Job> {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     const res = await fetch(url.toString(), {
       headers: {
