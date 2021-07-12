@@ -6,7 +6,9 @@ import debug from 'debug';
 import create_etag from 'etag';
 import express from 'express';
 import { URL } from 'url';
+import { klona } from 'klona/json';
 
+import { assertJob } from '@electron/bugbot-shared/build/interfaces';
 import { env, getEnvData } from '@electron/bugbot-shared/build/env-vars';
 
 import { ALL_SCOPES, Auth, AuthScope } from './auth';
@@ -17,7 +19,7 @@ import { buildLog } from './log';
 const DebugPrefix = 'broker:server';
 
 function getTaskBody(task: Task) {
-  const body = JSON.stringify(task.publicSubset());
+  const body = JSON.stringify(task.job);
   const etag = create_etag(body);
   return { body, etag };
 }
@@ -140,12 +142,15 @@ export class Server {
   }
 
   private postJob(req: express.Request, res: express.Response) {
-    let task: Task;
+    const d = debug(`${DebugPrefix}:postJob`);
+    d('posting job', req.body);
     try {
-      task = Task.createBisectTask(req.body);
+      assertJob(req.body);
+      const task = new Task(req.body);
       this.broker.addTask(task);
-      res.status(201).send(escapeHtml(task.id));
+      res.status(201).send(escapeHtml(task.job.id));
     } catch (error: unknown) {
+      d('bad job', error);
       res.status(422).send(escapeHtml(error.toString()));
     }
   }
@@ -184,27 +189,14 @@ export class Server {
     }
 
     try {
-      d('before patch', JSON.stringify(task));
       d('patch body', req.body);
-      jsonpatch.applyPatch(task, req.body, (op, index, tree) => {
-        if (!['add', 'copy', 'move', 'remove', 'replace'].includes(op.op)) {
-          return;
-        }
-        const [, prop] = op.path.split('/'); // '/bot_client_data/foo' -> 'bot_client_data'
-        const value =
-          op.op === 'add' || op.op === 'replace' ? op.value : undefined;
-        if (Task.canSet(prop, value)) {
-          return;
-        }
-        throw new jsonpatch.JsonPatchError(
-          `unable to patch ${prop} on task ${task.id}`,
-          'OPERATION_OP_INVALID',
-          index,
-          op,
-          tree,
-        );
-      });
-      d('after patch', JSON.stringify(task));
+      const scratch = klona(task.job); // deep copy
+      d('before patch', JSON.stringify(scratch));
+      jsonpatch.applyPatch(scratch, req.body);
+      d('after  patch', JSON.stringify(scratch));
+      assertJob(scratch);
+      d('patch looks OK');
+      jsonpatch.applyPatch(task.job, req.body);
       const { etag } = getTaskBody(task);
       res.header('ETag', etag);
       res.status(200).end();
@@ -218,9 +210,8 @@ export class Server {
     const d = debug(`${DebugPrefix}:getJobs`);
 
     d(`getJobs: query: ${JSON.stringify(req.query)}`);
-    const tasks = this.broker.getTasks();
-    const ids = Server.filter(tasks, req.query as any).map((task) => task.id);
-    d(`getJobs: tasks: [${ids.join(', ')}]`);
+    const jobs = this.broker.getTasks().map((task) => task.job);
+    const ids = Server.filter(jobs, req.query as any).map((job) => job.id);
     res.status(200).json(ids);
   }
 

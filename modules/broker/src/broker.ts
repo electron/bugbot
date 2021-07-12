@@ -4,7 +4,7 @@ export class Broker {
   private readonly tasks: Map<string, Task> = new Map();
 
   public addTask(task: Task): void {
-    this.tasks.set(task.id, task);
+    this.tasks.set(task.job.id, task);
   }
 
   public getTask(id: string): Task | undefined {

@@ -125,6 +125,9 @@ describe('broker', () => {
     params = {
       bisect_range: ['10.0.0', '11.2.0'],
       gist: 'abbaabbaabbaabbaabbaabbaabbaabbaabbaabba',
+      history: [],
+      id: mkuuid(),
+      time_added: Date.now(),
       type: 'bisect',
       ...params,
     };
@@ -231,7 +234,7 @@ describe('broker', () => {
 
   describe('/api/jobs/$job_id (GET)', () => {
     const bot_client_data = Math.random().toString();
-    const gist = 'gist';
+    const gist = 'fabaceae';
     const platform = 'linux';
     const type = 'bisect';
     let id: string;
@@ -293,6 +296,11 @@ describe('broker', () => {
     it('may include job.platform', async () => {
       const { body: job } = await getJob(id);
       expect(job.platform).toBe(platform);
+    });
+
+    it('gives a 404 for unknown jobs', async () => {
+      const { response } = await getJob(mkuuid());
+      expect(response.status).toBe(404);
     });
 
     it.todo('may include job.current');
@@ -442,7 +450,7 @@ describe('broker', () => {
     });
 
     it('replaces properties', async () => {
-      const new_gist = 'new_gist';
+      const new_gist = 'decade';
       const response = await patchJob(id, etag, [
         { op: 'replace', path: '/gist', value: new_gist },
       ]);
@@ -522,19 +530,6 @@ describe('broker', () => {
 
         const { body: job } = await getJob(id);
         expect(job.gist).not.toBe(new_gist);
-      });
-
-      it('the patch changes readonly properties', async () => {
-        const path = '/id';
-        const new_id = 'poop';
-        const response = await patchJob(id, etag, [
-          { op: 'replace', path, value: new_id },
-        ]);
-        expect(response.status).toBe(400);
-        expect(await response.text()).toContain(path);
-
-        const { response: res } = await getJob(new_id);
-        expect(res.status).toBe(404);
       });
     });
 
