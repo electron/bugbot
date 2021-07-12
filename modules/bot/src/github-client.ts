@@ -97,7 +97,7 @@ export class GithubClient {
         line,
         this.versions,
       );
-      if (cmd?.type === 'bisect') {
+      if (cmd?.type === JobType.bisect) {
         promises.push(this.runBisectJob(cmd, context));
       }
     }

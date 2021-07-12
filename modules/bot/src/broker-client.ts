@@ -45,7 +45,7 @@ export default class BrokerAPI {
       id: mkuuid(),
       time_added: Date.now(),
       type: JobType.bisect,
-      version_range: [fiddle.goodVersion, fiddle.badVersion],
+      version_range: [command.goodVersion, command.badVersion],
     };
 
     const body = JSON.stringify(bisectJob);
