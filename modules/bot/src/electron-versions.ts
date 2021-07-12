@@ -7,7 +7,7 @@ const isStable = (rel: Release) => rel.prerelease.length === 0;
 const hasStable = (releases: Release[]) => releases.some(isStable);
 
 // from https://github.com/electron/fiddle/blob/master/src/utils/sort-versions.ts
-function releaseCompare(a: Release, b: Release) {
+export function releaseCompare(a: Release, b: Release) {
   const l = a.compareMain(b);
   if (l) return l;
   // Electron's approach is nightly -> beta -> stable.
@@ -18,7 +18,7 @@ function releaseCompare(a: Release, b: Release) {
 }
 
 export class ElectronVersions {
-  private readonly releases = new Set<Release>();
+  private readonly releases = new Map<string, Release>();
   private releasesTime = 0; // epoch
 
   private async fetchReleases() {
@@ -28,7 +28,9 @@ export class ElectronVersions {
 
     this.releasesTime = Date.now();
     this.releases.clear();
-    for (const { version } of raw) this.releases.add(semver.parse(version));
+    for (const { version } of raw) {
+      this.releases.set(version, semver.parse(version));
+    }
   }
 
   private isCacheTooOld(): boolean {
@@ -52,7 +54,7 @@ export class ElectronVersions {
   public async getVersionsToTest(): Promise<string[]> {
     await this.ensureReleases();
 
-    const byMajor = this.groupReleasesByMajor([...this.releases]);
+    const byMajor = this.groupReleasesByMajor([...this.releases.values()]);
     const majors = [...byMajor.keys()].sort((a, b) => a - b);
 
     const versions: Release[] = [];
@@ -75,5 +77,19 @@ export class ElectronVersions {
     }
 
     return versions.sort(releaseCompare).map((ret) => ret.version);
+  }
+
+  public async getDefaultBisectStart(): Promise<string> {
+    return (await this.getVersionsToTest()).shift();
+  }
+
+  public async isVersion(version: string): Promise<boolean> {
+    await this.ensureReleases();
+    return this.releases.has(version);
+  }
+
+  public async getLatestVersion(): Promise<string> {
+    await this.ensureReleases();
+    return [...this.releases.values()].sort(releaseCompare).pop().version;
   }
 }

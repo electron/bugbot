@@ -286,19 +286,6 @@ describe('github-client', () => {
           expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
           expect(mockQueueBisectJob).not.toHaveBeenCalled();
         });
-
-        it('...the issue body has no gistId', async () => {
-          const onIssueCommentSpy = jest.spyOn(ghclient, 'onIssueComment');
-          const noGistFixture = JSON.parse(JSON.stringify(payloadFixture));
-          noGistFixture.issue.body = 'This issue body has no gistId';
-
-          await robot.receive({
-            name: 'issue_comment',
-            payload: noGistFixture,
-          } as any);
-          expect(onIssueCommentSpy).toHaveBeenCalledTimes(1);
-          expect(mockQueueBisectJob).not.toHaveBeenCalled();
-        });
       });
     });
   });

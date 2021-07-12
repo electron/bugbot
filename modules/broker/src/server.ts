@@ -143,6 +143,7 @@ export class Server {
 
   private postJob(req: express.Request, res: express.Response) {
     const d = debug(`${DebugPrefix}:postJob`);
+    d('posting job', req.body);
     try {
       d('%o', req.body);
       assertJob(req.body);
@@ -150,6 +151,7 @@ export class Server {
       this.broker.addTask(task);
       res.status(201).send(escapeHtml(task.job.id));
     } catch (error: unknown) {
+      d('bad job', error);
       res.status(422).send(escapeHtml(error.toString()));
     }
   }

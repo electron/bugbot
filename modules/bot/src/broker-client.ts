@@ -1,3 +1,4 @@
+import debug from 'debug';
 import fetch, { Response } from 'node-fetch';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
@@ -10,7 +11,9 @@ import {
   JobType,
 } from '@electron/bugbot-shared/build/interfaces';
 
-import { FiddleInput } from './issue-parser';
+import { BisectCommand } from './issue-parser';
+
+const DebugPrefix = 'BrokerAPI';
 
 export class APIError extends Error {
   public res: Response;
@@ -30,11 +33,14 @@ export default class BrokerAPI {
     this.baseURL = props.baseURL;
   }
 
-  public async queueBisectJob(fiddle: FiddleInput): Promise<string> {
+  public async queueBisectJob(command: BisectCommand): Promise<string> {
+    const d = debug(`${DebugPrefix}:queueBisectJob`);
+
     const url = new URL('/api/jobs', this.baseURL);
+    d('url', url);
 
     const bisectJob: BisectJob = {
-      gist: fiddle.gistId,
+      gist: command.gistId,
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
@@ -42,8 +48,10 @@ export default class BrokerAPI {
       version_range: [fiddle.goodVersion, fiddle.badVersion],
     };
 
-    const res = await fetch(url.toString(), {
-      body: JSON.stringify(bisectJob),
+    const body = JSON.stringify(bisectJob);
+    d('body', body);
+    const response = await fetch(url.toString(), {
+      body,
       headers: {
         Authorization: `Bearer ${this.authToken}`,
         'Content-Type': 'application/json',
@@ -51,27 +59,43 @@ export default class BrokerAPI {
       method: 'POST',
     });
 
-    return await res.text();
+    const { status, statusText } = response;
+    d('status', status, 'statusText', statusText);
+    const jobId = await response.text();
+    d('jobId', jobId);
+    return jobId;
   }
 
-  public stopJob(jobId: JobId): void {
+  public stopJob(jobId: JobId) {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     console.log('stopping job', { url });
   }
 
   public async getJob(jobId: JobId): Promise<Job> {
+    const d = debug(`${DebugPrefix}:getJob`);
+
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-    const res = await fetch(url.toString(), {
+    d('url', url);
+
+    const response = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${this.authToken}`,
       },
     });
-    return res.json();
+
+    const { status, statusText } = response;
+    d('status', status, 'statusText', statusText);
+
+    return response.json();
   }
 
   public async completeJob(jobId: JobId): Promise<void> {
+    const d = debug(`${DebugPrefix}:completeJob`);
+
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-    await fetch(url.toString(), {
+    d('url', url);
+
+    const response = await fetch(url.toString(), {
       body: JSON.stringify([
         { op: 'replace', path: '/bot_client_data', value: 'complete' },
       ]),
@@ -81,5 +105,8 @@ export default class BrokerAPI {
       },
       method: 'PATCH',
     });
+
+    const { status, statusText } = response;
+    d('status', status, 'statusText', statusText);
   }
 }

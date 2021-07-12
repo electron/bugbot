@@ -1,7 +1,7 @@
 # Broker Routes
 
 | Path | Method | Description |
-|---|---|---|---|
+|---|---|---|
 | [`/api/jobs/$job_id`](#apijobsjob_id-GET) | GET | Get a job's status. |
 | [`/api/jobs/$job_id/log`](#FIXME) | PUT | Append runner console.log lines. Called by the Runner. |
 | [`/api/jobs/$job_id`](#apijobsjob_id-PATCH) | PATCH | Modify a job (e.g. Runner claims a job or sets a result, Probot client changes bot_client_data) |
