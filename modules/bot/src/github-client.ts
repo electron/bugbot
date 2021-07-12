@@ -58,10 +58,18 @@ export class GithubClient {
     this.robot.on('issue_comment.edited', (ctx) => this.onIssueComment(ctx));
   }
 
-  private static isMaintainer(login: string): Promise<boolean> {
-    // TODO(erickzhao): add allowlist here
-    const maintainers = ['ckerr', 'clavin', 'erickzhao'];
-    return Promise.resolve(maintainers.includes(login));
+  // from https://github.com/electron/trop/blob/master/src/utils.ts
+  private async isAuthorizedUser(
+    context: Context<'issue_comment'>,
+    username: string,
+  ) {
+    const { data } = await context.octokit.repos.getCollaboratorPermissionLevel(
+      context.repo({
+        username,
+      }),
+    );
+
+    return ['admin', 'write'].includes(data.permission);
   }
 
   public async onIssueComment(
@@ -71,8 +79,8 @@ export class GithubClient {
     d('===> payload <===', JSON.stringify(context.payload));
 
     const { login } = context.payload.comment.user;
-    if (!(await GithubClient.isMaintainer(login))) {
-      d('not a maintainer; doing nothing');
+    if (!(await this.isAuthorizedUser(context, login))) {
+      d(`"${login}" is not a maintainer — doing nothing`);
       return;
     }
 
