@@ -10,7 +10,7 @@ import {
   JobId,
 } from '@electron/bugbot-shared/build/interfaces';
 
-import { FiddleInput } from './issue-parser';
+import { BisectCommand } from './issue-parser';
 
 const DebugPrefix = 'BrokerAPI';
 
@@ -32,15 +32,15 @@ export default class BrokerAPI {
     this.baseURL = props.baseURL;
   }
 
-  public async queueBisectJob(fiddle: FiddleInput): Promise<string> {
+  public async queueBisectJob(command: BisectCommand): Promise<string> {
     const d = debug(`${DebugPrefix}:queueBisectJob`);
 
     const url = new URL('/api/jobs', this.baseURL);
     d('url', url);
 
     const bisectJob: BisectJob = {
-      bisect_range: [fiddle.goodVersion, fiddle.badVersion],
-      gist: fiddle.gistId,
+      bisect_range: [command.goodVersion, command.badVersion],
+      gist: command.gistId,
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
