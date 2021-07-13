@@ -7,7 +7,7 @@ import { createProbot, Probot, ProbotOctokit } from 'probot';
 
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
-import payloadFixture from './fixtures/issue_comment.created.json';
+import payloadFixture from './fixtures/issue_comment.created.bisect.json';
 import { BisectJob, Result } from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
 
