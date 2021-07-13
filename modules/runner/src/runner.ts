@@ -145,10 +145,7 @@ export class Runner {
 
     this.stop();
     d('runner:start', `interval is ${this.pollIntervalMs}`);
-    this.pollInterval = setInterval(
-      () => this.pollSafely(),
-      this.pollIntervalMs,
-    );
+    this.pollInterval = setInterval(this.pollSafely, this.pollIntervalMs);
     this.pollSafely();
   }
 
@@ -160,14 +157,14 @@ export class Runner {
     d('runner:stop', 'interval cleared');
   }
 
-  public pollSafely(): void {
+  public pollSafely = (): void => {
     const d = debug(`${DebugPrefix}:pollSafely`);
-
     this.poll().catch((err) => d('error while polling broker:', inspect(err)));
-  }
+  };
 
   public async poll(): Promise<void> {
     const d = debug(`${DebugPrefix}:poll`);
+    d('polling', this.pollIntervalMs);
 
     const jobId = await this.pickNextJob();
     if (!jobId) return;
