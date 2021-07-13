@@ -4,6 +4,7 @@ import { URL } from 'url';
 import { inspect } from 'util';
 
 import {
+  Job,
   JobId,
   JobType,
   Result,
@@ -105,6 +106,8 @@ export class GithubClient {
         line,
         this.versions,
       );
+
+      // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
         promises.push(this.runBisectJob(cmd, context));
       }
@@ -133,12 +136,24 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
+    const completedJob = await this.pollAndReturnJob(jobId);
+    if (completedJob) {
+      await this.handleBisectResult(
+        completedJob.id,
+        completedJob.last,
+        context,
+      );
+    }
+  }
+
+  private async pollAndReturnJob(jobId: JobId) {
+    const d = debug('GitHubClient:pollJobId');
     // FIXME: this state info, such as the timer, needs to be a
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
     d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<Job | void>((resolve, reject) => {
       const pollBroker = async () => {
         if (this.isClosed) {
           return resolve();
@@ -151,34 +166,18 @@ export class GithubClient {
           setTimeout(pollBroker, this.pollIntervalMs);
         } else {
           d(`${jobId}: complete 🚀 `);
-
           try {
-            await this.handleBisectResult(jobId, job.last, context);
             await this.broker.completeJob(jobId);
+            return resolve(job);
           } catch (e) {
             return reject(e);
           }
-          return resolve();
         }
       };
 
       setTimeout(pollBroker, this.pollIntervalMs);
     });
   }
-
-  /*
-   * FIXME: this draft implementation needs to be completed
-   * const id = 'some-guid';
-   * let currentJob;
-   * try {
-   *   currentJob = await this.broker.getJob(id);
-   * } catch (e) {
-   *    // no-op
-   * }
-   * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-   *   this.broker.stopJob(id);
-   * } else if (action === actions.BISECT && !currentJob) {
-   */
 
   /**
    * Comments on the issue once a bisect operation is completed
