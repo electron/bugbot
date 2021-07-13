@@ -29,7 +29,7 @@ const DebugPrefix = 'runner' as const;
 
 class Task {
   private logTimer: ReturnType<typeof setTimeout>;
-  public readonly logBuffer: string[] = [];
+  private readonly logBuffer: string[] = [];
   public readonly timeBegun = Date.now();
 
   constructor(
