@@ -3,7 +3,11 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
-import { JobId, Result } from '@electron/bugbot-shared/build/interfaces';
+import {
+  JobId,
+  JobType,
+  Result,
+} from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import BrokerAPI from './broker-client';
@@ -101,7 +105,7 @@ export class GithubClient {
         line,
         this.versions,
       );
-      if (cmd?.type === 'bisect') {
+      if (cmd?.type === JobType.bisect) {
         promises.push(this.runBisectJob(cmd, context));
       }
     }
@@ -194,7 +198,7 @@ export class GithubClient {
 
     switch (result.status) {
       case 'success': {
-        const [a, b] = result.bisect_range;
+        const [a, b] = result.version_range as [string, string];
         paragraphs.push(
           `It looks like this bug was introduced between ${a} and ${b}`,
           `Commits between those versions: https://github.com/electron/electron/compare/v${a}...v${b}`,

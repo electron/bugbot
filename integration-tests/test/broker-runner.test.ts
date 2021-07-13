@@ -10,10 +10,12 @@ import { Runner } from '../../modules/runner/src/runner';
 
 import {
   BisectJob,
-  BisectRange,
   Current,
+  JobType,
   Platform,
   Result,
+  TestJob,
+  VersionRange,
 } from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60 * 1000);
@@ -35,7 +37,7 @@ describe('runner', () => {
     return brokerServer.start();
   }
 
-  function createRunner(opts: Record<string, any> = {}) {
+  function createRunner(opts: Record<string, unknown> = {}) {
     runner = new Runner({
       authToken,
       brokerUrl,
@@ -47,8 +49,8 @@ describe('runner', () => {
   }
 
   afterEach(async () => {
-    brokerServer.stop();
-    await runner.stop();
+    await brokerServer.stop();
+    runner.stop();
   });
 
   it('starts', async () => {
@@ -59,22 +61,36 @@ describe('runner', () => {
     expect(runner.platform).toBe(platform);
   });
 
-  async function runTask(task: Task) {
+  async function runTask(task: Task, runnerOpts: Record<string, any> = {}) {
     await startBroker();
     broker.addTask(task);
-    createRunner();
+    createRunner(runnerOpts);
     await runner.poll();
   }
 
-  function createBisectTask(opts: Partial<BisectJob> = {}) {
+  function createBisectTask(job: Partial<BisectJob> = {}) {
     return new Task({
-      bisect_range: ['10.0.0', '11.2.0'],
       gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
       history: [],
       id: mkuuid(),
+      platform,
       time_added: Date.now(),
-      type: 'bisect',
-      ...opts
+      type: JobType.bisect,
+      version_range: ['10.0.0', '11.2.0'],
+      ...job,
+    });
+  }
+
+  function createTestTask(job: Partial<TestJob> = {}) {
+    return new Task({
+      gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
+      history: [],
+      id: mkuuid(),
+      platform,
+      time_added: Date.now(),
+      type: JobType.test,
+      version: '10.0.0',
+      ...job,
     });
   }
 
@@ -117,7 +133,7 @@ describe('runner', () => {
   describe('handles successful bisection', () => {
     let task: Task;
 
-    const bisect_range: Readonly<BisectRange> = [
+    const version_range: Readonly<VersionRange> = [
       '11.0.0-nightly.20200724',
       '11.0.0-nightly.20200729',
     ];
@@ -132,14 +148,15 @@ describe('runner', () => {
 
     it('sets job.last', () => {
       const expected = {
-        bisect_range,
         runner: runner.uuid,
         status: 'success',
+        version_range,
       } as const;
+
       const { last } = task.job;
-      expect(last.bisect_range).toStrictEqual(expected.bisect_range);
       expect(last.runner).toBe(expected.runner);
       expect(last.status).toBe(expected.status);
+      expect(last.version_range).toStrictEqual(expected.version_range);
 
       const { time_begun, time_ended } = last;
       expect(time_begun).not.toBeNaN();
@@ -160,9 +177,80 @@ describe('runner', () => {
 
     it('includes the commit range to job.log', () => {
       const log = task.getRawLog();
-      const [a, b] = bisect_range;
+      const [a, b] = version_range;
       const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
       expect(log).toMatch(url);
+    });
+  });
+
+  describe('handles test that pass', () => {
+    let task: Task;
+
+    beforeAll(async () => {
+      task = createTestTask();
+      const { job } = task;
+      expect(job.last).toBeUndefined();
+      expect(job.history).toHaveLength(0);
+      await runTask(task);
+    });
+
+    it('sets job.last', () => {
+      const expected = {
+        runner: runner.uuid,
+        status: 'success',
+      } as const;
+
+      const { last } = task.job;
+      expect(last.runner).toBe(expected.runner);
+      expect(last.status).toBe(expected.status);
+
+      const { time_begun, time_ended } = last;
+      expect(time_begun).not.toBeNaN();
+      expect(time_begun).toBeGreaterThan(0);
+      expect(time_ended).not.toBeNaN();
+      expect(time_ended).toBeGreaterThanOrEqual(time_begun);
+    });
+  });
+
+  describe('handles tests that fail', () => {
+    let task: Task;
+
+    beforeAll(async () => {
+      task = createTestTask({ version: '11.0.2' });
+      const { job } = task;
+      expect(job.last).toBeUndefined();
+      expect(job.history).toHaveLength(0);
+      await runTask(task);
+    });
+
+    it('sets job.last', () => {
+      const expected = {
+        runner: runner.uuid,
+        status: 'failure',
+      } as const;
+
+      const { last } = task.job;
+      expect(last.runner).toBe(expected.runner);
+      expect(last.status).toBe(expected.status);
+
+      const { time_begun, time_ended } = last;
+      expect(time_begun).not.toBeNaN();
+      expect(time_begun).toBeGreaterThan(0);
+      expect(time_ended).not.toBeNaN();
+      expect(time_ended).toBeGreaterThanOrEqual(time_begun);
+    });
+  });
+
+  it('returns a system error if electron-fiddle cannot start', async () => {
+    const childTimeoutMs = 200;
+    const fiddleExec = '/dev/null';
+    const task = createTestTask();
+
+    await runTask(task, { childTimeoutMs, fiddleExec });
+    const { last } = task.job;
+    expect(last).toMatchObject({
+      error: expect.stringMatching(fiddleExec),
+      status: 'system_error',
     });
   });
 });

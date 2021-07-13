@@ -7,7 +7,14 @@ import { Operation as PatchOp } from 'fast-json-patch';
 import { URL, URLSearchParams } from 'url';
 import { v4 as mkuuid, validate as is_uuid } from 'uuid';
 
-import { Result, JobId } from '@electron/bugbot-shared/build/interfaces';
+import {
+  BisectJob,
+  JobId,
+  JobType,
+  Platform,
+  Result,
+  VersionRange,
+} from '@electron/bugbot-shared/build/interfaces';
 import { Auth, AuthScope } from '../src/auth';
 import { Server } from '../src/server';
 
@@ -120,15 +127,15 @@ describe('broker', () => {
     delete process.env.BUGBOT_AUTH_TOKEN;
   });
 
-  async function postNewBisectJob(params = {}) {
+  async function postNewBisectJob(params: Partial<BisectJob> = {}) {
     // fill in defaults for any missing required values
     params = {
-      bisect_range: ['10.0.0', '11.2.0'],
       gist: 'abbaabbaabbaabbaabbaabbaabbaabbaabbaabba',
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
-      type: 'bisect',
+      type: JobType.bisect,
+      version_range: ['10.0.0', '11.2.0'],
       ...params,
     };
 
@@ -179,37 +186,46 @@ describe('broker', () => {
       expect(is_uuid(id)).toBe(true);
     });
 
-    it(`rejects invalid job.bisect_range values`, async () => {
-      let bisect_range = ['10.0.0', 'Precise Pangolin'];
+    it(`rejects invalid job.version_range values`, async () => {
+      let version_range = ['10.0.0', 'Precise Pangolin'] as VersionRange;
       let body;
       let response;
-      ({ response, body } = await postNewBisectJob({ bisect_range }));
+      ({ response, body } = await postNewBisectJob({ version_range }));
       expect(response.status).toBe(422);
-      expect(body.includes('bisect_range'));
+      expect(body.includes('version_range'));
 
-      bisect_range = ['Precise Pangolin', '10.0.0'];
-      ({ response, body } = await postNewBisectJob({ bisect_range }));
+      version_range = ['Precise Pangolin', '10.0.0'];
+      ({ response, body } = await postNewBisectJob({ version_range }));
       expect(response.status).toBe(422);
-      expect(body.includes('bisect_range'));
+      expect(body.includes('version_range'));
     });
 
     it('rejects invalid job.platform values', async () => {
-      const unknown = 'android';
-      const { response, body } = await postNewBisectJob({ platform: unknown });
+      // cast away the type checking to force bad data in there
+      const platform = 'android' as Platform;
+      const params = { platform };
+
+      const { response, body } = await postNewBisectJob(params);
       expect(response.status).toBe(422);
-      expect(body.includes(unknown));
+      expect(body.includes(platform));
     });
 
     it('rejects invalid job.type values', async () => {
-      const unknown = 'gromify';
-      const { response, body } = await postNewBisectJob({ type: unknown });
+      // cast away the type checking to force bad data in there
+      const type = 'gromify' as JobType;
+      const params = { type } as Partial<BisectJob>;
+
+      const { response, body } = await postNewBisectJob(params);
       expect(response.status).toBe(422);
-      expect(body.includes(unknown));
+      expect(body.includes(type));
     });
 
     it('rejects properties that are unknown', async () => {
+      // cast away the type checking to force bad data in there
       const unknown = 'potrzebie';
-      const { response, body } = await postNewBisectJob({ [unknown]: unknown });
+      const params = { unknown } as Partial<BisectJob>;
+
+      const { response, body } = await postNewBisectJob(params);
       expect(response.status).toBe(422);
       expect(body.includes(unknown));
     });
@@ -218,7 +234,7 @@ describe('broker', () => {
       const gist = 'abcdabcdabcdabcdabcdabcdabcdabcdabcdabcd';
       const platform = 'linux';
       const required = ['gist', 'type'];
-      const type = 'bisect';
+      const type = JobType.bisect;
 
       for (const name of required) {
         const body = { gist, platform, type };
@@ -236,7 +252,7 @@ describe('broker', () => {
     const bot_client_data = Math.random().toString();
     const gist = 'fabaceae';
     const platform = 'linux';
-    const type = 'bisect';
+    const type = JobType.bisect;
     let id: string;
 
     beforeEach(async () => {
@@ -280,12 +296,12 @@ describe('broker', () => {
       expect(job.type).toBe(type);
     });
 
-    it('may include job.bisect_range', async () => {
+    it('may include job.version_range', async () => {
       const { body: job } = await getJob(id);
-      expect(Array.isArray(job.bisect_range)).toBe(true);
-      expect(job.bisect_range.length).toEqual(2);
-      expect(semver.valid(job.bisect_range[0])).toBeTruthy();
-      expect(semver.valid(job.bisect_range[1])).toBeTruthy();
+      expect(Array.isArray(job.version_range)).toBe(true);
+      expect(job.version_range.length).toEqual(2);
+      expect(semver.valid(job.version_range[0])).toBeTruthy();
+      expect(semver.valid(job.version_range[1])).toBeTruthy();
     });
 
     it('may include job.bot_client_data', async () => {
@@ -487,11 +503,11 @@ describe('broker', () => {
 
     it('patches object types', async () => {
       const result: Result = {
-        bisect_range: ['10.0.0', '10.0.1'],
         runner: mkuuid(),
         status: 'success',
         time_begun: Date.now(),
         time_ended: Date.now(),
+        version_range: ['10.0.0', '10.0.1'],
       };
       const response = await patchJob(id, etag, [
         { op: 'add', path: '/last', value: result },

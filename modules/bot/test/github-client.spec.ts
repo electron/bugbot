@@ -8,7 +8,11 @@ import { createProbot, Probot, ProbotOctokit } from 'probot';
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.bisect.json';
-import { BisectJob, Result } from '@electron/bugbot-shared/build/interfaces';
+import {
+  BisectJob,
+  JobType,
+  Result,
+} from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
 
 jest.mock('../src/broker-client');
@@ -87,20 +91,20 @@ describe('github-client', () => {
       });
       it('queues a bisect job and comments the result', async () => {
         const mockSuccess: Result = {
-          bisect_range: ['10.3.2', '10.4.0'],
           runner: 'my-runner-id',
           status: 'success',
           time_begun: 5,
           time_ended: 10,
+          version_range: ['10.3.2', '10.4.0'],
         };
         const id = 'my-job-id';
         const mockJobRunning: BisectJob = {
-          bisect_range: ['10.1.6', '11.0.2'],
           gist: 'my-gist-id',
           history: [],
           id,
           time_added: 5,
-          type: 'bisect',
+          type: JobType.bisect,
+          version_range: ['10.1.6', '11.0.2'],
         };
         const mockJobDone: BisectJob = {
           ...mockJobRunning,
@@ -142,10 +146,11 @@ describe('github-client', () => {
 
           // ...so we update it with the bisect info.
           .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
+            const [v1, v2] = mockSuccess.version_range;
             expect(body).toEqual(
-              `It looks like this bug was introduced between ${mockSuccess.bisect_range[0]} and ${mockSuccess.bisect_range[1]}\n` +
+              `It looks like this bug was introduced between ${v1} and ${v2}\n` +
                 '\n' +
-                `Commits between those versions: https://github.com/electron/electron/compare/v${mockSuccess.bisect_range[0]}...v${mockSuccess.bisect_range[1]}\n` +
+                `Commits between those versions: https://github.com/electron/electron/compare/v${v1}...v${v2}\n` +
                 '\n' +
                 `For more information, see ${process.env.BUGBOT_BROKER_URL}/log/${id}`,
             );
@@ -182,13 +187,13 @@ describe('github-client', () => {
           time_ended: 10,
         };
         const mockJob: BisectJob = {
-          bisect_range: ['10.1.6', '11.0.2'],
           gist: 'my-gist-id',
           history: [mockTestError],
           id: 'my-job-id',
           last: mockTestError,
           time_added: 5,
-          type: 'bisect',
+          type: JobType.bisect,
+          version_range: ['10.1.6', '11.0.2'],
         };
 
         mockQueueBisectJob.mockResolvedValueOnce(mockJob.id);

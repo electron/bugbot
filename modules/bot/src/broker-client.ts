@@ -8,6 +8,7 @@ import {
   BisectJob,
   Job,
   JobId,
+  JobType,
 } from '@electron/bugbot-shared/build/interfaces';
 
 import { BisectCommand } from './issue-parser';
@@ -39,12 +40,12 @@ export default class BrokerAPI {
     d('url', url);
 
     const bisectJob: BisectJob = {
-      bisect_range: [command.goodVersion, command.badVersion],
       gist: command.gistId,
       history: [],
       id: mkuuid(),
       time_added: Date.now(),
-      type: 'bisect',
+      type: JobType.bisect,
+      version_range: [command.goodVersion, command.badVersion],
     };
 
     const body = JSON.stringify(bisectJob);

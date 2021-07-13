@@ -145,6 +145,7 @@ export class Server {
     const d = debug(`${DebugPrefix}:postJob`);
     d('posting job', req.body);
     try {
+      d('%o', req.body);
       assertJob(req.body);
       const task = new Task(req.body);
       this.broker.addTask(task);

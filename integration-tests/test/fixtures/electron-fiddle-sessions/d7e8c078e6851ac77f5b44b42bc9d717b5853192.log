@@ -1,0 +1,12 @@
+Creating main window
+[10:31:23 PM] Console ready 🔬
+[10:31:23 PM] Task: Use Electron version 10.0.0
+(node:1188275) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+[10:31:28 PM] Task: Open fiddle "{"gistId":"8c5fc0c6a5153d49b5a4a56d3ed9da8f"}"
+[10:31:29 PM] Saving files to temp directory...
+[10:31:29 PM] Saved files to /tmp/tmp-1188275-cNX0CcYII6Hk
+[10:31:29 PM] Electron v10.0.0 started.
+[10:31:29 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[10:31:29 PM] test passed
+[10:31:29 PM] 
+[10:31:29 PM] Electron exited with code 0.
