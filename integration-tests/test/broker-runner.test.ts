@@ -81,6 +81,19 @@ describe('runner', () => {
     });
   }
 
+  function createTestTask(job: Partial<TestJob> = {}) {
+    return new Task({
+      gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
+      history: [],
+      id: mkuuid(),
+      platform,
+      time_added: Date.now(),
+      type: JobType.test,
+      version: '10.0.0',
+      ...job,
+    });
+  }
+
   describe('does not claim tasks', () => {
     async function expectTaskToNotChange(task: Task) {
       const takeSnapshot = (o: any) => JSON.stringify(o);
@@ -169,19 +182,6 @@ describe('runner', () => {
       expect(log).toMatch(url);
     });
   });
-
-  function createTestTask(job: Partial<TestJob> = {}) {
-    return new Task({
-      gist: '8c5fc0c6a5153d49b5a4a56d3ed9da8f',
-      history: [],
-      id: mkuuid(),
-      platform,
-      time_added: Date.now(),
-      type: JobType.test,
-      version: '10.0.0',
-      ...job,
-    });
-  }
 
   describe('handles test that pass', () => {
     let task: Task;
