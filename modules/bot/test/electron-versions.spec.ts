@@ -22,18 +22,20 @@ describe('electron-versions', () => {
   it.each([
     ['sorted', 'gets-the-supported-versions.json'],
     ['unsorted', 'gets-the-supported-versions-unsorted.json'],
-  ])('gets the supported versions when lite.json is %s', async (name, filename) => {
+  ])('gets the supported versions when data is %s', async (name, filename) => {
     mockFetch(filename);
     const electronVersions = new ElectronVersions();
     const versions = await electronVersions.getVersionsToTest();
     expect(versions).toStrictEqual([
       // two unsupported old versions
+      '8.0.0',
+      '8.5.5',
       '9.0.0',
       '9.4.4',
+
+      // four currently-supported versions
       '10.0.0',
       '10.4.7',
-
-      // all currently-supported versions
       '11.0.0',
       '11.4.9',
       '12.0.0',
@@ -55,12 +57,14 @@ describe('electron-versions', () => {
     const versions = await electronVersions.getVersionsToTest();
     expect(versions).toStrictEqual([
       // two unsupported old versions
+      '8.0.0',
+      '8.5.5',
       '9.0.0',
       '9.4.4',
+
+      // four currently-supported versions
       '10.0.0',
       '10.4.7',
-
-      // all currently-supported versions
       '11.0.0',
       '11.4.9',
       '12.0.0',

@@ -61,7 +61,9 @@ export class ElectronVersions {
 
     // Get the oldest and newest version of each branch we're testing.
     // If a branch has gone stable, skip its prereleases.
-    const SUPPORTED_MAJORS = 3; // https://www.electronjs.org/docs/tutorial/support
+
+    // const SUPPORTED_MAJORS = 3; // https://www.electronjs.org/docs/tutorial/support
+    const SUPPORTED_MAJORS = 4; // for rest of 2021. https://github.com/electron/electronjs.org/pull/5463
     const UNSUPPORTED_MAJORS_TO_TEST = 2;
     const NUM_STABLE_TO_TEST = SUPPORTED_MAJORS + UNSUPPORTED_MAJORS_TO_TEST;
     let stableLeft = NUM_STABLE_TO_TEST;
