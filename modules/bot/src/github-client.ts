@@ -105,6 +105,8 @@ export class GithubClient {
         line,
         this.versions,
       );
+
+      // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
         promises.push(this.runBisectJob(cmd, context));
       }
@@ -165,20 +167,6 @@ export class GithubClient {
       setTimeout(pollBroker, this.pollIntervalMs);
     });
   }
-
-  /*
-   * FIXME: this draft implementation needs to be completed
-   * const id = 'some-guid';
-   * let currentJob;
-   * try {
-   *   currentJob = await this.broker.getJob(id);
-   * } catch (e) {
-   *    // no-op
-   * }
-   * if (action === actions.STOP && currentJob && !currentJob.time_finished) {
-   *   this.broker.stopJob(id);
-   * } else if (action === actions.BISECT && !currentJob) {
-   */
 
   /**
    * Comments on the issue once a bisect operation is completed
