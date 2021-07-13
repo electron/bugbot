@@ -50,7 +50,7 @@ describe('runner', () => {
 
   afterEach(async () => {
     await brokerServer.stop();
-    await runner.stop();
+    runner.stop();
   });
 
   it('starts', async () => {
