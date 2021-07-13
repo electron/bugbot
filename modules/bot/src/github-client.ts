@@ -136,8 +136,14 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const result = await this.pollAndReturnJob(jobId);
-    if (result) await this.handleBisectResult(result.id, result.last, context);
+    const completedJob = await this.pollAndReturnJob(jobId);
+    if (completedJob) {
+      await this.handleBisectResult(
+        completedJob.id,
+        completedJob.last,
+        context,
+      );
+    }
   }
 
   private async pollAndReturnJob(jobId: JobId) {
