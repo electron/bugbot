@@ -136,22 +136,18 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    await this.pollJobId(jobId, async (job: Job) => {
-      await this.handleBisectResult(job.id, job.last, context);
-    });
+    const result = await this.pollAndReturnJob(jobId);
+    if (result) await this.handleBisectResult(result.id, result.last, context);
   }
 
-  private async pollJobId(
-    jobId: JobId,
-    completeCallback: (job: Job) => Promise<void>,
-  ) {
+  private async pollAndReturnJob(jobId: JobId) {
     const d = debug('GitHubClient:pollJobId');
     // FIXME: this state info, such as the timer, needs to be a
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
     d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<Job | void>((resolve, reject) => {
       const pollBroker = async () => {
         if (this.isClosed) {
           return resolve();
@@ -164,14 +160,12 @@ export class GithubClient {
           setTimeout(pollBroker, this.pollIntervalMs);
         } else {
           d(`${jobId}: complete 🚀 `);
-
           try {
-            await completeCallback(job);
             await this.broker.completeJob(jobId);
+            return resolve(job);
           } catch (e) {
             return reject(e);
           }
-          return resolve();
         }
       };
 
