@@ -28,14 +28,29 @@ const VersionPredicate = ow.string.is((str) => {
   return true;
 });
 
+// copied from electron-fiddle
+function electronSemVerCompare(a: semver.SemVer, b: semver.SemVer) {
+  const l = a.compareMain(b);
+  if (l) return l;
+  // Electron's approach is nightly -> other prerelease tags -> stable,
+  // so force `nightly` to sort before other prerelease tags.
+  const [prea] = a.prerelease;
+  const [preb] = b.prerelease;
+  if (prea === 'nightly' && preb !== 'nightly') return -1;
+  if (prea !== 'nightly' && preb === 'nightly') return 1;
+  return a.comparePre(b);
+}
+
 export type VersionRange = [Version, Version];
 const VersionRangePredicate = ow.array
   .ofType(VersionPredicate)
   .length(2)
-  .is((arr) => {
-    const [v1, v2] = arr;
-    if (semver.gte(v1, v2)) return `expected ${v1} to be less than ${v2}`;
-    return true;
+  .is((versions) => {
+    const sems = versions.map((version) => semver.parse(version));
+    const [v1, v2] = sems;
+    return electronSemVerCompare(v1, v2) < 0
+      ? true
+      : `expected ${v1.version} to be less than ${v2.version}`;
   });
 
 ///
