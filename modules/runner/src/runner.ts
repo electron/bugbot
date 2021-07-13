@@ -201,7 +201,7 @@ export class Runner {
 
     const idx = randomInt(0, ids.length);
     const [id] = ids.splice(idx, 1);
-    d('jobs %o picked %s', ids, id);
+    d('picked job %s, jobs remaining %o', id, ids);
     return id;
   }
 
