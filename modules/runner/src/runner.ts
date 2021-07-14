@@ -35,6 +35,7 @@ class Task {
   constructor(
     public readonly job: Job,
     public etag: string,
+    public runner: string,
     private readonly authToken: string,
     private readonly brokerUrl: string,
     private readonly logIntervalMs: number,
@@ -70,7 +71,7 @@ class Task {
     }
   }
 
-  public async sendPatch(patches: Readonly<PatchOp>[]) {
+  private async sendPatch(patches: Readonly<PatchOp>[]) {
     const d = debug(`${DebugPrefix}:sendPatch`);
     d('task: %O', this);
     d('patches: %O', patches);
@@ -91,6 +92,29 @@ class Task {
     const etag = resp.headers.get('etag');
     if (!etag) throw new Error('missing etag in broker job response');
     this.etag = etag;
+  }
+
+  public sendResult(resultIn: Partial<Result>): Promise<void> {
+    const result: Partial<Result> = {
+      runner: this.runner,
+      status: 'system_error',
+      time_begun: this.timeBegun,
+      time_ended: Date.now(),
+      ...resultIn,
+    };
+    return this.sendPatch([
+      { op: 'add', path: '/history/-', value: result },
+      { op: 'replace', path: '/last', value: result },
+      { op: 'remove', path: '/current' },
+    ]);
+  }
+
+  public async claimForRunner(): Promise<void> {
+    const current: Current = {
+      runner: this.runner,
+      time_begun: this.timeBegun,
+    };
+    await this.sendPatch([{ op: 'replace', path: '/current', value: current }]);
   }
 }
 
@@ -171,22 +195,21 @@ export class Runner {
 
     // Claim the job
     const task = await this.fetchTask(jobId);
-    const current: Current = {
-      runner: this.uuid,
-      time_begun: task.timeBegun,
-    };
-    await task.sendPatch([{ op: 'replace', path: '/current', value: current }]);
+    await task.claimForRunner();
+
+    let result: Partial<Result>;
 
     switch (task.job.type) {
       case JobType.bisect:
-        await this.runBisect(task);
+        result = await this.runBisect(task);
         break;
 
       case JobType.test:
-        await this.runTest(task);
+        result = await this.runTest(task);
         break;
     }
 
+    await task.sendResult(result);
     d('runner:poll done');
   }
 
@@ -249,25 +272,11 @@ export class Runner {
     return new Task(
       job,
       etag,
+      this.uuid,
       this.authToken,
       this.brokerUrl,
       this.logIntervalMs,
     );
-  }
-
-  private patchResult(task: Task, resultIn: Partial<Result>): Promise<void> {
-    const result: Result = {
-      runner: this.uuid,
-      status: 'system_error',
-      time_begun: task.timeBegun,
-      time_ended: Date.now(),
-      ...resultIn,
-    };
-    return task.sendPatch([
-      { op: 'add', path: '/history/-', value: result },
-      { op: 'replace', path: '/last', value: result },
-      { op: 'remove', path: '/current' },
-    ]);
   }
 
   private async runBisect(task: Task) {
@@ -298,9 +307,8 @@ export class Runner {
       d('fiddle bisect parse error: %O', parseErr);
       result.status = 'system_error';
       result.error = parseErr.toString();
-    } finally {
-      await this.patchResult(task, result);
     }
+    return result;
   }
 
   private async runTest(task: Task) {
@@ -326,7 +334,7 @@ export class Runner {
       result.status = 'test_error';
       result.error = 'Electron Fiddle was unable to complete the test.';
     }
-    await this.patchResult(task, result);
+    return result;
   }
 
   private async runFiddle(
