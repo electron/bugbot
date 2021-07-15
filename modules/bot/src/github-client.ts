@@ -17,6 +17,7 @@ import { BisectCommand, parseIssueCommand } from './issue-parser';
 import { ElectronVersions } from './electron-versions';
 
 const AppName = 'BugBot' as const;
+const DebugPrefix = 'GitHubClient' as const;
 
 export class GithubClient {
   private isClosed = false;
@@ -32,7 +33,7 @@ export class GithubClient {
     pollIntervalMs: number;
     robot: Probot;
   }) {
-    const d = debug('GithubClient:constructor');
+    const d = debug(`${DebugPrefix}:constructor`);
 
     Object.assign(this, opts);
     d('brokerBaseUrl', this.brokerBaseUrl);
@@ -49,7 +50,7 @@ export class GithubClient {
   }
 
   private listenToRobot() {
-    const d = debug('GithubClient:listenToRobot');
+    const d = debug(`${DebugPrefix}:listenToRobot`);
 
     const debugContext = (context) => d(context.name, inspect(context.payload));
     this.robot.onAny(debugContext);
@@ -80,7 +81,7 @@ export class GithubClient {
   public async onIssueComment(
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug('GithubClient:onIssueCommentCreated');
+    const d = debug(`${DebugPrefix}:onIssueCommentCreated`);
     d('===> payload <===', JSON.stringify(context.payload));
 
     const { login } = context.payload.comment.user;
@@ -120,7 +121,7 @@ export class GithubClient {
     bisectCmd: BisectCommand,
     context: Context<'issue_comment'>,
   ) {
-    const d = debug('GithubClient:runBisectJob');
+    const d = debug(`${DebugPrefix}:runBisectJob`);
 
     d(`Updating GitHub issue id ${context.payload.issue.id}`);
     const promises: Promise<unknown>[] = [];
@@ -147,7 +148,7 @@ export class GithubClient {
   }
 
   private async pollAndReturnJob(jobId: JobId) {
-    const d = debug('GitHubClient:pollJobId');
+    const d = debug(`${DebugPrefix}:pollJobId`);
     // FIXME: this state info, such as the timer, needs to be a
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
@@ -189,7 +190,7 @@ export class GithubClient {
     result: Result,
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug('GitHubClient:commentBisectResult');
+    const d = debug(`${DebugPrefix}:commentBisectResult`);
     const add_labels = new Set<string>();
     const del_labels = new Set<string>([Labels.BugBot.Running]);
     const paragraphs: string[] = [];
