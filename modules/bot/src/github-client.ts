@@ -81,7 +81,7 @@ export class GithubClient {
   public async onIssueComment(
     context: Context<'issue_comment'>,
   ): Promise<void> {
-    const d = debug(`${DebugPrefix}:onIssueCommentCreated`);
+    const d = debug(`${DebugPrefix}:onIssueComment`);
     d('===> payload <===', JSON.stringify(context.payload));
 
     const { login } = context.payload.comment.user;
