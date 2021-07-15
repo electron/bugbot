@@ -148,7 +148,7 @@ export class GithubClient {
   }
 
   private async pollAndReturnJob(jobId: JobId) {
-    const d = debug(`${DebugPrefix}:pollJobId`);
+    const d = debug(`${DebugPrefix}:pollAndReturnJob`);
     // FIXME: this state info, such as the timer, needs to be a
     // class property so that '/test stop' could stop the polling.
     // Poll until the job is complete
