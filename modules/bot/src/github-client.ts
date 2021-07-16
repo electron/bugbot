@@ -357,14 +357,14 @@ export class GithubClient {
     const issueId = context.payload.issue.id;
     const commentId = await this.findIssueCommentId(context);
     if (commentId) {
-      d('updating issue ${issueId} comment ${commentId}: %s', body);
+      d(`updating issue ${issueId} comment ${commentId}: %s`, body);
       await context.octokit.issues.updateComment({
         ...issue,
         body,
         comment_id: commentId,
       });
     } else {
-      d('creating new comment in issue ${issueId}: %s', body);
+      d(`creating new comment in issue ${issueId}: %s`, body);
       const response = await context.octokit.issues.createComment({
         ...issue,
         body,
