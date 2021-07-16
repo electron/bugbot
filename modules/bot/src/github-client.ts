@@ -163,10 +163,13 @@ export class GithubClient {
     const matrix: Matrix = {};
     const queueJobPromises: Promise<string>[] = [];
 
-    for (const p of command.platforms.slice(0, 2)) {
-      matrix[p] = matrix[p] || {};
-      for (const v of command.versions.slice(0, 1)) {
-        matrix[p][v] = matrix[p][v] || undefined;
+    for (const p of command.platforms) {
+      matrix[p] = {};
+      for (const v of command.versions) {
+        // this is important because we need the version keys
+        // to always be present for the table generator code
+        matrix[p][v] = undefined;
+
         const promise = this.broker.queueTestJob({
           gistId: command.gistId,
           platforms: [p],
@@ -180,7 +183,7 @@ export class GithubClient {
 
     const ids = await Promise.all(queueJobPromises);
 
-    d('All jobs queued: %o', ids);
+    d(`All ${ids.length} jobs queued: %o`, ids);
 
     for (const id of ids) {
       const promise = this.pollAndReturnJob(id).then((job: TestJob) => {
