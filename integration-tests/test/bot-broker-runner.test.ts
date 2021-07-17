@@ -158,18 +158,20 @@ describe('bot-broker-runner', () => {
 
     const tasks = broker.getTasks();
     expect(tasks.length).toBe(1);
-    const result = expect.objectContaining({
-      status: 'success',
-      version_range: ['10.3.2', '10.4.0'],
-    });
-    expect(tasks[0]).toMatchObject({
-      job: expect.objectContaining({
+    expect(tasks).toMatchObject([{
+      job: {
         gist: '59444f92bffd5730944a0de6d85067fd',
-        history: [result],
+        history: [{
+          status: 'success',
+          version_range: ['10.3.2', '10.4.0'],
+        }],
+        last: {
+          status: 'success',
+          version_range: ['10.3.2', '10.4.0'],
+        },
         type: 'bisect',
         version_range: ['10.1.6', '11.0.2'],
-        last: result,
-      })
-    });
+      }
+    }]);
   });
 });
