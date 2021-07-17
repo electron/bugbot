@@ -16,15 +16,6 @@ import { BisectCommand, TestCommand } from './issue-parser';
 
 const DebugPrefix = 'bot:BrokerAPI';
 
-export class APIError extends Error {
-  public res: Response;
-
-  constructor(res: Response, message: string) {
-    super(message);
-    this.res = res;
-  }
-}
-
 export default class BrokerAPI {
   private readonly authToken: string;
   private readonly baseURL: string;
