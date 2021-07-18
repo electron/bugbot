@@ -238,7 +238,7 @@ export class GithubClient {
   ) {
     const d = debug(`${DebugPrefix}:handleTestResult`);
     d({ job });
-    const table = generateTable(matrix);
+    const table = generateTable(matrix, this.brokerBaseUrl);
     await this.setIssueComment(table, context);
   }
 
