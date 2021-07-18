@@ -18,7 +18,6 @@ class LogSection {
 }
 
 export class Task {
-  public etag: string;
   public readonly job: Job;
   public readonly log: LogSection[] = [];
 
