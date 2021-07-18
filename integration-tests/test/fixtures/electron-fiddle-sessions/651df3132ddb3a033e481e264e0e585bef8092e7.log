@@ -1,18 +1,20 @@
 Creating main window
-[10:36:03 PM] Console ready 🔬
-[10:36:04 PM] Task: Use Electron version 11.0.2
-(node:1191615) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
-[10:36:10 PM] Task: Open fiddle "{"gistId":"8c5fc0c6a5153d49b5a4a56d3ed9da8f"}"
-[10:36:10 PM] Saving files to temp directory...
-[10:36:10 PM] Saved files to /tmp/tmp-1191615-3O1Lyp0OQcDs
-[10:36:10 PM] Electron v11.0.2 started.
-[10:36:11 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
-[10:36:11 PM] test failed
-[10:36:11 PM] Error: test failed
-    at Object.done (/tmp/tmp-1191615-3O1Lyp0OQcDs/preload.js:11:32)
-    at Object.fail (/tmp/tmp-1191615-3O1Lyp0OQcDs/preload.js:9:27)
-    at file:///tmp/tmp-1191615-3O1Lyp0OQcDs/renderer.js:17:8
+libva error: vaGetDriverNameByIndex() failed with unknown libva error, driver_name = (null)
+[8:23:54 PM] Console ready 🔬
+[8:23:54 PM] Task: Use Electron version 11.0.2
+(node:283201) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `exe --trace-deprecation ...` to show where the warning was created)
+[8:24:00 PM] Task: Open fiddle "{"gistId":"8c5fc0c6a5153d49b5a4a56d3ed9da8f"}"
+[8:24:00 PM] Saving files to temp directory...
+[8:24:00 PM] Saved files to /tmp/tmp-283201-soVulATJfEOq
+[8:24:00 PM] Electron v11.0.2 started.
+[8:24:00 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[8:24:00 PM] test failed
+[8:24:00 PM] Error: test failed
+    at Object.done (/tmp/tmp-283201-soVulATJfEOq/preload.js:11:32)
+    at Object.fail (/tmp/tmp-283201-soVulATJfEOq/preload.js:9:27)
+    at file:///tmp/tmp-283201-soVulATJfEOq/renderer.js:17:8
 TypeError: remote.screen.getPrimaryDisplay is not a function
-    at file:///tmp/tmp-1191615-3O1Lyp0OQcDs/renderer.js:11:40
-[10:36:11 PM] 
-[10:36:11 PM] Electron exited with code 1.
+    at file:///tmp/tmp-283201-soVulATJfEOq/renderer.js:11:40
+[8:24:00 PM] 
+[8:24:00 PM] Electron exited with code 1.

@@ -62,7 +62,7 @@ export default class BrokerAPI {
     const d = debug(`${DebugPrefix}:queueTestJob`);
 
     const url = new URL('/api/jobs', this.baseURL);
-    d('url', url);
+    d('queueing test command via %s', url);
 
     // FIXME(any): We should add a separate type here so that we can
     // pass in a single version and platform to this function

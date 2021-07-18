@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import nock, { Scope } from 'nock';
 import { URL } from 'url';
@@ -13,8 +14,6 @@ import { Server as BrokerServer } from '../../modules/broker/src/server';
 import { Labels } from '../../modules/bot/src/github-labels';
 import { Task } from '../../modules/broker/src/task';
 
-import bisectPayloadFixture from './../../modules/bot/test/fixtures/issue_comment.created.bisect.json';
-
 import {
   BisectJob,
   Current,
@@ -28,6 +27,7 @@ import {
 jest.setTimeout(60 * 1000);
 
 describe('bot-broker-runner', () => {
+  const fixtureDir = path.resolve(__dirname, 'fixtures', 'api.github.com');
   const brokerUrl = `http://localhost:43493` as const; // arbitrary port
   const pollIntervalMs = 10;
 
@@ -112,7 +112,7 @@ describe('bot-broker-runner', () => {
     nock.enableNetConnect();
 
     // shut down the runners
-    runners.forEach((runner) => runner.stop());
+    await Promise.all([...runners.values()].map((runner) => runner.stop()));
     runners.clear();
 
     // shut down the broker
@@ -131,7 +131,7 @@ describe('bot-broker-runner', () => {
   });
 
 
-  it('queues a bisect', async () => {
+  it('bisects', async () => {
     const botCommentId = 1 as const;
     const issueNumber = 10 as const;
     const projectPath = '/repos/erickzhao/bugbot' as const;
@@ -147,13 +147,13 @@ describe('bot-broker-runner', () => {
       .delete(`${issuePath}/labels/bugbot%2Ftest-running`).reply(200)
       // ... task runs...
       .post(`${issuePath}/labels`).reply(200)
-      // .get(`${issuePath}/comments?per_page=100`).reply(200, [botComment]) // Now, the comment from above should exist...
       .patch(`${projectPath}/issues/comments/${botCommentId}`).reply(200); // update the comment
 
     await startWithDefaults();
+    const filename = path.join(fixtureDir, 'issue_comment.created.bisect.json');
     await robot.receive({
       name: 'issue_comment',
-      payload: bisectPayloadFixture,
+      payload: JSON.parse(fs.readFileSync(filename, { encoding: 'utf8' })),
     } as any);
 
     const tasks = broker.getTasks();
@@ -172,6 +172,54 @@ describe('bot-broker-runner', () => {
         type: 'bisect',
         version_range: ['10.1.6', '11.0.2'],
       }
+    }]);
+  });
+
+  it('tests', async () => {
+    const botCommentId = 1 as const;
+    const issueNumber = 10 as const;
+    const projectPath = '/repos/erickzhao/bugbot' as const;
+    const issuePath = `${projectPath}/issues/${issueNumber}` as const;
+    const botComment = { id: botCommentId, user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` } };
+
+    ghNockScope = nock('https://api.github.com');
+    ghNockScope
+      // should we respond to this comment? yes, it's from an admin
+      .get(`${projectPath}/collaborators/erickzhao/permission`)
+      .reply(200, { permission: 'admin' })
+      // looking for any existing comment already posted by the bot...
+      .get(`${issuePath}/comments?per_page=100`).reply(200, [])
+      // nope; so no comment yet, so create one
+      .post(`${issuePath}/comments`).reply(200, { id: botCommentId })
+      // and when the test is finished, update the comment
+      .patch(`${projectPath}/issues/comments/${botCommentId}`).reply(200);
+
+    const filename = path.join(fixtureDir, 'issue_comment.created.test.json');
+    await startWithDefaults();
+    await robot.receive({
+      name: 'issue_comment',
+      payload: JSON.parse(fs.readFileSync(filename, { encoding: 'utf8' })),
+    } as any);
+
+    const tasks = broker.getTasks();
+    expect(tasks.length).toBe(1);
+    expect(tasks).toMatchObject([{
+      job: {
+        gist: '59444f92bffd5730944a0de6d85067fd',
+        history: [
+          {
+            status: 'failure',
+            error: 'The test ran and failed.',
+          },
+        ],
+        type: 'test',
+        version: '12.0.0',
+        platform: 'linux',
+        last: {
+          status: 'failure',
+          error: 'The test ran and failed.',
+        },
+      },
     }]);
   });
 });
