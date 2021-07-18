@@ -72,6 +72,9 @@ class Task {
     }
   }
 
+  /**
+   * @returns {boolean} success / failure (response.ok)
+   */
   private async sendPatch(patches: Readonly<PatchOp>[]): Promise<boolean> {
     const d = debug(`${this.DebugPrefix}:sendPatch`);
     d('task: %O', this);
@@ -89,15 +92,17 @@ class Task {
       method: 'PATCH',
     });
     d('broker response:', response.status, response.statusText);
+    const { headers, ok } = response;
 
-    // if we got an etag, keep the etag for later
-    if (response.ok && response.headers.has('etag')) {
-      this.etag = response.headers.get('etag');
-    }
+    // if we got an etag, keep it
+    if (ok && headers.has('etag')) this.etag = headers.get('etag');
 
-    return response.ok;
+    return ok;
   }
 
+  /**
+   * @returns {boolean} success / failure (response.ok)
+   */
   public sendResult(resultIn: Partial<Result>): Promise<boolean> {
     const result: Partial<Result> = {
       runner: this.runner,
@@ -113,6 +118,9 @@ class Task {
     ]);
   }
 
+  /**
+   * @returns {boolean} success / failure (response.ok)
+   */
   public claimForRunner(): Promise<boolean> {
     const current: Current = {
       runner: this.runner,
