@@ -241,9 +241,9 @@ export class Runner {
       // pick one at random
       const idx = randomInt(0, ids.length);
       const [id] = ids.splice(idx, 1);
-      d('claiming job %s, jobs remaining %o', id, ids);
 
       // try to claim it
+      d('claiming job %s, jobs remaining %o', id, ids);
       task = await this.fetchTask(id); // get the etag
       if (await task.claimForRunner()) jobId = id;
     }
