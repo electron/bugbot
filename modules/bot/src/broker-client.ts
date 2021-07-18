@@ -1,5 +1,5 @@
 import debug from 'debug';
-import fetch, { Response } from 'node-fetch';
+import fetch from 'node-fetch';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
