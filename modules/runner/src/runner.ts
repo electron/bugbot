@@ -236,22 +236,16 @@ export class Runner {
     let jobId: JobId;
     let task: Task;
     const ids = await this.fetchAvailableJobIds();
-    while (ids.length > 0) {
+    d('available jobs: %o', ids);
+    while (!jobId && ids.length > 0) {
       // pick one at random
       const idx = randomInt(0, ids.length);
       const [id] = ids.splice(idx, 1);
       d('claiming job %s, jobs remaining %o', id, ids);
 
       // try to claim it
-      task = await this.fetchTask(id);
-      const claimed = await task.claimForRunner();
-      if (claimed) {
-        d('claimed %s', jobId);
-        jobId = id;
-        break;
-      }
-
-      d(`unable to claim ${id}... ${ids.length} jobs left in list`);
+      task = await this.fetchTask(id); // get the etag
+      if (await task.claimForRunner()) jobId = id;
     }
     d('jobId %s task %o', jobId, task);
     if (!jobId) return;
