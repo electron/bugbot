@@ -1,0 +1,125 @@
+Creating main window
+electron-fiddle started
+   argv: ["/usr/lib/electron-fiddle/electron-fiddle","bisect","10.1.6","11.0.2","--fiddle","59444f92bffd5730944a0de6d85067fd","--full","--log-config"]
+   date: Sun Jul 18 2021 13:02:09 GMT-0500 (Central Daylight Time)
+   platform: linux
+   version: 0.25.2
+libva error: vaGetDriverNameByIndex() failed with unknown libva error, driver_name = (null)
+[1:02:09 PM] Console ready 🔬
+[1:02:10 PM] Task: Show channels Beta, Nightly, Stable
+[1:02:10 PM] Task: Open fiddle "{"gistId":"59444f92bffd5730944a0de6d85067fd"}"
+[1:02:10 PM] Task: Bisect  [10.1.6, 10.1.7, 10.2.0, 10.3.0, 10.3.1, 10.3.2, 10.4.0, 10.4.1, 10.4.2, 10.4.3, 10.4.4, 10.4.5, 10.4.6, 10.4.7, 11.0.0-nightly.20200525, 11.0.0-nightly.20200526, 11.0.0-nightly.20200529, 11.0.0-nightly.20200602, 11.0.0-nightly.20200603, 11.0.0-nightly.20200604, 11.0.0-nightly.20200609, 11.0.0-nightly.20200610, 11.0.0-nightly.20200611, 11.0.0-nightly.20200615, 11.0.0-nightly.20200616, 11.0.0-nightly.20200617, 11.0.0-nightly.20200618, 11.0.0-nightly.20200619, 11.0.0-nightly.20200701, 11.0.0-nightly.20200702, 11.0.0-nightly.20200703, 11.0.0-nightly.20200706, 11.0.0-nightly.20200707, 11.0.0-nightly.20200708, 11.0.0-nightly.20200709, 11.0.0-nightly.20200716, 11.0.0-nightly.20200717, 11.0.0-nightly.20200720, 11.0.0-nightly.20200721, 11.0.0-nightly.20200723, 11.0.0-nightly.20200724, 11.0.0-nightly.20200729, 11.0.0-nightly.20200730, 11.0.0-nightly.20200731, 11.0.0-nightly.20200803, 11.0.0-nightly.20200804, 11.0.0-nightly.20200805, 11.0.0-nightly.20200811, 11.0.0-nightly.20200812, 11.0.0-nightly.20200822, 11.0.0-nightly.20200824, 11.0.0-nightly.20200825, 11.0.0-nightly.20200826, 11.0.0-beta.1, 11.0.0-beta.3, 11.0.0-beta.4, 11.0.0-beta.5, 11.0.0-beta.6, 11.0.0-beta.7, 11.0.0-beta.8, 11.0.0-beta.9, 11.0.0-beta.11, 11.0.0-beta.12, 11.0.0-beta.13, 11.0.0-beta.16, 11.0.0-beta.17, 11.0.0-beta.18, 11.0.0-beta.19, 11.0.0-beta.20, 11.0.0-beta.22, 11.0.0-beta.23, 11.0.0, 11.0.1, 11.0.2]
+[1:02:10 PM] Runner: autobisect Electron 11.0.0-nightly.20200717 - setting version
+(node:811383) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `exe --trace-deprecation ...` to show where the warning was created)
+[1:02:12 PM] Runner: autobisect Electron 11.0.0-nightly.20200717 - starting test
+[1:02:12 PM] Saving files to temp directory...
+[1:02:12 PM] Saved files to /tmp/tmp-811383-iVNFyzxFPFWh
+[1:02:12 PM] Electron v11.0.0-nightly.20200717 started.
+[1:02:12 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[1:02:12 PM] (node:811453) electron: The default of contextIsolation is deprecated and will be changing from false to true in a future release of Electron.  See https://github.com/electron/electron/issues/23506 for more information
+[1:02:12 PM] test failed
+[1:02:12 PM] Error: test failed
+    at Object.done (/tmp/tmp-811383-iVNFyzxFPFWh/preload.js:11:32)
+    at Object.fail (/tmp/tmp-811383-iVNFyzxFPFWh/preload.js:9:27)
+    at Object.assert (/tmp/tmp-811383-iVNFyzxFPFWh/preload.js:7:19)
+    at Object.<anonymous> (/tmp/tmp-811383-iVNFyzxFPFWh/preload.js:24:8)
+    at Object.<anonymous> (/tmp/tmp-811383-iVNFyzxFPFWh/preload.js:31:3)
+    at Module._compile (internal/modules/cjs/loader.js:1150:30)
+    at Object.Module._extensions..js (internal/modules/cjs/loader.js:1171:10)
+    at Module.load (internal/modules/cjs/loader.js:990:32)
+    at Module._load (internal/modules/cjs/loader.js:883:14)
+    at Function.f._load (electron/js2c/asar_bundle.js:5:12552)
+[1:02:12 PM] 
+[1:02:12 PM] Electron exited with code 1.
+[1:02:12 PM] Runner: autobisect Electron 11.0.0-nightly.20200717 - finished test ❌ failed
+[1:02:12 PM] Runner: autobisect Electron 11.0.0-nightly.20200603 - setting version
+[1:02:13 PM] Runner: autobisect Electron 11.0.0-nightly.20200603 - starting test
+[1:02:13 PM] Saving files to temp directory...
+[1:02:13 PM] Saved files to /tmp/tmp-811383-rXUnDTg0jf3P
+[1:02:13 PM] Electron v11.0.0-nightly.20200603 started.
+[1:02:13 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[1:02:14 PM] test failed
+[1:02:14 PM] Error: test failed
+    at Object.done (/tmp/tmp-811383-rXUnDTg0jf3P/preload.js:11:32)
+    at Object.fail (/tmp/tmp-811383-rXUnDTg0jf3P/preload.js:9:27)
+    at Object.assert (/tmp/tmp-811383-rXUnDTg0jf3P/preload.js:7:19)
+    at Object.<anonymous> (/tmp/tmp-811383-rXUnDTg0jf3P/preload.js:24:8)
+    at Object.<anonymous> (/tmp/tmp-811383-rXUnDTg0jf3P/preload.js:31:3)
+    at Module._compile (internal/modules/cjs/loader.js:1145:30)
+    at Object.Module._extensions..js (internal/modules/cjs/loader.js:1166:10)
+    at Module.load (internal/modules/cjs/loader.js:981:32)
+    at Module._load (internal/modules/cjs/loader.js:881:14)
+    at Function.Module._load (electron/js2c/asar.js:738:28)
+[1:02:14 PM] 
+[1:02:14 PM] Electron exited with code 1.
+[1:02:14 PM] Runner: autobisect Electron 11.0.0-nightly.20200603 - finished test ❌ failed
+[1:02:14 PM] Runner: autobisect Electron 10.4.3 - setting version
+[1:02:15 PM] Runner: autobisect Electron 10.4.3 - starting test
+[1:02:15 PM] Saving files to temp directory...
+[1:02:15 PM] Saved files to /tmp/tmp-811383-fS7uumd3PTgW
+[1:02:15 PM] Electron v10.4.3 started.
+[1:02:15 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[1:02:15 PM] test failed
+[1:02:15 PM] Error: test failed
+    at Object.done (/tmp/tmp-811383-fS7uumd3PTgW/preload.js:11:32)
+    at Object.fail (/tmp/tmp-811383-fS7uumd3PTgW/preload.js:9:27)
+    at Object.assert (/tmp/tmp-811383-fS7uumd3PTgW/preload.js:7:19)
+    at Object.<anonymous> (/tmp/tmp-811383-fS7uumd3PTgW/preload.js:25:8)
+    at Object.<anonymous> (/tmp/tmp-811383-fS7uumd3PTgW/preload.js:31:3)
+    at Module._compile (internal/modules/cjs/loader.js:1145:30)
+    at Object.Module._extensions..js (internal/modules/cjs/loader.js:1166:10)
+    at Module.load (internal/modules/cjs/loader.js:981:32)
+    at Module._load (internal/modules/cjs/loader.js:881:14)
+    at Function.Module._load (electron/js2c/asar.js:779:28)
+[1:02:15 PM] 
+[1:02:15 PM] Electron exited with code 1.
+[1:02:15 PM] Runner: autobisect Electron 10.4.3 - finished test ❌ failed
+[1:02:15 PM] Runner: autobisect Electron 10.3.1 - setting version
+[1:02:16 PM] Runner: autobisect Electron 10.3.1 - starting test
+[1:02:16 PM] Saving files to temp directory...
+[1:02:16 PM] Saved files to /tmp/tmp-811383-huA9QQq8iS8g
+[1:02:16 PM] Electron v10.3.1 started.
+[1:02:17 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[1:02:17 PM] test passed
+[1:02:17 PM] 
+[1:02:17 PM] Electron exited with code 0.
+[1:02:17 PM] Runner: autobisect Electron 10.3.1 - finished test ✅ passed
+[1:02:17 PM] Runner: autobisect Electron 10.4.0 - setting version
+[1:02:18 PM] Runner: autobisect Electron 10.4.0 - starting test
+[1:02:18 PM] Saving files to temp directory...
+[1:02:18 PM] Saved files to /tmp/tmp-811383-5Kbrr044dvxh
+[1:02:18 PM] Electron v10.4.0 started.
+[1:02:18 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[1:02:18 PM] test failed
+[1:02:18 PM] Error: test failed
+    at Object.done (/tmp/tmp-811383-5Kbrr044dvxh/preload.js:11:32)
+    at Object.fail (/tmp/tmp-811383-5Kbrr044dvxh/preload.js:9:27)
+    at Object.assert (/tmp/tmp-811383-5Kbrr044dvxh/preload.js:7:19)
+    at Object.<anonymous> (/tmp/tmp-811383-5Kbrr044dvxh/preload.js:25:8)
+    at Object.<anonymous> (/tmp/tmp-811383-5Kbrr044dvxh/preload.js:31:3)
+    at Module._compile (internal/modules/cjs/loader.js:1145:30)
+    at Object.Module._extensions..js (internal/modules/cjs/loader.js:1166:10)
+    at Module.load (internal/modules/cjs/loader.js:981:32)
+    at Module._load (internal/modules/cjs/loader.js:881:14)
+    at Function.Module._load (electron/js2c/asar.js:779:28)
+[1:02:18 PM] 
+[1:02:18 PM] Electron exited with code 1.
+[1:02:18 PM] Runner: autobisect Electron 10.4.0 - finished test ❌ failed
+[1:02:18 PM] Runner: autobisect Electron 10.3.2 - setting version
+Electron's autoUpdater does not support the 'linux' platform
+[1:02:19 PM] Runner: autobisect Electron 10.3.2 - starting test
+[1:02:19 PM] Saving files to temp directory...
+[1:02:19 PM] Saved files to /tmp/tmp-811383-yAvtfvrRkYvU
+[1:02:20 PM] Electron v10.3.2 started.
+[1:02:20 PM] (electron) Sending uncompressed crash reports is deprecated and will be removed in a future version of Electron. Set { compress: true } to opt-in to the new behavior. Crash reports will be uploaded gzipped, which most crash reporting servers support.
+[1:02:20 PM] test passed
+[1:02:20 PM] 
+[1:02:20 PM] Electron exited with code 0.
+[1:02:20 PM] Runner: autobisect Electron 10.3.2 - finished test ✅ passed
+[1:02:20 PM] Runner: autobisect complete
+[1:02:20 PM] Runner: autobisect ✅ passed 10.3.2
+[1:02:20 PM] Runner: autobisect ❌ failed 10.4.0
+[1:02:20 PM] Runner: autobisect Commits between versions:
+[1:02:20 PM] https://github.com/electron/electron/compare/v10.3.2...v10.4.0
+[1:02:20 PM] Task: Bisect  success

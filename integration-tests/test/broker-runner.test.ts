@@ -18,7 +18,7 @@ import {
   VersionRange,
 } from '@electron/bugbot-shared/build/interfaces';
 
-jest.setTimeout(60 * 1000);
+jest.setTimeout(60_000);
 
 describe('runner', () => {
   const brokerUrl = `http://localhost:9090`; // arbitrary port

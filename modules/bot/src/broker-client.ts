@@ -1,5 +1,5 @@
 import debug from 'debug';
-import fetch, { Response } from 'node-fetch';
+import fetch from 'node-fetch';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
@@ -15,15 +15,6 @@ import {
 import { BisectCommand, TestCommand } from './issue-parser';
 
 const DebugPrefix = 'bot:BrokerAPI';
-
-export class APIError extends Error {
-  public res: Response;
-
-  constructor(res: Response, message: string) {
-    super(message);
-    this.res = res;
-  }
-}
 
 export default class BrokerAPI {
   private readonly authToken: string;
@@ -71,7 +62,7 @@ export default class BrokerAPI {
     const d = debug(`${DebugPrefix}:queueTestJob`);
 
     const url = new URL('/api/jobs', this.baseURL);
-    d('url', url);
+    d('queueing test command via %s', url);
 
     // FIXME(any): We should add a separate type here so that we can
     // pass in a single version and platform to this function

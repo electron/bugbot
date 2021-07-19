@@ -58,7 +58,6 @@ export class GithubClient {
     const d = debug(`${DebugPrefix}:listenToRobot`);
 
     const debugContext = (context) => d(context.name, inspect(context.payload));
-    this.robot.onAny(debugContext);
     this.robot.on('issue_comment', debugContext);
     this.robot.on('issues.opened', debugContext);
     this.robot.on('issues.labeled', debugContext);
@@ -87,7 +86,6 @@ export class GithubClient {
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug(`${DebugPrefix}:onIssueComment`);
-    d('===> payload <===', JSON.stringify(context.payload));
 
     const { login } = context.payload.comment.user;
     if (!(await this.isAuthorizedUser(context, login))) {
@@ -155,12 +153,13 @@ export class GithubClient {
     context: Context<'issue_comment'>,
   ) {
     const d = debug(`${DebugPrefix}:runTestMatrix`);
-    const resultPromises: Promise<Job | void>[] = [];
     d(
       'Running test matrix for platforms %o and versions %o',
       command.platforms,
       command.versions,
     );
+
+    await this.setIssueComment('Queuing bisect job...', context);
 
     // queue all jobs for matrix
     const matrix: Matrix = {};
@@ -173,14 +172,14 @@ export class GithubClient {
         // to always be present for the table generator code
         matrix[p][v] = undefined;
 
-        const promise = this.broker.queueTestJob({
-          gistId: command.gistId,
-          platforms: [p],
-          type: 'test',
-          versions: [v],
-        });
-
-        queueJobPromises.push(promise);
+        queueJobPromises.push(
+          this.broker.queueTestJob({
+            gistId: command.gistId,
+            platforms: [p],
+            type: 'test',
+            versions: [v],
+          }),
+        );
       }
     }
 
@@ -188,17 +187,15 @@ export class GithubClient {
 
     d(`All ${ids.length} jobs queued: %o`, ids);
 
-    for (const id of ids) {
-      const promise = this.pollAndReturnJob(id).then((job: TestJob) => {
-        matrix[job.platform][job.version] = job;
-        d('%O', matrix);
-        return this.handleTestResult(job, matrix, context);
-      });
-      resultPromises.push(promise);
-    }
+    const awaitOneJob = async (id: JobId) => {
+      const job = (await this.pollAndReturnJob(id)) as TestJob;
+      matrix[job.platform][job.version] = job;
+      d('%O', matrix);
+      await this.handleTestResult(job, matrix, context);
+    };
 
-    await Promise.all(resultPromises);
-    d(`All ${resultPromises.length} test jobs complete!`);
+    await Promise.all(ids.map((id) => awaitOneJob(id)));
+    d(`All ${ids.length} test jobs complete!`);
   }
 
   private async pollAndReturnJob(jobId: JobId) {
@@ -364,7 +361,7 @@ export class GithubClient {
         comment_id: commentId,
       });
     } else {
-      d(`creating new comment in issue ${issueId}: %s`, body);
+      d(`creating new comment in issue ${issueId}:\n%s`, body);
       const response = await context.octokit.issues.createComment({
         ...issue,
         body,
