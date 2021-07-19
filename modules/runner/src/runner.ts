@@ -21,16 +21,16 @@ import {
   assertBisectJob,
   assertTestJob,
 } from '@electron/bugbot-shared/build/interfaces';
+import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
-
-const DebugPrefix = 'runner' as const;
 
 class Task {
   private logTimer: ReturnType<typeof setTimeout>;
   private readonly logBuffer: string[] = [];
   public readonly timeBegun = Date.now();
+  private readonly debugPrefix: string;
 
   constructor(
     public readonly job: Job,
@@ -39,10 +39,12 @@ class Task {
     private readonly authToken: string,
     private readonly brokerUrl: string,
     private readonly logIntervalMs: number,
-  ) {}
+  ) {
+    this.debugPrefix = `runner:${this.runner}`;
+  }
 
   private async sendLogDataBuffer(url: URL) {
-    const d = debug(`${DebugPrefix}:sendLogDataBuffer`);
+    const d = debug(`${this.debugPrefix}:sendLogDataBuffer`);
     delete this.logTimer;
 
     const lines = this.logBuffer.splice(0);
@@ -72,7 +74,7 @@ class Task {
   }
 
   private async sendPatch(patches: Readonly<PatchOp>[]) {
-    const d = debug(`${DebugPrefix}:sendPatch`);
+    const d = debug(`${this.debugPrefix}:sendPatch`);
     d('task: %O', this);
     d('patches: %O', patches);
 
@@ -121,15 +123,15 @@ class Task {
 export class Runner {
   public readonly platform: Platform;
   public readonly uuid: RunnerId;
+  private readonly debugPrefix: string;
 
   private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
   private readonly fiddleArgv: string[];
-  private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
-  private pollInterval: ReturnType<typeof setInterval>;
+  private readonly loop: RotaryLoop;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -159,46 +161,31 @@ export class Runner {
     this.fiddleExec = this.fiddleArgv.shift();
     this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     this.uuid = opts.uuid || uuidv4();
+    this.debugPrefix = `runner:${this.uuid}`;
+    const pollIntervalMs =
+      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    this.loop = new RotaryLoop(this.debugPrefix, pollIntervalMs, this.pollOnce);
   }
 
-  public start(): void {
-    const d = debug(`${DebugPrefix}:start`);
+  public start = () => this.loop.start();
 
-    this.stop();
-    d('runner:start', `interval is ${this.pollIntervalMs}`);
-    this.pollInterval = setInterval(this.pollSafely, this.pollIntervalMs);
-    this.pollSafely();
-  }
+  public stop = () => this.loop.stop();
 
-  public stop(): void {
-    const d = debug(`${DebugPrefix}:stop`);
-
-    clearInterval(this.pollInterval);
-    this.pollInterval = undefined;
-    d('runner:stop', 'interval cleared');
-  }
-
-  public pollSafely = (): void => {
-    const d = debug(`${DebugPrefix}:pollSafely`);
-    this.poll().catch((err) => d('error while polling broker:', inspect(err)));
-  };
-
-  public async poll(): Promise<void> {
-    const d = debug(`${DebugPrefix}:poll`);
-    d('polling', this.pollIntervalMs);
+  public pollOnce = async (): Promise<void> => {
+    const d = debug(`${this.debugPrefix}:pollOnce`);
 
     const jobId = await this.pickNextJob();
+    d(jobId, 'jobId');
     if (!jobId) return;
 
     // Claim the job
+    d(jobId, 'claiming job');
     const task = await this.fetchTask(jobId);
     await task.claimForRunner();
 
+    d(jobId, 'running job');
     let result: Partial<Result>;
-
     switch (task.job.type) {
       case JobType.bisect:
         result = await this.runBisect(task);
@@ -209,12 +196,13 @@ export class Runner {
         break;
     }
 
+    d(jobId, 'sending result');
     await task.sendResult(result);
-    d('runner:poll done');
-  }
+    d('done');
+  };
 
   private async pickNextJob(): Promise<JobId | undefined> {
-    const d = debug(`${DebugPrefix}:pickNextJob`);
+    const d = debug(`${this.debugPrefix}:pickNextJob`);
 
     const ids = await this.fetchAvailableJobIds();
     if (!ids.length) return;
@@ -251,7 +239,7 @@ export class Runner {
   }
 
   private async fetchTask(id: JobId): Promise<Task> {
-    const d = debug(`${DebugPrefix}:fetchTask`);
+    const d = debug(`${this.debugPrefix}:fetchTask`);
 
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
     const resp = await fetch(job_url, {
@@ -280,7 +268,7 @@ export class Runner {
   }
 
   private async runBisect(task: Task) {
-    const d = debug(`${DebugPrefix}:runBisect`);
+    const d = debug(`${this.debugPrefix}:runBisect`);
 
     const { job } = task;
     assertBisectJob(job);
@@ -342,7 +330,7 @@ export class Runner {
     args: string[],
   ): Promise<{ code?: number; error?: string; out: string }> {
     return new Promise((resolve) => {
-      const d = debug(`${DebugPrefix}:runFiddle`);
+      const d = debug(`${this.debugPrefix}:runFiddle`);
       const ret = { code: null, out: '', error: null };
 
       const { childTimeoutMs, fiddleExec } = this;

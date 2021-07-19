@@ -65,7 +65,7 @@ describe('runner', () => {
     await startBroker();
     broker.addTask(task);
     createRunner(runnerOpts);
-    await runner.poll();
+    await runner.pollOnce();
   }
 
   function createBisectTask(job: Partial<BisectJob> = {}) {
