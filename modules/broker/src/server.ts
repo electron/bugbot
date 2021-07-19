@@ -165,7 +165,6 @@ export class Server {
     }
 
     const { body, etag } = getTaskBody(task);
-    task.etag = etag;
     res.header('ETag', etag);
     res.header('Content-Type', 'application/json');
     res.status(200).send(body);
@@ -180,13 +179,17 @@ export class Server {
       return;
     }
 
+    // check the etag
     const if_header = 'If-Match';
     const if_etag = req.header(if_header);
-    if (if_etag && if_etag !== task.etag) {
-      res
-        .status(412)
-        .send(escapeHtml(`Invalid ${if_header} header: ${if_etag}`));
-      return;
+    if (if_etag) {
+      const { etag } = getTaskBody(task);
+      if (if_etag !== etag) {
+        res
+          .status(412)
+          .send(escapeHtml(`Invalid ${if_header} header: ${if_etag}`));
+        return;
+      }
     }
 
     try {
