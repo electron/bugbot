@@ -67,7 +67,8 @@ export function generateTable(jobMatrix: Matrix, brokerBaseUrl: string) {
     tableInput.push(versionRow);
   }
 
-  const tableOutput = table(tableInput, { align: 'right' });
+  const align = ['l', ...new Array(platforms.length).fill('r')];
+  const tableOutput = table(tableInput, { align });
   d(tableOutput);
   return tableOutput;
 }
