@@ -185,29 +185,15 @@ export class Runner {
 
   public stop = () => this.loop.stop();
 
-  public pollOnce = async () => {
+  public pollOnce = async (): Promise<void> => {
     const d = debug(`${this.debugPrefix}:pollOnce`);
 
-    // find a job and claim it.
-    let jobId: JobId;
-    let task: Task;
-    const ids = await this.fetchAvailableJobIds();
-    d('available jobs: %o', ids);
-    while (!jobId && ids.length > 0) {
-      // pick one at random
-      const idx = randomInt(0, ids.length);
-      const [id] = ids.splice(idx, 1);
-
-      // try to claim it
-      d('claiming job %s, jobs remaining %o', id, ids);
-      task = await this.fetchTask(id); // get the etag
-      if (await task.claimForRunner()) jobId = id;
-    }
-    d('jobId %s task %o', jobId, task);
-    if (!jobId) return;
+    const task = await this.claimNextTask();
+    d('next task: %o', task);
+    if (!task) return;
 
     // run the job
-    d(jobId, 'running job');
+    d(task.job.id, 'running job');
     let result: Partial<Result>;
     switch (task.job.type) {
       case JobType.bisect:
@@ -219,10 +205,32 @@ export class Runner {
         break;
     }
 
-    d(jobId, 'sending result');
+    d(task.job.id, 'sending result');
     await task.sendResult(result);
     d('done');
   };
+
+  private async claimNextTask(): Promise<Task | undefined> {
+    const d = debug(`${this.debugPrefix}:claimNextTask`);
+
+    // find a job and claim it.
+    let task: Task | undefined;
+    const ids = await this.fetchAvailableJobIds();
+    d('available jobs: %o', ids);
+    while (!task && ids.length > 0) {
+      // pick one at random
+      const idx = randomInt(0, ids.length);
+      const [id] = ids.splice(idx, 1);
+
+      // try to claim it
+      d('claiming job %s, jobs remaining %o', id, ids);
+      const t = await this.fetchTask(id); // get the etag
+      if (await t.claimForRunner()) task = t;
+    }
+
+    d('task %o', task);
+    return task;
+  }
 
   /**
    * Polls the broker for a list of unclaimed job IDs.
