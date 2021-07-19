@@ -19,10 +19,10 @@ export class RotaryLoop {
     const d = debug(`${this.debugPrefix}:start`);
     if (this.isRunning) throw new Error('already running');
 
-    d('entering runner poll loop...');
+    d('entering loop...');
     this.runningPromise = this.pollLoop();
     await this.runningPromise;
-    d('...exited runner poll loop');
+    d('...exited loop');
     delete this.runningPromise;
   };
 
