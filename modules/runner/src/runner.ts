@@ -21,6 +21,7 @@ import {
   assertBisectJob,
   assertTestJob,
 } from '@electron/bugbot-shared/build/interfaces';
+import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
@@ -129,12 +130,8 @@ export class Runner {
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
   private readonly fiddleArgv: string[];
-  private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
-  private pollInterval: ReturnType<typeof setInterval>;
-  private runningPromise: Promise<unknown>;
-  private stopResolve: (value: unknown) => void;
-  private stopping = false;
+  private readonly loop: RotaryLoop;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -164,57 +161,18 @@ export class Runner {
     this.fiddleExec = this.fiddleArgv.shift();
     this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     this.uuid = opts.uuid || uuidv4();
     this.debugPrefix = `runner:${this.uuid}`;
+    const pollIntervalMs =
+      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    this.loop = new RotaryLoop(this.debugPrefix, pollIntervalMs, this.pollOnce);
   }
 
-  private isRunning = () => this.runningPromise !== undefined;
+  public start = () => this.loop.start();
 
-  public async start() {
-    const d = debug(`${this.debugPrefix}:start`);
-    if (this.isRunning()) throw new Error('already running');
+  public stop = () => this.loop.stop();
 
-    d('entering runner poll loop...');
-    this.runningPromise = this.pollLoop();
-    await this.runningPromise;
-    d('...exited runner poll loop');
-    delete this.runningPromise;
-  }
-
-  public async stop() {
-    const d = debug(`${this.debugPrefix}:stop`);
-    if (!this.isRunning()) return;
-
-    d('stopping...');
-    this.stopping = true;
-    this.stopResolve(undefined);
-    await this.runningPromise;
-    delete this.runningPromise;
-    this.stopping = false;
-    d('...stopped');
-  }
-
-  private async pollLoop(): Promise<void> {
-    const d = debug(`${this.debugPrefix}:pollLoop`);
-    while (!this.stopping) {
-      const stopPromise = new Promise((r) => (this.stopResolve = r));
-
-      d('awake; calling pollOnce');
-      await this.pollOnce();
-
-      // sleep until next polling time or stop requested
-      d('sleeping');
-      const ms = this.pollIntervalMs;
-      const sleepPromise = new Promise((r) => setTimeout(r, ms, ms));
-      await Promise.race([stopPromise, sleepPromise]);
-      delete this.stopResolve;
-    }
-    // this.poll().catch((err) => d('error while polling broker:', inspect(err)));
-  }
-
-  public async pollOnce(): Promise<void> {
+  public pollOnce = async (): Promise<void> => {
     const d = debug(`${this.debugPrefix}:pollOnce`);
 
     const jobId = await this.pickNextJob();
@@ -241,7 +199,7 @@ export class Runner {
     d(jobId, 'sending result');
     await task.sendResult(result);
     d('done');
-  }
+  };
 
   private async pickNextJob(): Promise<JobId | undefined> {
     const d = debug(`${this.debugPrefix}:pickNextJob`);
