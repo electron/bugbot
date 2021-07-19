@@ -32,7 +32,7 @@ function platformDisplayName(platform: Platform) {
     case 'linux':
       return 'Linux';
     case 'win32':
-      return 'Windows 10';
+      return 'Windows';
   }
 }
 
