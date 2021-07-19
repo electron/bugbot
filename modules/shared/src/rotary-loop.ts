@@ -5,17 +5,17 @@ export class RotaryLoop {
   private stopResolve?: (value: unknown) => void;
   private stopping = false;
 
-  private get isRunning(): boolean {
-    return this.runningPromise !== undefined;
-  }
-
   constructor(
     private readonly debugPrefix: string,
     private readonly pollIntervalMs: number,
     private readonly pollOnce: () => Promise<void>,
   ) {}
 
-  public start = async () => {
+  private get isRunning(): boolean {
+    return this.runningPromise !== undefined;
+  }
+
+  public start = async (): Promise<void> => {
     const d = debug(`${this.debugPrefix}:start`);
     if (this.isRunning) throw new Error('already running');
 
@@ -26,7 +26,7 @@ export class RotaryLoop {
     delete this.runningPromise;
   };
 
-  public stop = async () => {
+  public stop = async (): Promise<void> => {
     const d = debug(`${this.debugPrefix}:stop`);
     if (!this.isRunning) return;
 
