@@ -24,7 +24,7 @@ import {
   VersionRange,
 } from '@electron/bugbot-shared/build/interfaces';
 
-jest.setTimeout(60 * 1000);
+jest.setTimeout(60_000);
 
 describe('bot-broker-runner', () => {
   const fixtureDir = path.resolve(__dirname, 'fixtures', 'api.github.com');
