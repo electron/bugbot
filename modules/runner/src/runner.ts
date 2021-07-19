@@ -73,14 +73,17 @@ class Task {
     }
   }
 
-  private async sendPatch(patches: Readonly<PatchOp>[]) {
+  /**
+   * @returns {boolean} success / failure (response.ok)
+   */
+  private async sendPatch(patches: Readonly<PatchOp>[]): Promise<boolean> {
     const d = debug(`${this.debugPrefix}:sendPatch`);
     d('task: %O', this);
     d('patches: %O', patches);
 
     // Send the patch
     const job_url = new URL(`api/jobs/${this.job.id}`, this.brokerUrl);
-    const resp = await fetch(job_url, {
+    const response = await fetch(job_url, {
       body: JSON.stringify(patches),
       headers: {
         Authorization: `Bearer ${this.authToken}`,
@@ -89,14 +92,19 @@ class Task {
       },
       method: 'PATCH',
     });
+    d('broker response:', response.status, response.statusText);
+    const { headers, ok } = response;
 
-    // Extract the etag header & make sure it was defined
-    const etag = resp.headers.get('etag');
-    if (!etag) throw new Error('missing etag in broker job response');
-    this.etag = etag;
+    // if we got an etag, keep it
+    if (ok && headers.has('etag')) this.etag = headers.get('etag');
+
+    return ok;
   }
 
-  public sendResult(resultIn: Partial<Result>): Promise<void> {
+  /**
+   * @returns {boolean} success / failure (response.ok)
+   */
+  public sendResult(resultIn: Partial<Result>): Promise<boolean> {
     const result: Partial<Result> = {
       runner: this.runner,
       status: 'system_error',
@@ -111,12 +119,17 @@ class Task {
     ]);
   }
 
-  public async claimForRunner(): Promise<void> {
+  /**
+   * @returns {boolean} success / failure (response.ok)
+   */
+  public claimForRunner(): Promise<boolean> {
     const current: Current = {
       runner: this.runner,
       time_begun: this.timeBegun,
     };
-    await this.sendPatch([{ op: 'replace', path: '/current', value: current }]);
+    return this.sendPatch([
+      { op: 'replace', path: '/current', value: current },
+    ]);
   }
 }
 
@@ -175,16 +188,12 @@ export class Runner {
   public pollOnce = async (): Promise<void> => {
     const d = debug(`${this.debugPrefix}:pollOnce`);
 
-    const jobId = await this.pickNextJob();
-    d(jobId, 'jobId');
-    if (!jobId) return;
+    const task = await this.claimNextTask();
+    d('next task: %o', task);
+    if (!task) return;
 
-    // Claim the job
-    d(jobId, 'claiming job');
-    const task = await this.fetchTask(jobId);
-    await task.claimForRunner();
-
-    d(jobId, 'running job');
+    // run the job
+    d(task.job.id, 'running job');
     let result: Partial<Result>;
     switch (task.job.type) {
       case JobType.bisect:
@@ -196,21 +205,31 @@ export class Runner {
         break;
     }
 
-    d(jobId, 'sending result');
+    d(task.job.id, 'sending result');
     await task.sendResult(result);
     d('done');
   };
 
-  private async pickNextJob(): Promise<JobId | undefined> {
-    const d = debug(`${this.debugPrefix}:pickNextJob`);
+  private async claimNextTask(): Promise<Task | undefined> {
+    const d = debug(`${this.debugPrefix}:claimNextTask`);
 
+    // find a job and claim it.
+    let task: Task | undefined;
     const ids = await this.fetchAvailableJobIds();
-    if (!ids.length) return;
+    d('available jobs: %o', ids);
+    while (!task && ids.length > 0) {
+      // pick one at random
+      const idx = randomInt(0, ids.length);
+      const [id] = ids.splice(idx, 1);
 
-    const idx = randomInt(0, ids.length);
-    const [id] = ids.splice(idx, 1);
-    d('picked job %s, jobs remaining %o', id, ids);
-    return id;
+      // try to claim it
+      d('claiming job %s, jobs remaining %o', id, ids);
+      const t = await this.fetchTask(id); // get the etag
+      if (await t.claimForRunner()) task = t;
+    }
+
+    d('task %o', task);
+    return task;
   }
 
   /**
