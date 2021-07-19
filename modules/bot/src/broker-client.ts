@@ -14,7 +14,7 @@ import {
 
 import { BisectCommand, TestCommand } from './issue-parser';
 
-const DebugPrefix = 'BrokerAPI';
+const DebugPrefix = 'bot:BrokerAPI';
 
 export class APIError extends Error {
   public res: Response;

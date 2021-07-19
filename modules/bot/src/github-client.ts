@@ -19,7 +19,7 @@ import { ElectronVersions } from './electron-versions';
 import { generateTable, Matrix } from './table-generator';
 
 const AppName = 'BugBot' as const;
-const DebugPrefix = 'GitHubClient' as const;
+const DebugPrefix = 'bot:GitHubClient' as const;
 
 export class GithubClient {
   private isClosed = false;
@@ -28,6 +28,9 @@ export class GithubClient {
   private readonly pollIntervalMs: number;
   private readonly robot: Probot;
   private readonly versions = new ElectronVersions();
+
+  // issue id -> bot comment id
+  private readonly botCommentIds = new Map<number, number>();
 
   constructor(opts: {
     authToken: string;
@@ -316,35 +319,57 @@ export class GithubClient {
     await Promise.all(promises);
   }
 
-  private async setIssueComment(
-    markdownComment: string,
-    context: Context<'issue_comment'>,
-  ): Promise<void> {
-    const issue = context.issue();
+  private async findIssueCommentId(context: Context<'issue_comment'>) {
+    const d = debug(`${DebugPrefix}:findIssueCommentId`);
+    const issueId = context.payload.issue.id;
 
-    // FIXME(any): iterate through all pages to get full comment set
+    // is the comment id cached?
+    if (this.botCommentIds.has(issueId)) {
+      const commentId = this.botCommentIds.get(issueId);
+      d(`found cached id ${commentId} for issue ${issueId}`);
+      return commentId;
+    }
+
+    // not cached; try to look it up
+    // FIXME(anyone): iterate past the first 100 comments if needed
+    d(`scraping issue ${issueId} for the bot comment`);
+    const issue = context.issue();
     const { data: comments } = await context.octokit.issues.listComments({
       ...issue,
       per_page: 100, // max
     });
 
     const lastBotComment = comments.reverse().find((comment) => {
-      const { user } = comment;
       const botName = env('BUGBOT_GITHUB_LOGIN');
-      return user.login === `${botName}[bot]`;
+      return comment.user.login === `${botName}[bot]`;
     });
+    const commentId = lastBotComment?.id;
+    d(`scraping issue ${issueId} result: ${commentId}`);
+    return commentId;
+  }
 
-    if (lastBotComment) {
+  private async setIssueComment(
+    body: string,
+    context: Context<'issue_comment'>,
+  ): Promise<void> {
+    const d = debug(`${DebugPrefix}:setIssueComment`);
+    const issue = context.issue();
+    const issueId = context.payload.issue.id;
+    const commentId = await this.findIssueCommentId(context);
+    if (commentId) {
+      d(`updating issue ${issueId} comment ${commentId}: %s`, body);
       await context.octokit.issues.updateComment({
         ...issue,
-        comment_id: lastBotComment.id,
-        body: markdownComment,
+        body,
+        comment_id: commentId,
       });
     } else {
-      await context.octokit.issues.createComment({
+      d(`creating new comment in issue ${issueId}: %s`, body);
+      const response = await context.octokit.issues.createComment({
         ...issue,
-        body: markdownComment,
+        body,
       });
+      this.botCommentIds.set(issueId, response.data.id);
     }
   }
 }
