@@ -9,9 +9,10 @@ import {
   Job,
   JobId,
   JobType,
+  TestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 
-import { BisectCommand } from './issue-parser';
+import { BisectCommand, TestCommand } from './issue-parser';
 
 const DebugPrefix = 'BrokerAPI';
 
@@ -49,6 +50,42 @@ export default class BrokerAPI {
     };
 
     const body = JSON.stringify(bisectJob);
+    d('body', body);
+    const response = await fetch(url.toString(), {
+      body,
+      headers: {
+        Authorization: `Bearer ${this.authToken}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+    });
+
+    const { status, statusText } = response;
+    d('status', status, 'statusText', statusText);
+    const jobId = await response.text();
+    d('jobId', jobId);
+    return jobId;
+  }
+
+  public async queueTestJob(command: TestCommand): Promise<string> {
+    const d = debug(`${DebugPrefix}:queueTestJob`);
+
+    const url = new URL('/api/jobs', this.baseURL);
+    d('url', url);
+
+    // FIXME(any): We should add a separate type here so that we can
+    // pass in a single version and platform to this function
+    const testJob: TestJob = {
+      gist: command.gistId,
+      history: [],
+      id: mkuuid(),
+      time_added: Date.now(),
+      type: JobType.test,
+      version: command.versions[0],
+      platform: command.platforms[0],
+    };
+
+    const body = JSON.stringify(testJob);
     d('body', body);
     const response = await fetch(url.toString(), {
       body,

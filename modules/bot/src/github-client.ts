@@ -4,17 +4,19 @@ import { URL } from 'url';
 import { inspect } from 'util';
 
 import {
+  BisectJob,
   Job,
   JobId,
   JobType,
-  Result,
+  TestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
-import { BisectCommand, parseIssueCommand } from './issue-parser';
+import { BisectCommand, parseIssueCommand, TestCommand } from './issue-parser';
 import { ElectronVersions } from './electron-versions';
+import { generateTable, Matrix } from './table-generator';
 
 const AppName = 'BugBot' as const;
 const DebugPrefix = 'GitHubClient' as const;
@@ -111,6 +113,8 @@ export class GithubClient {
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
         promises.push(this.runBisectJob(cmd, context));
+      } else if (cmd?.type === JobType.test) {
+        promises.push(this.runTestMatrix(cmd, context));
       }
     }
 
@@ -137,14 +141,61 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const completedJob = await this.pollAndReturnJob(jobId);
+    const completedJob = (await this.pollAndReturnJob(jobId)) as BisectJob;
     if (completedJob) {
-      await this.handleBisectResult(
-        completedJob.id,
-        completedJob.last,
-        context,
-      );
+      await this.handleBisectResult(completedJob, context);
     }
+  }
+
+  private async runTestMatrix(
+    command: TestCommand,
+    context: Context<'issue_comment'>,
+  ) {
+    const d = debug(`${DebugPrefix}:runTestMatrix`);
+    const resultPromises: Promise<Job | void>[] = [];
+    d(
+      'Running test matrix for platforms %o and versions %o',
+      command.platforms,
+      command.versions,
+    );
+
+    // queue all jobs for matrix
+    const matrix: Matrix = {};
+    const queueJobPromises: Promise<string>[] = [];
+
+    for (const p of command.platforms) {
+      matrix[p] = {};
+      for (const v of command.versions) {
+        // this is important because we need the version keys
+        // to always be present for the table generator code
+        matrix[p][v] = undefined;
+
+        const promise = this.broker.queueTestJob({
+          gistId: command.gistId,
+          platforms: [p],
+          type: 'test',
+          versions: [v],
+        });
+
+        queueJobPromises.push(promise);
+      }
+    }
+
+    const ids = await Promise.all(queueJobPromises);
+
+    d(`All ${ids.length} jobs queued: %o`, ids);
+
+    for (const id of ids) {
+      const promise = this.pollAndReturnJob(id).then((job: TestJob) => {
+        matrix[job.platform][job.version] = job;
+        d('%O', matrix);
+        return this.handleTestResult(job, matrix, context);
+      });
+      resultPromises.push(promise);
+    }
+
+    await Promise.all(resultPromises);
+    d(`All ${resultPromises.length} test jobs complete!`);
   }
 
   private async pollAndReturnJob(jobId: JobId) {
@@ -180,21 +231,33 @@ export class GithubClient {
     });
   }
 
+  private async handleTestResult(
+    job: TestJob,
+    matrix: Matrix,
+    context: Context<'issue_comment'>,
+  ) {
+    const d = debug(`${DebugPrefix}:handleTestResult`);
+    d({ job });
+    const table = generateTable(matrix);
+    await this.setIssueComment(table, context);
+  }
+
   /**
    * Comments on the issue once a bisect operation is completed
    * @param result The result from a Fiddle bisection
    * @param context Probot context object
    */
   private async handleBisectResult(
-    jobId: JobId,
-    result: Result,
+    job: BisectJob,
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug(`${DebugPrefix}:handleBisectResult`);
     const add_labels = new Set<string>();
     const del_labels = new Set<string>([Labels.BugBot.Running]);
     const paragraphs: string[] = [];
-    const log_url = new URL(`/log/${jobId}`, this.brokerBaseUrl);
+    const log_url = new URL(`/log/${job.id}`, this.brokerBaseUrl);
+
+    const result = job.last;
 
     switch (result.status) {
       case 'success': {
