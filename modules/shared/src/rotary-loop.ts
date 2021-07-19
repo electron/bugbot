@@ -15,7 +15,7 @@ export class RotaryLoop {
     private readonly pollOnce: () => Promise<void>,
   ) {}
 
-  start = async () => {
+  public start = async () => {
     const d = debug(`${this.debugPrefix}:start`);
     if (this.isRunning) throw new Error('already running');
 
@@ -26,7 +26,7 @@ export class RotaryLoop {
     delete this.runningPromise;
   };
 
-  stop = async () => {
+  public stop = async () => {
     const d = debug(`${this.debugPrefix}:stop`);
     if (!this.isRunning) return;
 
