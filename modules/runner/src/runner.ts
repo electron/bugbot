@@ -21,6 +21,7 @@ import {
   assertBisectJob,
   assertTestJob,
 } from '@electron/bugbot-shared/build/interfaces';
+import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
@@ -29,7 +30,7 @@ class Task {
   private logTimer: ReturnType<typeof setTimeout>;
   private readonly logBuffer: string[] = [];
   public readonly timeBegun = Date.now();
-  private readonly DebugPrefix: string;
+  private readonly debugPrefix: string;
 
   constructor(
     public readonly job: Job,
@@ -39,11 +40,11 @@ class Task {
     private readonly brokerUrl: string,
     private readonly logIntervalMs: number,
   ) {
-    this.DebugPrefix = `runner:${this.runner}`;
+    this.debugPrefix = `runner:${this.runner}`;
   }
 
   private async sendLogDataBuffer(url: URL) {
-    const d = debug(`${this.DebugPrefix}:sendLogDataBuffer`);
+    const d = debug(`${this.debugPrefix}:sendLogDataBuffer`);
     delete this.logTimer;
 
     const lines = this.logBuffer.splice(0);
@@ -76,7 +77,7 @@ class Task {
    * @returns {boolean} success / failure (response.ok)
    */
   private async sendPatch(patches: Readonly<PatchOp>[]): Promise<boolean> {
-    const d = debug(`${this.DebugPrefix}:sendPatch`);
+    const d = debug(`${this.debugPrefix}:sendPatch`);
     d('task: %O', this);
     d('patches: %O', patches);
 
@@ -135,19 +136,15 @@ class Task {
 export class Runner {
   public readonly platform: Platform;
   public readonly uuid: RunnerId;
-  private readonly DebugPrefix: string;
+  private readonly debugPrefix: string;
 
   private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly fiddleExec: string;
   private readonly fiddleArgv: string[];
-  private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
-  private pollInterval: ReturnType<typeof setInterval>;
-  private stopResolve: (value: unknown) => void;
-  private sleepPromise: Promise<void>;
-  private stopping = false;
+  private readonly loop: RotaryLoop;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -177,81 +174,26 @@ export class Runner {
     this.fiddleExec = this.fiddleArgv.shift();
     this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
-    this.pollIntervalMs =
-      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     this.uuid = opts.uuid || uuidv4();
-    this.DebugPrefix = `runner:${this.uuid}`;
+    this.debugPrefix = `runner:${this.uuid}`;
+    const pollIntervalMs =
+      opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
+    this.loop = new RotaryLoop(this.debugPrefix, pollIntervalMs, this.pollOnce);
   }
 
-  private runningPromise: Promise<unknown>;
+  public start = () => this.loop.start();
 
-  private isRunning = () => this.runningPromise !== undefined;
+  public stop = () => this.loop.stop();
 
-  public async start() {
-    const d = debug(`${this.DebugPrefix}:start`);
-    if (this.isRunning()) throw new Error('already running');
+  public pollOnce = async (): Promise<void> => {
+    const d = debug(`${this.debugPrefix}:pollOnce`);
 
-    d('entering runner poll loop...');
-    this.runningPromise = this.pollLoop();
-    await this.runningPromise;
-    d('...exited runner poll loop');
-    delete this.runningPromise;
-  }
-
-  public async stop() {
-    const d = debug(`${this.DebugPrefix}:stop`);
-    if (!this.isRunning()) return;
-
-    d('stopping...');
-    this.stopping = true;
-    this.stopResolve(undefined);
-    await this.runningPromise;
-    delete this.runningPromise;
-    this.stopping = false;
-    d('...stopped');
-  }
-
-  private async pollLoop(): Promise<void> {
-    const d = debug(`${this.DebugPrefix}:pollLoop`);
-    while (!this.stopping) {
-      const stopPromise = new Promise((r) => (this.stopResolve = r));
-
-      d('awake; calling pollOnce');
-      await this.pollOnce();
-
-      // sleep until next polling time or stop requested
-      d('sleeping');
-      const ms = this.pollIntervalMs;
-      const sleepPromise = new Promise((r) => setTimeout(r, ms, ms));
-      await Promise.race([stopPromise, sleepPromise]);
-      delete this.stopResolve;
-    }
-    // this.poll().catch((err) => d('error while polling broker:', inspect(err)));
-  }
-
-  public async pollOnce(): Promise<void> {
-    const d = debug(`${this.DebugPrefix}:pollOnce`);
-
-    // find a job and claim it.
-    let jobId: JobId;
-    let task: Task;
-    const ids = await this.fetchAvailableJobIds();
-    d('available jobs: %o', ids);
-    while (!jobId && ids.length > 0) {
-      // pick one at random
-      const idx = randomInt(0, ids.length);
-      const [id] = ids.splice(idx, 1);
-
-      // try to claim it
-      d('claiming job %s, jobs remaining %o', id, ids);
-      task = await this.fetchTask(id); // get the etag
-      if (await task.claimForRunner()) jobId = id;
-    }
-    d('jobId %s task %o', jobId, task);
-    if (!jobId) return;
+    const task = await this.claimNextTask();
+    d('next task: %o', task);
+    if (!task) return;
 
     // run the job
-    d(jobId, 'running job');
+    d(task.job.id, 'running job');
     let result: Partial<Result>;
     switch (task.job.type) {
       case JobType.bisect:
@@ -263,9 +205,31 @@ export class Runner {
         break;
     }
 
-    d(jobId, 'sending result');
+    d(task.job.id, 'sending result');
     await task.sendResult(result);
     d('done');
+  };
+
+  private async claimNextTask(): Promise<Task | undefined> {
+    const d = debug(`${this.debugPrefix}:claimNextTask`);
+
+    // find a job and claim it.
+    let task: Task | undefined;
+    const ids = await this.fetchAvailableJobIds();
+    d('available jobs: %o', ids);
+    while (!task && ids.length > 0) {
+      // pick one at random
+      const idx = randomInt(0, ids.length);
+      const [id] = ids.splice(idx, 1);
+
+      // try to claim it
+      d('claiming job %s, jobs remaining %o', id, ids);
+      const t = await this.fetchTask(id); // get the etag
+      if (await t.claimForRunner()) task = t;
+    }
+
+    d('task %o', task);
+    return task;
   }
 
   /**
@@ -294,7 +258,7 @@ export class Runner {
   }
 
   private async fetchTask(id: JobId): Promise<Task> {
-    const d = debug(`${this.DebugPrefix}:fetchTask`);
+    const d = debug(`${this.debugPrefix}:fetchTask`);
 
     const job_url = new URL(`api/jobs/${id}`, this.brokerUrl);
     const resp = await fetch(job_url, {
@@ -323,7 +287,7 @@ export class Runner {
   }
 
   private async runBisect(task: Task) {
-    const d = debug(`${this.DebugPrefix}:runBisect`);
+    const d = debug(`${this.debugPrefix}:runBisect`);
 
     const { job } = task;
     assertBisectJob(job);
@@ -387,7 +351,7 @@ export class Runner {
     args: string[],
   ): Promise<{ code?: number; error?: string; out: string }> {
     return new Promise((resolve) => {
-      const d = debug(`${this.DebugPrefix}:runFiddle`);
+      const d = debug(`${this.debugPrefix}:runFiddle`);
       const ret = { code: null, out: '', error: null };
 
       const { childTimeoutMs, fiddleExec } = this;

@@ -4,20 +4,22 @@ import { URL } from 'url';
 import { inspect } from 'util';
 
 import {
+  BisectJob,
   Job,
   JobId,
   JobType,
-  Result,
+  TestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
-import { BisectCommand, parseIssueCommand } from './issue-parser';
+import { BisectCommand, parseIssueCommand, TestCommand } from './issue-parser';
 import { ElectronVersions } from './electron-versions';
+import { generateTable, Matrix } from './table-generator';
 
 const AppName = 'BugBot' as const;
-const DebugPrefix = 'GitHubClient' as const;
+const DebugPrefix = 'bot:GitHubClient' as const;
 
 export class GithubClient {
   private isClosed = false;
@@ -26,6 +28,9 @@ export class GithubClient {
   private readonly pollIntervalMs: number;
   private readonly robot: Probot;
   private readonly versions = new ElectronVersions();
+
+  // issue id -> bot comment id
+  private readonly botCommentIds = new Map<number, number>();
 
   constructor(opts: {
     authToken: string;
@@ -111,6 +116,8 @@ export class GithubClient {
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
         promises.push(this.runBisectJob(cmd, context));
+      } else if (cmd?.type === JobType.test) {
+        promises.push(this.runTestMatrix(cmd, context));
       }
     }
 
@@ -137,14 +144,61 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const completedJob = await this.pollAndReturnJob(jobId);
+    const completedJob = (await this.pollAndReturnJob(jobId)) as BisectJob;
     if (completedJob) {
-      await this.handleBisectResult(
-        completedJob.id,
-        completedJob.last,
-        context,
-      );
+      await this.handleBisectResult(completedJob, context);
     }
+  }
+
+  private async runTestMatrix(
+    command: TestCommand,
+    context: Context<'issue_comment'>,
+  ) {
+    const d = debug(`${DebugPrefix}:runTestMatrix`);
+    const resultPromises: Promise<Job | void>[] = [];
+    d(
+      'Running test matrix for platforms %o and versions %o',
+      command.platforms,
+      command.versions,
+    );
+
+    // queue all jobs for matrix
+    const matrix: Matrix = {};
+    const queueJobPromises: Promise<string>[] = [];
+
+    for (const p of command.platforms) {
+      matrix[p] = {};
+      for (const v of command.versions) {
+        // this is important because we need the version keys
+        // to always be present for the table generator code
+        matrix[p][v] = undefined;
+
+        const promise = this.broker.queueTestJob({
+          gistId: command.gistId,
+          platforms: [p],
+          type: 'test',
+          versions: [v],
+        });
+
+        queueJobPromises.push(promise);
+      }
+    }
+
+    const ids = await Promise.all(queueJobPromises);
+
+    d(`All ${ids.length} jobs queued: %o`, ids);
+
+    for (const id of ids) {
+      const promise = this.pollAndReturnJob(id).then((job: TestJob) => {
+        matrix[job.platform][job.version] = job;
+        d('%O', matrix);
+        return this.handleTestResult(job, matrix, context);
+      });
+      resultPromises.push(promise);
+    }
+
+    await Promise.all(resultPromises);
+    d(`All ${resultPromises.length} test jobs complete!`);
   }
 
   private async pollAndReturnJob(jobId: JobId) {
@@ -180,21 +234,33 @@ export class GithubClient {
     });
   }
 
+  private async handleTestResult(
+    job: TestJob,
+    matrix: Matrix,
+    context: Context<'issue_comment'>,
+  ) {
+    const d = debug(`${DebugPrefix}:handleTestResult`);
+    d({ job });
+    const table = generateTable(matrix, this.brokerBaseUrl);
+    await this.setIssueComment(table, context);
+  }
+
   /**
    * Comments on the issue once a bisect operation is completed
    * @param result The result from a Fiddle bisection
    * @param context Probot context object
    */
   private async handleBisectResult(
-    jobId: JobId,
-    result: Result,
+    job: BisectJob,
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug(`${DebugPrefix}:handleBisectResult`);
     const add_labels = new Set<string>();
     const del_labels = new Set<string>([Labels.BugBot.Running]);
     const paragraphs: string[] = [];
-    const log_url = new URL(`/log/${jobId}`, this.brokerBaseUrl);
+    const log_url = new URL(`/log/${job.id}`, this.brokerBaseUrl);
+
+    const result = job.last;
 
     switch (result.status) {
       case 'success': {
@@ -253,35 +319,57 @@ export class GithubClient {
     await Promise.all(promises);
   }
 
-  private async setIssueComment(
-    markdownComment: string,
-    context: Context<'issue_comment'>,
-  ): Promise<void> {
-    const issue = context.issue();
+  private async findIssueCommentId(context: Context<'issue_comment'>) {
+    const d = debug(`${DebugPrefix}:findIssueCommentId`);
+    const issueId = context.payload.issue.id;
 
-    // FIXME(any): iterate through all pages to get full comment set
+    // is the comment id cached?
+    if (this.botCommentIds.has(issueId)) {
+      const commentId = this.botCommentIds.get(issueId);
+      d(`found cached id ${commentId} for issue ${issueId}`);
+      return commentId;
+    }
+
+    // not cached; try to look it up
+    // FIXME(anyone): iterate past the first 100 comments if needed
+    d(`scraping issue ${issueId} for the bot comment`);
+    const issue = context.issue();
     const { data: comments } = await context.octokit.issues.listComments({
       ...issue,
       per_page: 100, // max
     });
 
     const lastBotComment = comments.reverse().find((comment) => {
-      const { user } = comment;
       const botName = env('BUGBOT_GITHUB_LOGIN');
-      return user.login === `${botName}[bot]`;
+      return comment.user.login === `${botName}[bot]`;
     });
+    const commentId = lastBotComment?.id;
+    d(`scraping issue ${issueId} result: ${commentId}`);
+    return commentId;
+  }
 
-    if (lastBotComment) {
+  private async setIssueComment(
+    body: string,
+    context: Context<'issue_comment'>,
+  ): Promise<void> {
+    const d = debug(`${DebugPrefix}:setIssueComment`);
+    const issue = context.issue();
+    const issueId = context.payload.issue.id;
+    const commentId = await this.findIssueCommentId(context);
+    if (commentId) {
+      d(`updating issue ${issueId} comment ${commentId}: %s`, body);
       await context.octokit.issues.updateComment({
         ...issue,
-        comment_id: lastBotComment.id,
-        body: markdownComment,
+        body,
+        comment_id: commentId,
       });
     } else {
-      await context.octokit.issues.createComment({
+      d(`creating new comment in issue ${issueId}: %s`, body);
+      const response = await context.octokit.issues.createComment({
         ...issue,
-        body: markdownComment,
+        body,
       });
+      this.botCommentIds.set(issueId, response.data.id);
     }
   }
 }
