@@ -30,9 +30,7 @@ describe('bot-broker-runner', () => {
   const fixtureDir = path.resolve(__dirname, 'fixtures', 'api.github.com');
   const brokerUrl = `http://localhost:43493` as const; // arbitrary port
   const pollIntervalMs = 10;
-
-  // const auth = new Auth();
-  const authToken = 'test' as const; // auth.createToken([AuthScope.UpdateJobs]);
+  const authToken = 'test' as const;
 
   // BOT
 
