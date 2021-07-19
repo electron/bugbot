@@ -80,11 +80,16 @@ describe('github-client', () => {
   });
 
   describe('GithubClient', () => {
+    const botCommentId = 1;
+    const repoPath = '/repos/erickzhao/bugbot';
+    const issueNumber = 10;
+    const issuePath = `${repoPath}/issues/${issueNumber}`;
+
     describe('on `/test bisect` command', () => {
       beforeEach(() => {
         nockScope = nock('https://api.github.com');
         nockScope
-          .get('/repos/erickzhao/bugbot/collaborators/erickzhao/permission')
+          .get(`${repoPath}/collaborators/erickzhao/permission`)
           .reply(200, {
             permission: 'admin',
           });
@@ -118,34 +123,25 @@ describe('github-client', () => {
 
         nockScope
           // No comments yet...
-          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+          .get(`${issuePath}/comments?per_page=100`)
           .reply(200, [])
 
           // ...so we create a new comment
-          .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+          .post(`${issuePath}/comments`, ({ body }) => {
             expect(body).toEqual('Queuing bisect job...');
             return true;
           })
-          .reply(200)
+          .reply(200, { id: botCommentId })
 
           // Add bugbot/test-running label
-          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+          .post(`${issuePath}/labels`, ({ labels }) => {
             expect(labels).toEqual([Labels.BugBot.Running]);
             return true;
           })
           .reply(200)
 
-          // Now, the comment from above should exist...
-          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-          .reply(200, [
-            {
-              id: 1,
-              user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` },
-            },
-          ])
-
-          // ...so we update it with the bisect info.
-          .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
+          // Update the previous comment
+          .patch(`${repoPath}/issues/comments/${botCommentId}`, ({ body }) => {
             const [v1, v2] = mockSuccess.version_range;
             expect(body).toEqual(
               `It looks like this bug was introduced between ${v1} and ${v2}\n` +
@@ -159,12 +155,9 @@ describe('github-client', () => {
           .reply(200)
 
           // delete the `bugbot/test-running` label and add `bug/regression`
-          .delete(
-            '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
-            () => true,
-          )
+          .delete(`${issuePath}/labels/bugbot%2Ftest-running`, () => true)
           .reply(200)
-          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+          .post(`${issuePath}/labels`, ({ labels }) => {
             expect(labels).toEqual([Labels.Bug.Regression]);
             return true;
           })
@@ -179,6 +172,7 @@ describe('github-client', () => {
       });
 
       it('handles failures gracefully', async () => {
+        const botCommentId = 1;
         const mockTestError: Result = {
           error: 'my-error',
           runner: 'my-runner-id',
@@ -201,33 +195,25 @@ describe('github-client', () => {
 
         nockScope
           // No comments yet...
-          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
+          .get(`${issuePath}/comments?per_page=100`)
           .reply(200, [])
 
           // ...so we create a new comment
-          .post('/repos/erickzhao/bugbot/issues/10/comments', ({ body }) => {
+          .post(`${issuePath}/comments`, ({ body }) => {
             expect(body).toEqual('Queuing bisect job...');
             return true;
           })
-          .reply(200)
+          .reply(200, { id: botCommentId })
 
           // Add bugbot/test-running label
-          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+          .post(`${issuePath}/labels`, ({ labels }) => {
             expect(labels).toEqual([Labels.BugBot.Running]);
             return true;
           })
           .reply(200)
 
-          // Now, the comment from above should exist...
-          .get('/repos/erickzhao/bugbot/issues/10/comments?per_page=100')
-          .reply(200, [
-            {
-              id: 1,
-              user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` },
-            },
-          ])
-          // ...so we update the comment with an error message.
-          .patch('/repos/erickzhao/bugbot/issues/comments/1', ({ body }) => {
+          // Update the previous comment with an error message
+          .patch(`${repoPath}/issues/comments/${botCommentId}`, ({ body }) => {
             expect(body).toBe(
               `BugBot was unable to complete this bisection. Check the table’s links for more information.\n\n` +
                 'A maintainer in @wg-releases will need to look into this. When any issues are resolved, BugBot can be restarted by replacing the bugbot/maintainer-needed label with bugbot/test-needed.\n\n' +
@@ -238,12 +224,9 @@ describe('github-client', () => {
           .reply(200)
 
           // delete the `bugbot/test-running` label and add `bugbot/maintainer-needed`
-          .delete(
-            '/repos/erickzhao/bugbot/issues/10/labels/bugbot%2Ftest-running',
-            () => true,
-          )
+          .delete(`${issuePath}/labels/bugbot%2Ftest-running`)
           .reply(200)
-          .post('/repos/erickzhao/bugbot/issues/10/labels', ({ labels }) => {
+          .post(`${issuePath}/labels`, ({ labels }) => {
             expect(labels).toEqual([Labels.BugBot.MaintainerNeeded]);
             return true;
           })
@@ -291,13 +274,13 @@ describe('github-client', () => {
         it('...the commenter is not a maintainer', async () => {
           // remove existing valid maintainer mock
           const interceptor = nockScope.get(
-            '/repos/erickzhao/bugbot/collaborators/erickzhao/permission',
+            `${repoPath}/collaborators/erickzhao/permission`,
           );
           nock.removeInterceptor(interceptor);
 
           // mock invalid maintainer
           nockScope
-            .get('/repos/erickzhao/bugbot/collaborators/fnord/permission')
+            .get(`${repoPath}/collaborators/fnord/permission`)
             .reply(200, {
               permissions: 'none',
             });
