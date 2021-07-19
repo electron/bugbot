@@ -132,8 +132,8 @@ export class Runner {
   private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
   private pollInterval: ReturnType<typeof setInterval>;
+  private runningPromise: Promise<unknown>;
   private stopResolve: (value: unknown) => void;
-  private sleepPromise: Promise<void>;
   private stopping = false;
 
   /**
@@ -169,8 +169,6 @@ export class Runner {
     this.uuid = opts.uuid || uuidv4();
     this.DebugPrefix = `runner:${this.uuid}`;
   }
-
-  private runningPromise: Promise<unknown>;
 
   private isRunning = () => this.runningPromise !== undefined;
 
