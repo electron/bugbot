@@ -132,7 +132,7 @@ export class Runner {
   private readonly pollIntervalMs: number;
   private readonly logIntervalMs: number;
   private pollInterval: ReturnType<typeof setInterval>;
-  private runningPromise: Promise<unknown>;
+  private runningPromise?: Promise<unknown>;
   private stopResolve: (value: unknown) => void;
   private stopping = false;
 
