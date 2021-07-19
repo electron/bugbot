@@ -297,6 +297,7 @@ export class Runner {
       ...[JobType.bisect, job.version_range[0], job.version_range[1]],
       ...['--fiddle', job.gist],
       '--full',
+      '--log-config',
     ]);
 
     const result: Partial<Result> = {};
@@ -326,6 +327,7 @@ export class Runner {
       JobType.test,
       ...['--version', job.version],
       ...['--fiddle', job.gist],
+      '--log-config',
     ]);
 
     const result: Partial<Result> = {};
