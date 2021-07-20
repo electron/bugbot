@@ -14,7 +14,7 @@ import {
   Platform,
   Result,
   VersionRange,
-} from '@electron/bugbot-shared/src/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 import { Auth, AuthScope } from '../src/auth';
 import { Server } from '../src/server';
 

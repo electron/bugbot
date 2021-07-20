@@ -16,7 +16,7 @@ import {
   Result,
   TestJob,
   VersionRange,
-} from '@electron/bugbot-shared/src/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60_000);
 

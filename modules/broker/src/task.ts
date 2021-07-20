@@ -6,7 +6,7 @@ import {
   Job,
   RunnerId,
   assertJob,
-} from '@electron/bugbot-shared/src/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 
 class LogSection {
   public readonly runner: RunnerId;

@@ -12,7 +12,7 @@ import {
   BisectJob,
   JobType,
   Result,
-} from '@electron/bugbot-shared/src/interfaces';
+} from '@electron/bugbot-shared/build/interfaces';
 import { Labels } from '../src/github-labels';
 
 jest.mock('../src/broker-client');
