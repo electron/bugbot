@@ -9,8 +9,8 @@ import {
   JobId,
   JobType,
   TestJob,
-} from '@electron/bugbot-shared/build/interfaces';
-import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
+} from '@electron/bugbot-shared/src/interfaces';
+import { env, envInt } from '@electron/bugbot-shared/src/env-vars';
 
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';

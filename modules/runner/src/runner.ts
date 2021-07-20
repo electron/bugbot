@@ -20,9 +20,9 @@ import {
   assertJob,
   assertBisectJob,
   assertTestJob,
-} from '@electron/bugbot-shared/build/interfaces';
-import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
-import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
+} from '@electron/bugbot-shared/src/interfaces';
+import { RotaryLoop } from '@electron/bugbot-shared/src/rotary-loop';
+import { env, envInt } from '@electron/bugbot-shared/src/env-vars';
 
 import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 

@@ -6,7 +6,7 @@ import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
 import { ElectronVersions, releaseCompare } from './electron-versions';
-import { Platform } from '@electron/bugbot-shared/build/interfaces';
+import { Platform } from '@electron/bugbot-shared/src/interfaces';
 
 // no types exist for this module
 //eslint-disable-next-line @typescript-eslint/no-var-requires
