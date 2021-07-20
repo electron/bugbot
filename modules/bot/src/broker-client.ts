@@ -3,14 +3,13 @@ import fetch from 'node-fetch';
 import { URL } from 'url';
 import { v4 as mkuuid } from 'uuid';
 
-// import { FiddleBisectResult } from '@electron/bugbot-runner/build/fiddle-bisect-parser';
 import {
   BisectJob,
   Job,
   JobId,
   JobType,
   TestJob,
-} from '@electron/bugbot-shared/build/interfaces';
+} from '@electron/bugbot-shared/src/interfaces';
 
 import { BisectCommand, TestCommand } from './issue-parser';
 
