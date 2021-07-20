@@ -21,6 +21,12 @@ import { generateTable, Matrix } from './table-generator';
 const AppName = 'BugBot' as const;
 const DebugPrefix = 'bot:GitHubClient' as const;
 
+interface BotCommentInfo {
+  body: string;
+  id: number; // comment id
+  time: number; // epoch msec
+}
+
 export class GithubClient {
   private isClosed = false;
   private readonly broker: BrokerAPI;
@@ -29,8 +35,8 @@ export class GithubClient {
   private readonly robot: Probot;
   private readonly versions = new ElectronVersions();
 
-  // issue id -> bot comment id
-  private readonly botCommentIds = new Map<number, number>();
+  // issue id # -> bugbot's comment in that issue
+  private readonly botCommentInfo = new Map<number, BotCommentInfo>();
 
   constructor(opts: {
     authToken: string;
@@ -191,10 +197,12 @@ export class GithubClient {
       const job = (await this.pollAndReturnJob(id)) as TestJob;
       matrix[job.platform][job.version] = job;
       d('%O', matrix);
-      await this.handleTestResult(job, matrix, context);
+      await this.maybeSetIssueMatrixComment(job, matrix, context);
     };
 
     await Promise.all(ids.map((id) => awaitOneJob(id)));
+    d('all promises settled; sending final update');
+    await this.setIssueMatrixComment(matrix, context);
     d(`All ${ids.length} test jobs complete!`);
   }
 
@@ -231,15 +239,33 @@ export class GithubClient {
     });
   }
 
-  private async handleTestResult(
+  private async maybeSetIssueMatrixComment(
     job: TestJob,
     matrix: Matrix,
     context: Context<'issue_comment'>,
   ) {
-    const d = debug(`${DebugPrefix}:handleTestResult`);
-    d({ job });
-    const table = generateTable(matrix, this.brokerBaseUrl);
-    await this.setIssueComment(table, context);
+    const d = debug(`${DebugPrefix}:maybeSetIssueMatrixComment`);
+    const issueId = context.payload.issue.id;
+    d({ issueId, job });
+
+    // don't update too often
+    const commentInfo = this.botCommentInfo.get(issueId);
+    if (commentInfo && commentInfo.time + this.pollIntervalMs > Date.now()) {
+      d('just updated issue #${issueId} recently; not updating again so soon');
+      return;
+    }
+
+    await this.setIssueMatrixComment(matrix, context);
+  }
+
+  private async setIssueMatrixComment(
+    matrix: Matrix,
+    context: Context<'issue_comment'>,
+  ) {
+    const d = debug(`${DebugPrefix}:setIssueMatrixComment`);
+    const body = generateTable(matrix, this.brokerBaseUrl);
+    d(`issueId ${context.payload.issue.id} body:\n${body}`);
+    await this.setIssueComment(body, context);
   }
 
   /**
@@ -316,33 +342,35 @@ export class GithubClient {
     await Promise.all(promises);
   }
 
-  private async findIssueCommentId(context: Context<'issue_comment'>) {
-    const d = debug(`${DebugPrefix}:findIssueCommentId`);
+  private async findBotComment(
+    context: Context<'issue_comment'>,
+  ): Promise<BotCommentInfo | undefined> {
+    const d = debug(`${DebugPrefix}:findBotComment`);
     const issueId = context.payload.issue.id;
 
-    // is the comment id cached?
-    if (this.botCommentIds.has(issueId)) {
-      const commentId = this.botCommentIds.get(issueId);
-      d(`found cached id ${commentId} for issue ${issueId}`);
-      return commentId;
+    // see if the comment info is already cached
+    let info = this.botCommentInfo.get(issueId);
+    if (info) {
+      d(`found cached info for issue #${issueId}: ${JSON.stringify(info)}`);
+      return info;
     }
 
     // not cached; try to look it up
     // FIXME(anyone): iterate past the first 100 comments if needed
     d(`scraping issue ${issueId} for the bot comment`);
-    const issue = context.issue();
-    const { data: comments } = await context.octokit.issues.listComments({
-      ...issue,
-      per_page: 100, // max
-    });
-
+    const opts = context.issue({ per_page: 100 });
+    const { data: comments } = await context.octokit.issues.listComments(opts);
+    const botName = env('BUGBOT_GITHUB_LOGIN');
     const lastBotComment = comments.reverse().find((comment) => {
-      const botName = env('BUGBOT_GITHUB_LOGIN');
       return comment.user.login === `${botName}[bot]`;
     });
-    const commentId = lastBotComment?.id;
-    d(`scraping issue ${issueId} result: ${commentId}`);
-    return commentId;
+
+    if (lastBotComment) {
+      const { body, id, updated_at } = lastBotComment;
+      info = { body, id, time: Date.parse(updated_at) };
+      this.botCommentInfo.set(issueId, info);
+      return info;
+    }
   }
 
   private async setIssueComment(
@@ -350,24 +378,29 @@ export class GithubClient {
     context: Context<'issue_comment'>,
   ): Promise<void> {
     const d = debug(`${DebugPrefix}:setIssueComment`);
-    const issue = context.issue();
     const issueId = context.payload.issue.id;
-    const commentId = await this.findIssueCommentId(context);
-    if (commentId) {
-      d(`updating issue ${issueId} comment ${commentId}: %s`, body);
-      await context.octokit.issues.updateComment({
-        ...issue,
-        body,
-        comment_id: commentId,
-      });
-    } else {
-      d(`creating new comment in issue ${issueId}:\n%s`, body);
-      const response = await context.octokit.issues.createComment({
-        ...issue,
-        body,
-      });
-      this.botCommentIds.set(issueId, response.data.id);
+    d(`setting issue #${issueId} bot comment:\n%s`, body);
+
+    let commentInfo = await this.findBotComment(context);
+    if (!commentInfo) {
+      d('no comment to update; posting a new one');
+      const opts = context.issue({ body });
+      const response = await context.octokit.issues.createComment(opts);
+      commentInfo = { body, id: response.data.id, time: Date.now() };
+      this.botCommentInfo.set(issueId, commentInfo);
+      return;
     }
+
+    if (body === commentInfo.body) {
+      d('new body matches previous body; not updating');
+      return;
+    }
+
+    d(`patching existing comment ${commentInfo.id}`);
+    const opts = context.issue({ body, comment_id: commentInfo.id });
+    await context.octokit.issues.updateComment(opts);
+    commentInfo.body = body;
+    commentInfo.time = Date.now();
   }
 }
 
