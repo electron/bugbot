@@ -8,8 +8,8 @@ import express from 'express';
 import { URL } from 'url';
 import { klona } from 'klona/json';
 
-import { assertJob } from '@electron/bugbot-shared/src/interfaces';
-import { env, getEnvData } from '@electron/bugbot-shared/src/env-vars';
+import { assertJob } from '@electron/bugbot-shared/build/interfaces';
+import { env, getEnvData } from '@electron/bugbot-shared/build/env-vars';
 
 import { ALL_SCOPES, Auth, AuthScope } from './auth';
 import { Broker } from './broker';
