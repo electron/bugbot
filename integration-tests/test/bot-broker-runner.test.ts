@@ -180,6 +180,12 @@ describe('bot-broker-runner', () => {
     const issuePath = `${projectPath}/issues/${issueNumber}` as const;
     const botComment = { id: botCommentId, user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` } };
 
+    const electronJsNockscope = nock('https://electronjs.org/')
+      .get('/headers/index.json')
+      .replyWithFile(200, __dirname + '/fixtures/electron-versions.json', {
+        'Content-Type': 'application/json',
+      });
+
     ghNockScope = nock('https://api.github.com');
     ghNockScope
       // should we respond to this comment? yes, it's from an admin
