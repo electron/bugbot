@@ -251,7 +251,7 @@ export class GithubClient {
     // don't update too often
     const commentInfo = this.botCommentInfo.get(issueId);
     if (commentInfo && commentInfo.time + this.pollIntervalMs > Date.now()) {
-      d('just updated issue #${issueId} recently; not updating again so soon');
+      d(`just updated issue #${issueId} recently; not updating again so soon`);
       return;
     }
 
