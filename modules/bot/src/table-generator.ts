@@ -41,6 +41,10 @@ function generateCell(job: TestJob, brokerBaseUrl: string) {
   return `[${cellLabel(job)}](${logUrl.toString()})`;
 }
 
+function versionMarkdown(version: string) {
+  return `[${version}](https://github.com/electron/electron/releases/tag/v${version})`;
+}
+
 export function generateTable(jobMatrix: Matrix, brokerBaseUrl: string) {
   const d = debug('bot:generateTable');
   d('input matrix %O', jobMatrix);
@@ -57,7 +61,7 @@ export function generateTable(jobMatrix: Matrix, brokerBaseUrl: string) {
 
   // each row is a version with its results per platform
   for (const version of versions) {
-    const versionRow = [version];
+    const versionRow = [versionMarkdown(version)];
 
     for (const plat of platforms) {
       const result = jobMatrix[plat][version] as TestJob;
