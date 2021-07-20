@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "build": "# no-op",
+    "build": "tsc -b",
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --coverage"
   },
