@@ -120,6 +120,19 @@ describe('issue-parser', () => {
         const command = await parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toBeUndefined();
       });
+
+      it('does not parse win32 as Electron 32.0.0', async () => {
+        const issueBody = getIssueBody('issue.md');
+        const platforms = ['linux', 'win32'];
+        const vers = ['11.0.2'];
+        const comment = `${COMMENT} ${platforms.join(' ')} ${vers.join(' ')}`;
+        const command = await parseIssueCommand(issueBody, comment, versions);
+        expect(command).toStrictEqual({
+          ...expectedCommand,
+          platforms,
+          versions: vers,
+        });
+      });
     });
 
     describe('parsing bisect commands', () => {

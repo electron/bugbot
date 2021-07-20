@@ -147,13 +147,13 @@ async function parseTestCommand(
       ret.gistId = id;
       continue;
     }
-    const ver = SemVer.coerce(word);
-    if (ver) {
-      ret.versions.push(ver.version);
-      continue;
-    }
     if (ALL_PLATFORMS.includes(word)) {
       ret.platforms.push(word as Platform);
+      continue;
+    }
+    const ver = SemVer.coerce(word);
+    if (ver && (await versions.isVersion(ver.version))) {
+      ret.versions.push(ver.version);
       continue;
     }
   }
