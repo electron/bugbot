@@ -10,7 +10,9 @@ export interface Matrix {
   win32?: any;
 }
 
-function cellLabel(job: TestJob) {
+const pendingLabel = 'Pending&ensp;🟡';
+
+function getJobLabel(job: TestJob) {
   switch (job.last?.status) {
     case 'success':
       return 'Passed&ensp;🟢';
@@ -21,7 +23,7 @@ function cellLabel(job: TestJob) {
     case 'test_error':
       return 'Test Error&ensp;🔵';
     default:
-      return 'Pending&ensp;🟡';
+      return pendingLabel;
   }
 }
 
@@ -37,8 +39,12 @@ function platformDisplayName(platform: Platform) {
 }
 
 function generateCell(job: TestJob, brokerBaseUrl: string) {
+  // if job hasn't been allocated yet, show it as pending
+  if (!job?.id) return pendingLabel;
+
+  // job has been allocated, so we can link to the log
   const logUrl = new URL(`/log/${job.id}`, brokerBaseUrl);
-  return `[${cellLabel(job)}](${logUrl.toString()})`;
+  return `[${getJobLabel(job)}](${logUrl.toString()})`;
 }
 
 function versionMarkdown(version: string) {
