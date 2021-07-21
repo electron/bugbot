@@ -12,9 +12,8 @@ import fetch from 'node-fetch';
  */
 export function logMetric(
   message: string,
-  labels?: Record<string, string>,
+  labels: Record<string, string> = {},
 ): void {
-  const now = Date.now();
   const d = debug('log-metric');
 
   const envUrl = process.env.BUGBOT_LOG_METRICS_URL; // required
@@ -34,7 +33,7 @@ export function logMetric(
           ...(labels || {}),
           app: 'bugbot',
         },
-        values: [[Math.round(now * 1000000).toString(), message]],
+        values: [[Math.round(Date.now() * 1_000_000).toString(), message]],
       },
     ],
   };
