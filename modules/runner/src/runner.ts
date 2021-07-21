@@ -78,8 +78,9 @@ class Task {
    */
   private async sendPatch(patches: Readonly<PatchOp>[]): Promise<boolean> {
     const d = debug(`${this.debugPrefix}:sendPatch`);
-    d('task: %O', this);
-    d('patches: %O', patches);
+    d('job: %O', this.job);
+    d('patches:');
+    for (const patch of patches) d('%o', patch);
 
     // Send the patch
     const job_url = new URL(`api/jobs/${this.job.id}`, this.brokerUrl);
