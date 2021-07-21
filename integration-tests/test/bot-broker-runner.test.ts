@@ -27,10 +27,11 @@ import {
 jest.setTimeout(60_000);
 
 describe('bot-broker-runner', () => {
-  const fixtureDir = path.resolve(__dirname, 'fixtures', 'api.github.com');
-  const brokerUrl = `http://localhost:43493` as const; // arbitrary port
-  const pollIntervalMs = 10;
   const authToken = 'test' as const;
+  const brokerUrl = `http://localhost:43493` as const; // arbitrary port
+  const commentIntervalMs = 20;
+  const fixtureDir = path.resolve(__dirname, 'fixtures', 'api.github.com');
+  const pollIntervalMs = 10;
 
   // BOT
 
@@ -52,6 +53,7 @@ describe('bot-broker-runner', () => {
     ghclient = new GithubClient({
       authToken,
       brokerBaseUrl: brokerUrl,
+      commentIntervalMs,
       pollIntervalMs,
       robot,
     });

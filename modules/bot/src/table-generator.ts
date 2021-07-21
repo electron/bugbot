@@ -13,6 +13,8 @@ export interface Matrix {
 const pendingLabel = 'Pending&ensp;🟡';
 
 function getJobLabel(job: TestJob) {
+  if (job.current?.time_begun) return 'Started&ensp;🟡';
+
   switch (job.last?.status) {
     case 'success':
       return 'Passed&ensp;🟢';

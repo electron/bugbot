@@ -20,6 +20,7 @@ jest.mock('../src/broker-client');
 describe('github-client', () => {
   const authToken = process.env.BUGBOT_AUTH_TOKEN;
   const brokerBaseUrl = process.env.BUGBOT_BROKER_URL;
+  const commentIntervalMs = 20;
   const pollIntervalMs = 10;
 
   let ghclient: GithubClient;
@@ -57,6 +58,7 @@ describe('github-client', () => {
     ghclient = new GithubClient({
       authToken,
       brokerBaseUrl,
+      commentIntervalMs,
       pollIntervalMs,
       robot,
     });

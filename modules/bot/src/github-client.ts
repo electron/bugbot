@@ -31,6 +31,7 @@ export class GithubClient {
   private isClosed = false;
   private readonly broker: BrokerAPI;
   private readonly brokerBaseUrl: string;
+  private readonly commentIntervalMs: number;
   private readonly pollIntervalMs: number;
   private readonly robot: Probot;
   private readonly versions = new ElectronVersions();
@@ -41,6 +42,7 @@ export class GithubClient {
   constructor(opts: {
     authToken: string;
     brokerBaseUrl: string;
+    commentIntervalMs: number;
     pollIntervalMs: number;
     robot: Probot;
   }) {
@@ -251,7 +253,7 @@ export class GithubClient {
 
     // don't update too often
     const commentInfo = this.botCommentInfo.get(issueId);
-    if (commentInfo && commentInfo.time + this.pollIntervalMs > Date.now()) {
+    if (commentInfo && commentInfo.time + this.commentIntervalMs > Date.now()) {
       d(`just updated issue #${issueId} recently; not updating again so soon`);
       return;
     }
@@ -421,7 +423,8 @@ export default (robot: Probot): void => {
   new GithubClient({
     authToken: env('BUGBOT_AUTH_TOKEN'),
     brokerBaseUrl: env('BUGBOT_BROKER_URL'),
-    robot,
+    commentIntervalMs: 10_000,
     pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+    robot,
   });
 };
