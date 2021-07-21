@@ -209,9 +209,8 @@ export class Runner {
 
       d(task.job.id, 'sending result');
       await task.sendResult(result);
+      d('done');
     }
-
-    d('done');
   };
 
   private async claimNextTask(): Promise<Task | undefined> {
