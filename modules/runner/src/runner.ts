@@ -382,8 +382,11 @@ export class Runner {
       child.on('error', (err) => (ret.error = err.toString()));
 
       child.on('close', (code) => {
-        ret.code = code;
-        ret.out = stdout.join('');
+        const out = stdout.join('');
+        const match = /Electron Fiddle is exiting with code (\d+)/.exec(out);
+        if (match) code = Number.parseInt(match[1]);
+        d('on close, got code', code);
+        ret.out = out;
         d('resolve %O', ret);
         resolve(ret);
       });
