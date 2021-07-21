@@ -29,7 +29,7 @@ export default class BrokerAPI {
     const d = debug(`${DebugPrefix}:queueBisectJob`);
 
     const url = new URL('/api/jobs', this.baseURL);
-    d('url', url);
+    d('url', url.toString());
 
     const bisectJob: BisectJob = {
       gist: command.gistId,
@@ -62,7 +62,7 @@ export default class BrokerAPI {
     const d = debug(`${DebugPrefix}:queueTestJob`);
 
     const url = new URL('/api/jobs', this.baseURL);
-    d('queueing test command via %s', url);
+    d('queueing test command via %s', url.toString());
 
     // FIXME(any): We should add a separate type here so that we can
     // pass in a single version and platform to this function
@@ -103,7 +103,7 @@ export default class BrokerAPI {
     const d = debug(`${DebugPrefix}:getJob`);
 
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-    d('url', url);
+    d('url', url.toString());
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -121,7 +121,7 @@ export default class BrokerAPI {
     const d = debug(`${DebugPrefix}:completeJob`);
 
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-    d('url', url);
+    d('url', url.toString());
 
     const response = await fetch(url.toString(), {
       body: JSON.stringify([
