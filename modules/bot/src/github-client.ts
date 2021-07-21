@@ -382,25 +382,37 @@ export class GithubClient {
     d(`setting issue #${issueId} bot comment:\n%s`, body);
 
     let commentInfo = await this.findBotComment(context);
-    if (!commentInfo) {
+
+    // maybe do nothing
+    if (body === commentInfo?.body) {
+      d('new body matches previous body; not updating');
+      return;
+    }
+
+    // maybe patch an existing comment
+    if (commentInfo) {
+      try {
+        d(`patching existing comment ${commentInfo.id}`);
+        const opts = context.issue({ body, comment_id: commentInfo.id });
+        await context.octokit.issues.updateComment(opts);
+        commentInfo.body = body;
+        commentInfo.time = Date.now();
+        return;
+      } catch (error) {
+        d('patching existing comment failed; posting a new one instead', error);
+      }
+    }
+
+    // maybe post a new comment
+    try {
       d('no comment to update; posting a new one');
       const opts = context.issue({ body });
       const response = await context.octokit.issues.createComment(opts);
       commentInfo = { body, id: response.data.id, time: Date.now() };
       this.botCommentInfo.set(issueId, commentInfo);
-      return;
+    } catch (error) {
+      d('unable to post new comment', error);
     }
-
-    if (body === commentInfo.body) {
-      d('new body matches previous body; not updating');
-      return;
-    }
-
-    d(`patching existing comment ${commentInfo.id}`);
-    const opts = context.issue({ body, comment_id: commentInfo.id });
-    await context.octokit.issues.updateComment(opts);
-    commentInfo.body = body;
-    commentInfo.time = Date.now();
   }
 }
 
