@@ -382,8 +382,15 @@ export class Runner {
       child.on('error', (err) => (ret.error = err.toString()));
 
       child.on('close', (code) => {
+        d('got exit code from child process close event', code);
+        const out = stdout.join('');
+        const match = /Electron Fiddle is exiting with code (\d+)/.exec(out);
+        if (match) {
+          code = Number.parseInt(match[1]);
+          d(`got exit code "${code}" from log message "${match[0]}"`);
+        }
         ret.code = code;
-        ret.out = stdout.join('');
+        ret.out = out;
         d('resolve %O', ret);
         resolve(ret);
       });
