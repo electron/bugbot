@@ -165,8 +165,6 @@ export class GithubClient {
       command.versions,
     );
 
-    await this.setIssueComment('Queuing bisect job...', context);
-
     // queue all jobs for matrix
     const matrix: Matrix = {};
     const queueJobPromises: Promise<string>[] = [];
@@ -188,6 +186,9 @@ export class GithubClient {
         );
       }
     }
+
+    // set initial matrix comment
+    await this.setIssueMatrixComment(matrix, context);
 
     const ids = await Promise.all(queueJobPromises);
 
