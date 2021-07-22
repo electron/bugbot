@@ -187,28 +187,29 @@ export class Runner {
   public stop = () => this.loop.stop();
 
   public pollOnce = async (): Promise<void> => {
+    let task: Task | undefined;
     const d = debug(`${this.debugPrefix}:pollOnce`);
 
-    const task = await this.claimNextTask();
-    d('next task: %o', task);
-    if (!task) return;
+    while ((task = await this.claimNextTask())) {
+      d('next task: %o', task);
 
-    // run the job
-    d(task.job.id, 'running job');
-    let result: Partial<Result>;
-    switch (task.job.type) {
-      case JobType.bisect:
-        result = await this.runBisect(task);
-        break;
+      // run the job
+      d(task.job.id, 'running job');
+      let result: Partial<Result>;
+      switch (task.job.type) {
+        case JobType.bisect:
+          result = await this.runBisect(task);
+          break;
 
-      case JobType.test:
-        result = await this.runTest(task);
-        break;
+        case JobType.test:
+          result = await this.runTest(task);
+          break;
+      }
+
+      d(task.job.id, 'sending result');
+      await task.sendResult(result);
+      d('done');
     }
-
-    d(task.job.id, 'sending result');
-    await task.sendResult(result);
-    d('done');
   };
 
   private async claimNextTask(): Promise<Task | undefined> {
