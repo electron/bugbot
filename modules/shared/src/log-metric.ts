@@ -10,11 +10,12 @@ import fetch from 'node-fetch';
  * with the data format defined by:
  * https://grafana.com/docs/loki/latest/api/#post-lokiapiv1push
  *
- * The message can either be a string, which is sent raw, or an object that is
- * serialized and sent as JSON.
+ * `data` is the metric data that you would expect to change in each log message
+ * or even across different types of log messages; `labels` are common among a
+ * large group of different kinds of log messages (e.g. which module made it).
  */
 export function logMetric(
-  message: string | Record<string, any>,
+  data: Record<string, any>,
   labels: Record<string, string> = {},
 ): void {
   const d = debug('log-metric');
@@ -29,8 +30,6 @@ export function logMetric(
   }
 
   // Craft the payload
-  const logMsg =
-    typeof message === 'string' ? message : JSON.stringify(message);
   const payload = {
     streams: [
       {
@@ -38,7 +37,9 @@ export function logMetric(
           ...(labels || {}),
           app: 'bugbot',
         },
-        values: [[Math.round(Date.now() * 1_000_000).toString(), logMsg]],
+        values: [
+          [Math.round(Date.now() * 1_000_000).toString(), JSON.stringify(data)],
+        ],
       },
     ],
   };
