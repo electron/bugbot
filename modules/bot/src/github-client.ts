@@ -210,7 +210,7 @@ export class GithubClient {
   }
 
   private async waitForCompletedJob(jobId: JobId): Promise<Job> {
-    const sleepMsec = 5_000;
+    const sleepMsec = 2_000;
     const d = debug(`${DebugPrefix}:waitForCompletedJob`);
     d(`Polling job '${jobId}' every ${sleepMsec} ms`);
     for (;;) {
