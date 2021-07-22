@@ -397,7 +397,8 @@ export class GithubClient {
       try {
         d(`patching existing comment ${commentInfo.id}`);
         const opts = context.issue({ body, comment_id: commentInfo.id });
-        await context.octokit.issues.updateComment(opts);
+        const response = await context.octokit.issues.updateComment(opts);
+        d('patch-comment response %O', response);
         commentInfo.body = body;
         commentInfo.time = Date.now();
         return;
@@ -411,6 +412,7 @@ export class GithubClient {
       d('no comment to update; posting a new one');
       const opts = context.issue({ body });
       const response = await context.octokit.issues.createComment(opts);
+      d('create-comment response %O', response);
       commentInfo = { body, id: response.data.id, time: Date.now() };
       this.botCommentInfo.set(issueId, commentInfo);
     } catch (error) {
