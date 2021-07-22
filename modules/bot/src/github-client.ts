@@ -188,7 +188,7 @@ export class GithubClient {
     }
 
     // set initial matrix comment
-    await this.setIssueMatrixComment(matrix, context);
+    await this.setIssueMatrixComment(matrix, context, command.gistId);
 
     const ids = await Promise.all(queueJobPromises);
 
@@ -203,7 +203,7 @@ export class GithubClient {
 
     await Promise.all(ids.map((id) => awaitOneJob(id)));
     d('all promises settled; sending final update');
-    await this.setIssueMatrixComment(matrix, context);
+    await this.setIssueMatrixComment(matrix, context, command.gistId);
     d(`All ${ids.length} test jobs complete!`);
   }
 
@@ -256,15 +256,18 @@ export class GithubClient {
       return;
     }
 
-    await this.setIssueMatrixComment(matrix, context);
+    await this.setIssueMatrixComment(matrix, context, job.gist);
   }
 
   private async setIssueMatrixComment(
     matrix: Matrix,
     context: Context<'issue_comment'>,
+    gist: string,
   ) {
     const d = debug(`${DebugPrefix}:setIssueMatrixComment`);
-    const body = generateTable(matrix, this.brokerBaseUrl);
+    const link = `Testing https://gist.github.com/${gist}`;
+    const table = generateTable(matrix, this.brokerBaseUrl);
+    const body = [link, table].join('\n\n');
     d(`issueId ${context.payload.issue.id} body:\n${body}`);
     await this.setIssueComment(body, context);
   }
