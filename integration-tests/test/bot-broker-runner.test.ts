@@ -140,8 +140,8 @@ describe('bot-broker-runner', () => {
       .get(`${projectPath}/collaborators/erickzhao/permission`)
       .reply(200, { permission: 'admin' })
       .post(`${issuePath}/labels`).reply(200)
-      .get(`${issuePath}/comments?per_page=100`).reply(200, []) // No comments yet...
-      .post(`${issuePath}/comments`).reply(200, { id: botCommentId }) // ...so we create a new comment
+      // create a new comment:
+      .post(`${issuePath}/comments`).reply(200, { id: botCommentId })
       .delete(`${issuePath}/labels/bugbot%2Ftest-running`).reply(200)
       // ... task runs...
       .post(`${issuePath}/labels`).reply(200)
@@ -191,9 +191,7 @@ describe('bot-broker-runner', () => {
       // should we respond to this comment? yes, it's from an admin
       .get(`${projectPath}/collaborators/erickzhao/permission`)
       .reply(200, { permission: 'admin' })
-      // looking for any existing comment already posted by the bot...
-      .get(`${issuePath}/comments?per_page=100`).reply(200, [])
-      // nope; so no comment yet, so create one
+      // create a new comment:
       .post(`${issuePath}/comments`).reply(200, { id: botCommentId })
       // and when the test is finished, update the comment
       .patch(`${projectPath}/issues/comments/${botCommentId}`).reply(200);
