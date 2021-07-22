@@ -267,7 +267,8 @@ export class GithubClient {
     const d = debug(`${DebugPrefix}:setIssueMatrixComment`);
     const link = `Testing https://gist.github.com/${gist}`;
     const table = generateTable(matrix, this.brokerBaseUrl);
-    const body = [link, table].join('\n\n');
+    const footer = `*I am a bot. [Learn more about what I can do!](https://github.com/electron/bugbot#readme)*`;
+    const body = [link, table, footer].join('\n\n');
     d(`issueId ${context.payload.issue.id} body:\n${body}`);
     await this.setIssueComment(body, context);
   }
