@@ -54,6 +54,8 @@ Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#usin
 | `BUGBOT_POLL_INTERVAL_MS` | Bot, Runner | How frequently to poll the Broker | 20 seconds |
 | `BUGBOT_AUTH_TOKEN` | Required: Bot, Runner; Optional: Broker | The auth token for communications with the Broker |
 | `BUGBOT_GITHUB_LOGIN` | Bot | The name of the GitHub app registered for the Probot client |
+| `BUGBOT_LOG_METRICS_URL` | Broker | The remote Loki endpoint to send log metrics to |
+| `BUGBOT_LOG_METRICS_AUTH` | Broker | The (`Basic`) auth credentials to authenticate log metrics requests with |
 
 ## Development
 
