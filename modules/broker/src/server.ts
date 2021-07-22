@@ -150,10 +150,12 @@ export class Server {
       assertJob(req.body);
       const task = new Task(req.body);
       this.broker.addTask(task);
-      logMetric(`created new task ${task.job.id}`, {
-        module: 'broker',
-        event: 'task_created',
-      });
+      logMetric(
+        {
+          event: 'task_created',
+        },
+        { module: 'broker' },
+      );
       res.status(201).send(escapeHtml(task.job.id));
     } catch (error: unknown) {
       d('bad job', error);

@@ -9,9 +9,12 @@ import fetch from 'node-fetch';
  * This code assumes that it is sending logs to an instance of Grafana Loki,
  * with the data format defined by:
  * https://grafana.com/docs/loki/latest/api/#post-lokiapiv1push
+ *
+ * The message can either be a string, which is sent raw, or an object that is
+ * serialized and sent as JSON.
  */
 export function logMetric(
-  message: string,
+  message: string | Record<string, any>,
   labels: Record<string, string> = {},
 ): void {
   const d = debug('log-metric');
@@ -26,6 +29,8 @@ export function logMetric(
   }
 
   // Craft the payload
+  const logMsg =
+    typeof message === 'string' ? message : JSON.stringify(message);
   const payload = {
     streams: [
       {
@@ -33,7 +38,7 @@ export function logMetric(
           ...(labels || {}),
           app: 'bugbot',
         },
-        values: [[Math.round(Date.now() * 1_000_000).toString(), message]],
+        values: [[Math.round(Date.now() * 1_000_000).toString(), logMsg]],
       },
     ],
   };
@@ -62,7 +67,7 @@ export function logMetric(
       }
 
       // Something must have gone wrong, log a debug error
-      return res.text().then((data) => d('unexpected response:', data));
+      return res.text().then((data) => d('unexpected response:', res, data));
     })
     .catch((err) => {
       d('error', err);
