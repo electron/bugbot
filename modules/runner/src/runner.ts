@@ -166,7 +166,7 @@ export class Runner {
     this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
-      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
+      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 60_000);
     this.fiddleArgv = stringArgv(
       opts.fiddleExec ||
         process.env.BUGBOT_FIDDLE_EXEC ||
