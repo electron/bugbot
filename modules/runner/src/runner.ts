@@ -78,8 +78,9 @@ class Task {
    */
   private async sendPatch(patches: Readonly<PatchOp>[]): Promise<boolean> {
     const d = debug(`${this.debugPrefix}:sendPatch`);
-    d('task: %O', this);
-    d('patches: %O', patches);
+    d('job: %o', this.job);
+    d('patches:');
+    for (const patch of patches) d('%o', patch);
 
     // Send the patch
     const job_url = new URL(`api/jobs/${this.job.id}`, this.brokerUrl);
@@ -274,7 +275,7 @@ export class Runner {
     }
 
     const job = await resp.json();
-    d('job %O', job);
+    d('job %o', job);
     assertJob(job);
     return new Task(
       job,
@@ -365,8 +366,7 @@ export class Runner {
       ] as const;
       task.addLogData(startupLog.join('\n'));
 
-      d('exec: %s', fiddleExec);
-      d('args: %o', args);
+      d(`${fiddleExec} ${args.join(' ')}`);
       d('opts: %o', opts);
       const child = spawn(fiddleExec, args, opts);
 
