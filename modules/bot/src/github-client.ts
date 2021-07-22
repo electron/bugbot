@@ -150,7 +150,7 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const completedJob = (await this.pollAndReturnJob(jobId)) as BisectJob;
+    const completedJob = (await this.waitForCompletedJob(jobId)) as BisectJob;
     if (completedJob) {
       await this.handleBisectResult(completedJob, context);
     }
@@ -197,7 +197,7 @@ export class GithubClient {
     d(`All ${ids.length} jobs queued: %o`, ids);
 
     const awaitOneJob = async (id: JobId) => {
-      const job = (await this.pollAndReturnJob(id)) as TestJob;
+      const job = (await this.waitForCompletedJob(id)) as TestJob;
       matrix[job.platform][job.version] = job;
       d('%O', matrix);
       await this.maybeSetIssueMatrixComment(job, matrix, context);
@@ -209,37 +209,17 @@ export class GithubClient {
     d(`All ${ids.length} test jobs complete!`);
   }
 
-  private async pollAndReturnJob(jobId: JobId) {
-    const d = debug(`${DebugPrefix}:pollAndReturnJob`);
-    // FIXME: this state info, such as the timer, needs to be a
-    // class property so that '/test stop' could stop the polling.
-    // Poll until the job is complete
-    d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
-
-    return new Promise<Job | void>((resolve, reject) => {
-      const pollBroker = async () => {
-        if (this.isClosed) {
-          return resolve();
-        }
-
-        d(`${jobId}: polling job...`);
-        const job = await this.broker.getJob(jobId);
-        if (!job.last) {
-          d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
-          setTimeout(pollBroker, this.pollIntervalMs);
-        } else {
-          d(`${jobId}: complete 🚀 `);
-          try {
-            await this.broker.completeJob(jobId);
-            return resolve(job);
-          } catch (e) {
-            return reject(e);
-          }
-        }
-      };
-
-      setTimeout(pollBroker, this.pollIntervalMs);
-    });
+  private async waitForCompletedJob(jobId: JobId): Promise<Job> {
+    const sleepMsec = 5_000;
+    const d = debug(`${DebugPrefix}:waitForCompletedJob`);
+    d(`Polling job '${jobId}' every ${sleepMsec} ms`);
+    for (;;) {
+      if (this.isClosed) return;
+      d(`${jobId}: polling job...`);
+      const job = await this.broker.getJob(jobId);
+      if (job.last) return job;
+      await new Promise((r) => setTimeout(r, sleepMsec, sleepMsec));
+    }
   }
 
   private async maybeSetIssueMatrixComment(
