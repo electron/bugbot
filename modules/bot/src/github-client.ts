@@ -35,8 +35,8 @@ export class GithubClient {
   private readonly robot: Probot;
   private readonly versions = new ElectronVersions();
 
-  // issue id # -> bugbot's comment in that issue
-  private readonly botCommentInfo = new Map<number, BotCommentInfo>();
+  // issue id # -> bugbot's comment in that issue for the current task
+  private readonly currentComment = new Map<number, BotCommentInfo>();
 
   constructor(opts: {
     authToken: string;
@@ -109,13 +109,10 @@ export class GithubClient {
    */
   private async handleManualCommand(context: Context<'issue_comment'>) {
     const promises: Promise<void>[] = [];
+    const { issue } = context.payload;
 
     for (const line of context.payload.comment.body.split('\n')) {
-      const cmd = await parseIssueCommand(
-        context.payload.issue.body,
-        line,
-        this.versions,
-      );
+      const cmd = await parseIssueCommand(issue.body, line, this.versions);
 
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
@@ -126,6 +123,8 @@ export class GithubClient {
     }
 
     await Promise.all(promises);
+
+    this.currentComment.delete(issue.id);
   }
 
   private async runBisectJob(
@@ -250,8 +249,8 @@ export class GithubClient {
     d({ issueId, job });
 
     // don't update too often
-    const commentInfo = this.botCommentInfo.get(issueId);
-    if (commentInfo && commentInfo.time + this.pollIntervalMs > Date.now()) {
+    const comment = this.currentComment.get(issueId);
+    if (comment && comment.time + this.pollIntervalMs > Date.now()) {
       d(`just updated issue #${issueId} recently; not updating again so soon`);
       return;
     }
@@ -343,37 +342,6 @@ export class GithubClient {
     await Promise.all(promises);
   }
 
-  private async findBotComment(
-    context: Context<'issue_comment'>,
-  ): Promise<BotCommentInfo | undefined> {
-    const d = debug(`${DebugPrefix}:findBotComment`);
-    const issueId = context.payload.issue.id;
-
-    // see if the comment info is already cached
-    let info = this.botCommentInfo.get(issueId);
-    if (info) {
-      d(`found cached info for issue #${issueId}: ${JSON.stringify(info)}`);
-      return info;
-    }
-
-    // not cached; try to look it up
-    // FIXME(anyone): iterate past the first 100 comments if needed
-    d(`scraping issue ${issueId} for the bot comment`);
-    const opts = context.issue({ per_page: 100 });
-    const { data: comments } = await context.octokit.issues.listComments(opts);
-    const botName = env('BUGBOT_GITHUB_LOGIN');
-    const lastBotComment = comments.reverse().find((comment) => {
-      return comment.user.login === `${botName}[bot]`;
-    });
-
-    if (lastBotComment) {
-      const { body, id, updated_at } = lastBotComment;
-      info = { body, id, time: Date.parse(updated_at) };
-      this.botCommentInfo.set(issueId, info);
-      return info;
-    }
-  }
-
   private async setIssueComment(
     body: string,
     context: Context<'issue_comment'>,
@@ -382,35 +350,35 @@ export class GithubClient {
     const issueId = context.payload.issue.id;
     d(`setting issue #${issueId} bot comment:\n%s`, body);
 
-    let commentInfo = await this.findBotComment(context);
+    let comment = this.currentComment.get(issueId);
 
     // maybe do nothing
-    if (body === commentInfo?.body) {
+    if (body === comment?.body) {
       d('new body matches previous body; not updating');
       return;
     }
 
     // maybe patch an existing comment
-    if (commentInfo) {
+    if (comment) {
       try {
-        d(`patching existing comment ${commentInfo.id}`);
-        const opts = context.issue({ body, comment_id: commentInfo.id });
+        d(`patching existing comment ${comment.id}`);
+        const opts = context.issue({ body, comment_id: comment.id });
         await context.octokit.issues.updateComment(opts);
-        commentInfo.body = body;
-        commentInfo.time = Date.now();
+        comment.body = body;
+        comment.time = Date.now();
         return;
       } catch (error) {
         d('patching existing comment failed; posting a new one instead', error);
       }
     }
 
-    // maybe post a new comment
+    // post a new comment
     try {
       d('no comment to update; posting a new one');
       const opts = context.issue({ body });
       const response = await context.octokit.issues.createComment(opts);
-      commentInfo = { body, id: response.data.id, time: Date.now() };
-      this.botCommentInfo.set(issueId, commentInfo);
+      comment = { body, id: response.data.id, time: Date.now() };
+      this.currentComment.set(issueId, comment);
     } catch (error) {
       d('unable to post new comment', error);
     }

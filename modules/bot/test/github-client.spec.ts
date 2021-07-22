@@ -122,11 +122,7 @@ describe('github-client', () => {
           .mockResolvedValueOnce(mockJobDone);
 
         nockScope
-          // No comments yet...
-          .get(`${issuePath}/comments?per_page=100`)
-          .reply(200, [])
-
-          // ...so we create a new comment
+          // Create a new comment
           .post(`${issuePath}/comments`, ({ body }) => {
             expect(body).toEqual('Queuing bisect job...');
             return true;
@@ -194,11 +190,7 @@ describe('github-client', () => {
         mockGetJob.mockResolvedValueOnce(mockJob);
 
         nockScope
-          // No comments yet...
-          .get(`${issuePath}/comments?per_page=100`)
-          .reply(200, [])
-
-          // ...so we create a new comment
+          // Create a new comment
           .post(`${issuePath}/comments`, ({ body }) => {
             expect(body).toEqual('Queuing bisect job...');
             return true;
