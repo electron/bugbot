@@ -186,12 +186,11 @@ export class Runner {
   public stop = () => this.loop.stop();
 
   public pollOnce = async (): Promise<void> => {
+    let task: Task | undefined;
     const d = debug(`${this.debugPrefix}:pollOnce`);
 
-    for (;;) {
-      const task = await this.claimNextTask();
+    while ((task = await this.claimNextTask())) {
       d('next task: %o', task);
-      if (!task) return;
 
       // run the job
       d(task.job.id, 'running job');
