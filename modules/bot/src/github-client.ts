@@ -186,21 +186,25 @@ export class GithubClient {
       }
     }
 
-    // set initial matrix comment
-    await this.setIssueMatrixComment(matrix, context, command.gistId);
-
     const ids = await Promise.all(queueJobPromises);
 
     d(`All ${ids.length} jobs queued: %o`, ids);
 
-    const update = (job: TestJob) => {
-      matrix[job.platform][job.version] = job;
-      void this.maybeSetIssueMatrixComment(job, matrix, context);
-    };
-    await Promise.all(ids.map((id) => this.pollUntilDone(id, update)));
-    d('all promises settled; sending final update');
-    await this.setIssueMatrixComment(matrix, context, command.gistId);
-    d(`All ${ids.length} test jobs complete!`);
+    // while the jobs are running, periodically update the comment
+    const CommentIntervalMsec = 3_000;
+    const updateComment = () =>
+      void this.setIssueMatrixComment(matrix, context, command.gistId);
+    const interval = setInterval(updateComment, CommentIntervalMsec);
+    updateComment();
+
+    // poll jobs until they're all settled
+    const updateMatrix = (j: TestJob) => (matrix[j.platform][j.version] = j);
+    await Promise.all(ids.map((id) => this.pollUntilDone(id, updateMatrix)));
+
+    // jobs done; patch the comment one last time to ensure everything is shown
+    d(`All ${ids.length} test jobs complete! Updating the comment`);
+    clearInterval(interval);
+    updateComment();
   }
 
   private async pollUntilDone(
@@ -221,26 +225,6 @@ export class GithubClient {
       d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
       await new Promise((r) => setTimeout(r, ms, ms));
     }
-  }
-
-  private async maybeSetIssueMatrixComment(
-    job: TestJob,
-    matrix: Matrix,
-    context: Context<'issue_comment'>,
-  ) {
-    const d = debug(`${DebugPrefix}:maybeSetIssueMatrixComment`);
-    const issueId = context.payload.issue.id;
-    d({ issueId, job });
-
-    // don't update too often
-    const MaxCommentFreqMsec = 3_000;
-    const comment = this.currentComment.get(issueId);
-    if (comment && comment.time + MaxCommentFreqMsec > Date.now()) {
-      d(`just updated issue #${issueId} recently; not updating again so soon`);
-      return;
-    }
-
-    await this.setIssueMatrixComment(matrix, context, job.gist);
   }
 
   private async setIssueMatrixComment(
