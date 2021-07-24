@@ -8,7 +8,7 @@ import { URL } from 'url';
 import { randomInt } from 'crypto';
 import { spawnSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
-import { prepareElectron, prepareGist } from './electron';
+import { Setup } from './setup';
 import { Task } from './task';
 
 import {
@@ -31,10 +31,11 @@ export class Runner {
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly debugPrefix: string;
-  private readonly versions = new ElectronVersions();
   private readonly fiddleExec: string;
   private readonly logIntervalMs: number;
   private readonly loop: RotaryLoop;
+  private readonly setup: Setup;
+  private readonly versions = new ElectronVersions();
   public readonly platform: Platform;
   public readonly uuid: RunnerId;
 
@@ -42,18 +43,18 @@ export class Runner {
    * Creates and initializes the runner from environment variables and default
    * values, then starts the runner's execution loop.
    */
-  constructor(
-    opts: {
-      authToken?: string;
-      brokerUrl?: string;
-      childTimeoutMs?: number;
-      fiddleExec?: string;
-      logIntervalMs?: number;
-      platform?: Platform;
-      pollIntervalMs?: number;
-      uuid?: string;
-    } = {},
-  ) {
+  constructor(opts: {
+    authToken?: string;
+    brokerUrl?: string;
+    childTimeoutMs?: number;
+    fiddleExec?: string;
+    logIntervalMs?: number;
+    platform?: Platform;
+    pollIntervalMs?: number;
+    setup: Setup;
+    uuid?: string;
+  }) {
+    this.setup = opts.setup;
     this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
@@ -297,8 +298,8 @@ export class Runner {
     const d = debug(`${this.debugPrefix}:runFiddle`);
 
     // set up the electron binary and the gist
-    let exec = await prepareElectron(version);
-    const folder = await prepareGist(gistId);
+    let exec = await this.setup.prepareElectron(version);
+    const folder = await this.setup.prepareGist(gistId);
     const args = [folder];
     if (process.platform !== 'darwin' && process.platform !== 'win32') {
       args.unshift(exec);

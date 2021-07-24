@@ -1,25 +1,32 @@
 import debug from 'debug';
+import envPaths from 'env-paths';
 import plimit from 'p-limit';
-import { Runner } from './runner';
-import { ensureDownloaded } from './electron';
+
 import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
+
+import { ElectronSetup, Setup } from './setup';
+import { Runner } from './runner';
 
 const d = debug('runner');
 
-async function prefetch() {
+async function prefetch(setup: Setup) {
   const ev = new ElectronVersions();
   const versions = await ev.getVersions();
   const limit = plimit(5);
   await Promise.allSettled(
-    versions.map((version) => limit(() => ensureDownloaded(version))),
+    versions.map((version) => limit(() => setup.ensureDownloaded(version))),
   );
 }
 
 async function main() {
-  if (process.argv.some((arg) => arg === '--prefetch')) return void prefetch();
+  const paths = envPaths('bugbot', { suffix: '' });
+  const setup = new ElectronSetup(paths.data);
+
+  if (process.argv.some((arg) => arg === '--prefetch'))
+    return void prefetch(setup);
 
   try {
-    const runner = new Runner();
+    const runner = new Runner({ setup });
     await runner.start();
   } catch (err) {
     d('encountered an error: %O', err);
