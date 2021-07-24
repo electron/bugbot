@@ -312,11 +312,9 @@ export class Runner {
     return new Promise((resolve) => {
       const ret = { code: null, out: '', error: null };
 
-      task.addLogData(`
+      task.addLogData(`🧪 Testing
 
-🧪 Testing
-
-  - date: ${new Date().toLocaleTimeString()}
+  - date: ${new Date().toISOString()}
   - electron_version: ${version}  https://github.com/electron/electron/releases/tag/v${version}
   - gist: https://gist.github.com/${gistId}
 
