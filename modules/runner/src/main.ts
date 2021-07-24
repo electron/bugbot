@@ -1,7 +1,7 @@
 import debug from 'debug';
 import plimit from 'p-limit';
 import { Runner } from './runner';
-import { ensureElectronIsDownloaded } from './electron';
+import { ensureDownloaded } from './electron';
 import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
 
 const d = debug('runner');
@@ -11,7 +11,7 @@ async function prefetch() {
   const versions = await ev.getVersions();
   const limit = plimit(5);
   await Promise.allSettled(
-    versions.map((version) => limit(() => ensureElectronIsDownloaded(version))),
+    versions.map((version) => limit(() => ensureDownloaded(version))),
   );
 }
 

@@ -4,23 +4,18 @@ import debug from 'debug';
 import envPaths from 'env-paths';
 import extract from 'extract-zip';
 import simpleGit from 'simple-git';
-
 import { download as electronDownload } from '@electron/get';
 
-async function readFile(filename: string): Promise<string | undefined> {
-  try {
-    return await fs.readFile(filename, 'utf8');
-  } catch {
-    return undefined;
-  }
-}
+// ${path}/bugbot/electron/current/    - a single unzipped 'current' install
+// ${path}/bugbot/electron/zips/*.zip  - downloaded, zipped versions of electron
+// ${path}/bugbot/gists/*              - downloaded gists
 
 const paths = envPaths('bugbot', { suffix: '' });
 const dataRoot = paths.data;
 
 const DebugPrefix = 'runner:electron' as const;
 
-// Electron versions
+/// Electron
 
 const zipDir = path.join(dataRoot, 'electron', 'zips');
 
@@ -45,12 +40,10 @@ async function downloadElectron(version: string): Promise<string> {
   });
 }
 
-export async function ensureElectronIsDownloaded(
-  version: string,
-): Promise<string> {
+export async function ensureDownloaded(version: string): Promise<string> {
   const d = debug(`${DebugPrefix}:${version}:ensureElectron`);
-  const zipName = getZipName(version);
-  const zipFile = path.join(zipDir, zipName);
+
+  const zipFile = path.join(zipDir, getZipName(version));
   if (fs.existsSync(zipFile)) {
     d(`"${zipFile}" exists; no need to download`);
   } else {
@@ -60,6 +53,7 @@ export async function ensureElectronIsDownloaded(
     await fs.move(tempFile, zipFile);
     d(`"${zipFile}" downloaded`);
   }
+
   return zipFile;
 }
 
@@ -74,42 +68,49 @@ function execSubpath(): string {
   }
 }
 
-export async function prepareElectron(version: string) {
+export async function prepareElectron(version: string): Promise<string> {
   const d = debug(`${DebugPrefix}:${version}:prepareElectron`);
-  const zipfile = await ensureElectronIsDownloaded(version);
 
+  // see if the current version (if any) is already `version`
   const currentDir = path.join(dataRoot, 'electron', 'current');
-  const currentVersionFile = path.join(currentDir, 'version');
-  const currentVersion = await readFile(currentVersionFile);
-
-  if (currentVersion === version) {
-    d(`already installed`);
-  } else {
-    d(`installing from "${zipfile}"`);
-    await fs.emptyDir(currentDir);
-    await extract(zipfile, { dir: currentDir });
+  const versionFile = path.join(currentDir, 'version');
+  try {
+    const currentVersion = fs.readFileSync(versionFile, 'utf8');
+    if (currentVersion === version) {
+      d(`already installed`);
+      return;
+    }
+  } catch {
+    // no current version
   }
 
+  const zipFile = await ensureDownloaded(version);
+  d(`installing from "${zipFile}"`);
+  await fs.emptyDir(currentDir);
+  await extract(zipFile, { dir: currentDir });
+
+  // return the full path to the electron executable
   const exec = path.join(currentDir, execSubpath());
   d(`executable is at "${exec}"`);
   return exec;
 }
 
-// gists
+// Gists
 
 export async function prepareGist(gistId: string): Promise<string> {
   const d = debug(`${DebugPrefix}:${gistId}:prepareGist`);
 
   const gistDir = path.join(dataRoot, 'gists', gistId);
-  const git = simpleGit();
-
   if (!fs.existsSync(gistDir)) {
     d(`cloning gist into "${gistDir}"`);
+    const git = simpleGit();
     await git.clone(`https://gist.github.com/${gistId}.git`, gistDir);
   } else {
     d(`'git pull origin master' in "${gistDir}"`);
-    await git.cwd(gistDir).pull('origin', 'master', { '--no-rebase': null });
+    const git = simpleGit(gistDir);
+    await git.pull('origin', 'master', { '--no-rebase': null });
   }
 
+  // return the full path to the gist's main.js
   return path.join(gistDir, 'main.js');
 }
