@@ -202,6 +202,7 @@ export class Runner {
 `);
     versions.forEach((ver, i) => log('#' + `${i}`.padStart(3, '0'), ver));
 
+    // basically a binary search
     let left = 0;
     let right = versions.length - 1;
     let code;
@@ -297,12 +298,19 @@ export class Runner {
     version: string,
     gistId: string,
   ): Promise<{ code?: number; error?: string; out: string }> {
-    const exec = await prepareElectron(version);
+    const d = debug(`${this.debugPrefix}:runFiddle`);
+
+    // set up the electron binary and the gist
+    let exec = await prepareElectron(version);
     const folder = await prepareGist(gistId);
+    const args = [folder];
+    if (process.platform !== 'darwin' && process.platform !== 'win32') {
+      args.unshift(exec);
+      exec = 'xvfb-run';
+    }
+
     return new Promise((resolve) => {
-      const d = debug(`${this.debugPrefix}:runFiddle`);
       const ret = { code: null, out: '', error: null };
-      const args = [folder];
 
       task.addLogData(`
 
@@ -313,13 +321,14 @@ export class Runner {
   - gist: https://gist.github.com/${gistId}
 
   - os_arch: ${os.arch()}
-  - os_platform: ${os.platform()}
+  - os_platform: ${process.platform}
   - os_release: ${os.release()}
   - os_version: ${os.version()}
   - getos: ${this.osInfo}
 
 `);
       const opts = { timeout: this.childTimeoutMs };
+
       const child = spawn(exec, args, opts);
 
       // Save stdout locally so we can parse the result.
