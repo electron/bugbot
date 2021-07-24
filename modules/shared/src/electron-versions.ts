@@ -92,6 +92,11 @@ export class ElectronVersions {
     return this.releases.has(version);
   }
 
+  public async getVersions(): Promise<string[]> {
+    await this.ensureReleases();
+    return [...this.releases.keys()];
+  }
+
   public async getLatestVersion(): Promise<string> {
     await this.ensureReleases();
     return [...this.releases.values()].sort(releaseCompare).pop().version;

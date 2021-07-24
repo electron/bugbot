@@ -33,8 +33,8 @@ async function downloadElectron(version: string): Promise<string> {
   const getProgressCallback = (progress: { percent: number }) => {
     const pct = Math.round(progress.percent * 100);
     if (pctDone + 10 <= pct) {
+      d(`${pct >= 100 ? '🏁' : '⏳'} downloaded ${pct}%`);
       pctDone = pct;
-      d(`⏳ downloaded ${pct}%`);
     }
   };
   return await electronDownload(version, {
@@ -45,7 +45,9 @@ async function downloadElectron(version: string): Promise<string> {
   });
 }
 
-async function ensureElectron(version: string): Promise<string> {
+export async function ensureElectronIsDownloaded(
+  version: string,
+): Promise<string> {
   const d = debug(`${DebugPrefix}:${version}:ensureElectron`);
   const zipName = getZipName(version);
   const zipFile = path.join(zipDir, zipName);
@@ -74,7 +76,7 @@ function execSubpath(): string {
 
 export async function prepareElectron(version: string) {
   const d = debug(`${DebugPrefix}:${version}:prepareElectron`);
-  const zipfile = await ensureElectron(version);
+  const zipfile = await ensureElectronIsDownloaded(version);
 
   const currentDir = path.join(dataRoot, 'electron', 'current');
   const currentVersionFile = path.join(currentDir, 'version');

@@ -1,6 +1,7 @@
 {
   "extends": "@electron/bugbot-shared/tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["es2020"],
     "outDir": "build",
     "tsBuildInfoFile": "build/.tsbuildinfo",
     "rootDir": "src"
