@@ -1,12 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
+
 import {
   BisectCommand,
   TestCommand,
   parseIssueCommand,
 } from '../src/issue-parser';
-import { ElectronVersions } from '../src/electron-versions';
 
 describe('issue-parser', () => {
   const versionsMock = {

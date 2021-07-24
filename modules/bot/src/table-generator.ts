@@ -1,7 +1,8 @@
-import { Platform, TestJob } from '@electron/bugbot-shared/src/interfaces';
-import { debug } from 'debug';
-import { URL } from 'url';
 import table from 'markdown-table';
+import { URL } from 'url';
+import { debug } from 'debug';
+
+import { Platform, TestJob } from '@electron/bugbot-shared/src/interfaces';
 
 // FIXME(any): better typing here
 export interface Matrix {

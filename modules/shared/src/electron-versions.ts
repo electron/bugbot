@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
 import * as semver from 'semver';
 
+import { VersionRange } from './interfaces';
+
 type Release = semver.SemVer;
 
 const isStable = (rel: Release) => rel.prerelease.length === 0;
@@ -93,5 +95,17 @@ export class ElectronVersions {
   public async getLatestVersion(): Promise<string> {
     await this.ensureReleases();
     return [...this.releases.values()].sort(releaseCompare).pop().version;
+  }
+
+  public async getVersionsInRange(range: VersionRange): Promise<string[]> {
+    let [sema, semb] = range.map((version) => semver.parse(version));
+    if (releaseCompare(sema, semb) > 0) [sema, semb] = [semb, sema];
+
+    await this.ensureReleases();
+    return [...this.releases.values()]
+      .filter((ver) => releaseCompare(ver, sema) >= 0)
+      .filter((ver) => releaseCompare(ver, semb) <= 0)
+      .sort((a, b) => releaseCompare(a, b))
+      .map((ver) => ver.version);
   }
 }

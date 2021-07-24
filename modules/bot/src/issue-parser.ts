@@ -5,7 +5,11 @@ import toString = require('mdast-util-to-string');
 import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
-import { ElectronVersions, releaseCompare } from './electron-versions';
+
+import {
+  ElectronVersions,
+  releaseCompare,
+} from '@electron/bugbot-shared/build/electron-versions';
 import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 // no types exist for this module

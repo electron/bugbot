@@ -1,17 +1,17 @@
 import debug from 'debug';
+import * as os from 'os';
 import fetch from 'node-fetch';
-import stringArgv from 'string-argv';
-import which from 'which';
-import { Operation as PatchOp } from 'fast-json-patch';
-import { URL } from 'url';
+import getos from 'getos';
 import { inspect } from 'util';
+
+import { URL } from 'url';
 import { randomInt } from 'crypto';
 import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
+import { prepareElectron, prepareGist } from './electron';
+import { Task } from './task';
 
 import {
-  Current,
-  Job,
   JobId,
   JobType,
   Platform,
@@ -23,129 +23,20 @@ import {
 } from '@electron/bugbot-shared/build/interfaces';
 import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
-
-import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
-
-class Task {
-  private logTimer: ReturnType<typeof setTimeout>;
-  private readonly logBuffer: string[] = [];
-  public readonly timeBegun = Date.now();
-  private readonly debugPrefix: string;
-
-  constructor(
-    public readonly job: Job,
-    public etag: string,
-    public runner: string,
-    private readonly authToken: string,
-    private readonly brokerUrl: string,
-    private readonly logIntervalMs: number,
-  ) {
-    this.debugPrefix = `runner:${this.runner}`;
-  }
-
-  private async sendLogDataBuffer(url: URL) {
-    const d = debug(`${this.debugPrefix}:sendLogDataBuffer`);
-    delete this.logTimer;
-
-    const lines = this.logBuffer.splice(0);
-    const body = lines.join('\n');
-    d(`sending ${lines.length} lines`, body);
-    const resp = await fetch(url, {
-      body,
-      headers: {
-        Authorization: `Bearer ${this.authToken}`,
-        'Content-Type': 'text/plain; charset=utf-8',
-      },
-      method: 'PUT',
-    });
-    d(`resp.status ${resp.status}`);
-  }
-
-  public addLogData(data: string) {
-    // save the URL to safeguard against this.jobId being cleared at end-of-job
-    const log_url = new URL(`api/jobs/${this.job.id}/log`, this.brokerUrl);
-    this.logBuffer.push(data);
-    if (!this.logTimer) {
-      this.logTimer = setTimeout(
-        () => void this.sendLogDataBuffer(log_url),
-        this.logIntervalMs,
-      );
-    }
-  }
-
-  /**
-   * @returns {boolean} success / failure (response.ok)
-   */
-  private async sendPatch(patches: Readonly<PatchOp>[]): Promise<boolean> {
-    const d = debug(`${this.debugPrefix}:sendPatch`);
-    d('job: %o', this.job);
-    d('patches:');
-    for (const patch of patches) d('%o', patch);
-
-    // Send the patch
-    const job_url = new URL(`api/jobs/${this.job.id}`, this.brokerUrl);
-    const response = await fetch(job_url, {
-      body: JSON.stringify(patches),
-      headers: {
-        Authorization: `Bearer ${this.authToken}`,
-        'Content-Type': 'application/json',
-        ETag: this.etag,
-      },
-      method: 'PATCH',
-    });
-    d('broker response:', response.status, response.statusText);
-    const { headers, ok } = response;
-
-    // if we got an etag, keep it
-    if (ok && headers.has('etag')) this.etag = headers.get('etag');
-
-    return ok;
-  }
-
-  /**
-   * @returns {boolean} success / failure (response.ok)
-   */
-  public sendResult(resultIn: Partial<Result>): Promise<boolean> {
-    const result: Partial<Result> = {
-      runner: this.runner,
-      status: 'system_error',
-      time_begun: this.timeBegun,
-      time_ended: Date.now(),
-      ...resultIn,
-    };
-    return this.sendPatch([
-      { op: 'add', path: '/history/-', value: result },
-      { op: 'replace', path: '/last', value: result },
-      { op: 'remove', path: '/current' },
-    ]);
-  }
-
-  /**
-   * @returns {boolean} success / failure (response.ok)
-   */
-  public claimForRunner(): Promise<boolean> {
-    const current: Current = {
-      runner: this.runner,
-      time_begun: this.timeBegun,
-    };
-    return this.sendPatch([
-      { op: 'replace', path: '/current', value: current },
-    ]);
-  }
-}
+import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
 
 export class Runner {
-  public readonly platform: Platform;
-  public readonly uuid: RunnerId;
-  private readonly debugPrefix: string;
-
+  private osInfo = '';
   private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
+  private readonly debugPrefix: string;
+  private readonly versions = new ElectronVersions();
   private readonly fiddleExec: string;
-  private readonly fiddleArgv: string[];
   private readonly logIntervalMs: number;
   private readonly loop: RotaryLoop;
+  public readonly platform: Platform;
+  public readonly uuid: RunnerId;
 
   /**
    * Creates and initializes the runner from environment variables and default
@@ -167,12 +58,6 @@ export class Runner {
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
       opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
-    this.fiddleArgv = stringArgv(
-      opts.fiddleExec ||
-        process.env.BUGBOT_FIDDLE_EXEC ||
-        which.sync('electron-fiddle'),
-    );
-    this.fiddleExec = this.fiddleArgv.shift();
     this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
     this.uuid = opts.uuid || uuidv4();
@@ -180,6 +65,7 @@ export class Runner {
     const pollIntervalMs =
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     this.loop = new RotaryLoop(this.debugPrefix, pollIntervalMs, this.pollOnce);
+    getos((err, result) => (this.osInfo = inspect(result || err)));
   }
 
   public start = () => this.loop.start();
@@ -194,7 +80,7 @@ export class Runner {
       d('next task: %o', task);
 
       // run the job
-      d(task.job.id, 'running job');
+      d(`running job.id "${task.job.id}"`);
       let result: Partial<Result>;
       switch (task.job.type) {
         case JobType.bisect:
@@ -230,7 +116,6 @@ export class Runner {
       if (await t.claimForRunner()) task = t;
     }
 
-    d('task %o', task);
     return task;
   }
 
@@ -290,33 +175,94 @@ export class Runner {
 
   private async runBisect(task: Task) {
     const d = debug(`${this.debugPrefix}:runBisect`);
+    const log = (first, ...rest) => {
+      task.addLogData([first, ...rest].join(' '));
+      d(first, ...rest);
+    };
 
     const { job } = task;
     assertBisectJob(job);
+    const { gist, version_range } = job;
+    const versions = await this.versions.getVersionsInRange(version_range);
 
-    const { code, error, out } = await this.runFiddle(task, [
-      ...this.fiddleArgv,
-      ...[JobType.bisect, job.version_range[0], job.version_range[1]],
-      ...['--fiddle', job.gist],
-      '--full',
-      '--log-config',
-    ]);
+    const resultString = (result) => {
+      if (!result) return '';
+      if (result.code === 0) return '🟢 passed';
+      if (result.code === 1) return '🔴 failed';
+      return '🟠 error: test did not pass or fail';
+      // FIXME: more reasons
+    };
+
+    log(`gist is https://gist.github.com/${gist}`);
+    log(`bisect requested between ${inspect(version_range)}`);
+    log(`bisecting across ${versions.length} versions...`);
+    versions.forEach((ver, idx) => log(`${idx + 1}`.padStart(3, '0'), ver));
+
+    let left = 0;
+    let right = versions.length - 1;
+    let code;
+    const testOrder: number[] = [];
+    const results: ({ code?: number; error?: string } | undefined)[] =
+      new Array(versions.length);
+    while (left + 1 < right) {
+      const mid = Math.round(left + (right - left) / 2);
+      const version = versions[mid];
+      testOrder.push(mid);
+      log(`bisecting, range [${left}..${right}], mid is ${mid} (${version})`);
+
+      const result = await this.runFiddle(task, version, gist);
+      results[mid] = result;
+      log(`${resultString(result)} ${versions[mid]}`);
+
+      if (result.code === 0) {
+        left = mid;
+        continue;
+      } else if (result.code === 1) {
+        right = mid;
+        continue;
+      } else {
+        // FIXME: check errors
+        code = result.code;
+        break;
+      }
+    }
+
+    log(`🏁 finished bisecting across ${versions.length} versions...`);
+    versions.forEach((ver, idx) => {
+      const order = testOrder.indexOf(idx);
+      if (order === -1) return;
+      log(
+        `${idx + 1}`.padStart(3, '0'),
+        resultString(results[idx]),
+        ver,
+        `(test #${order + 1})`,
+      );
+    });
+
+    log('🏁 done bisecting');
+    const success = results[left].code === 0 && results[right].code === 1;
+    if (success) {
+      const good = versions[left];
+      const bad = versions[right];
+      const results = [
+        `🟢 passed ${good}`,
+        `🔴 failed ${bad}`,
+        'Commits between versions:',
+        `↔ https://github.com/electron/electron/compare/v${good}...v${bad}`,
+      ].join('\n');
+      log(results);
+    } else {
+      // FIXME: log some failure
+    }
 
     const result: Partial<Result> = {};
-    try {
-      const res = parseFiddleBisectOutput(out);
-      if (res.success) {
-        result.status = 'success';
-        result.version_range = [res.goodVersion, res.badVersion];
-      } else {
-        // TODO(clavin): ^ better wording
-        result.error = `Failed to narrow test down to two versions: ${error}`;
-        result.status = code === 1 ? 'test_error' : 'system_error';
-      }
-    } catch (parseErr: unknown) {
-      d('fiddle bisect parse error: %O', parseErr);
-      result.status = 'system_error';
-      result.error = parseErr.toString();
+    if (success) {
+      result.status = 'success';
+      result.version_range = [versions[left], versions[right]];
+    } else {
+      // TODO(clavin): ^ better wording
+      result.error = `Failed to narrow test down to two versions`;
+      result.status = code === 1 ? 'test_error' : 'system_error';
     }
     return result;
   }
@@ -324,13 +270,7 @@ export class Runner {
   private async runTest(task: Task) {
     const { job } = task;
     assertTestJob(job);
-    const { code, error } = await this.runFiddle(task, [
-      ...this.fiddleArgv,
-      JobType.test,
-      ...['--version', job.version],
-      ...['--fiddle', job.gist],
-      '--log-config',
-    ]);
+    const { code, error } = await this.runFiddle(task, job.version, job.gist);
 
     const result: Partial<Result> = {};
     if (error) {
@@ -350,26 +290,33 @@ export class Runner {
 
   private async runFiddle(
     task: Task,
-    args: string[],
+    version: string,
+    gistId: string,
   ): Promise<{ code?: number; error?: string; out: string }> {
+    const exec = await prepareElectron(version);
+    const folder = await prepareGist(gistId);
     return new Promise((resolve) => {
       const d = debug(`${this.debugPrefix}:runFiddle`);
       const ret = { code: null, out: '', error: null };
+      const args = [folder];
 
-      const { childTimeoutMs, fiddleExec } = this;
-      const opts = { timeout: childTimeoutMs };
+      task.addLogData(`
 
-      const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      const startupLog = [
-        `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
-        `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
-        `${prefix}   ... with opts ${inspect(opts)}`,
-      ] as const;
-      task.addLogData(startupLog.join('\n'));
+## Running Test
 
-      d(`${fiddleExec} ${args.join(' ')}`);
-      d('opts: %o', opts);
-      const child = spawn(fiddleExec, args, opts);
+  - date: ${new Date().toLocaleTimeString()},
+  - electron_version: ${version},
+  - gist: https://gist.github.com/${gistId}
+
+  - os_arch: ${os.arch()},
+  - os_platform: ${os.platform()},
+  - os_release: ${os.release()},
+  - os_version: ${os.version()},
+  - getos: ${this.osInfo},
+
+`);
+      const opts = { timeout: this.childTimeoutMs };
+      const child = spawn(exec, args, opts);
 
       // Save stdout locally so we can parse the result.
       // Report both stdout + stderr to the broker via addLogData().
@@ -384,13 +331,8 @@ export class Runner {
 
       child.on('close', (code) => {
         d('got exit code from child process close event', code);
-        const out = stdout.join('');
-        const match = /Electron Fiddle is exiting with code (\d+)/.exec(out);
-        if (match) {
-          code = Number.parseInt(match[1]);
-          d(`got exit code "${code}" from log message "${match[0]}"`);
-        }
         ret.code = code;
+        const out = stdout.join('');
         ret.out = out;
         d('resolve %O', ret);
         resolve(ret);

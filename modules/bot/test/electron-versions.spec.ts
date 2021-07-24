@@ -1,6 +1,7 @@
-import { ElectronVersions } from '../src/electron-versions';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
 
 jest.mock('node-fetch');
 import fetch from 'node-fetch';

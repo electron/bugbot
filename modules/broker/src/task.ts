@@ -37,7 +37,7 @@ export class Task {
     }
 
     d('appending to log:', data);
-    const lines = data.split(/\r?\n/).filter((line) => line?.length > 0);
+    const lines = data.split(/\r?\n/);
     log[log.length - 1].lines.push(...lines);
   }
 
