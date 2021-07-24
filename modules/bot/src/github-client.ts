@@ -147,7 +147,7 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const completedJob = (await this.pollAndReturnJob(jobId)) as BisectJob;
+    const completedJob = (await this.pollUntilDone(jobId)) as BisectJob;
     if (completedJob) {
       await this.handleBisectResult(completedJob, context);
     }
@@ -193,50 +193,34 @@ export class GithubClient {
 
     d(`All ${ids.length} jobs queued: %o`, ids);
 
-    const awaitOneJob = async (id: JobId) => {
-      const job = (await this.pollAndReturnJob(id)) as TestJob;
+    const update = (job: TestJob) => {
       matrix[job.platform][job.version] = job;
-      d('%O', matrix);
-      await this.maybeSetIssueMatrixComment(job, matrix, context);
+      void this.maybeSetIssueMatrixComment(job, matrix, context);
     };
-
-    await Promise.all(ids.map((id) => awaitOneJob(id)));
+    await Promise.all(ids.map((id) => this.pollUntilDone(id, update)));
     d('all promises settled; sending final update');
     await this.setIssueMatrixComment(matrix, context, command.gistId);
     d(`All ${ids.length} test jobs complete!`);
   }
 
-  private async pollAndReturnJob(jobId: JobId) {
+  private async pollUntilDone(
+    jobId: JobId,
+    updateJob: (job: Job) => unknown = () => {
+      /* no-op */
+    },
+  ) {
+    const ms = this.pollIntervalMs;
     const d = debug(`${DebugPrefix}:pollAndReturnJob`);
-    // FIXME: this state info, such as the timer, needs to be a
-    // class property so that '/test stop' could stop the polling.
-    // Poll until the job is complete
     d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
 
-    return new Promise<Job | void>((resolve, reject) => {
-      const pollBroker = async () => {
-        if (this.isClosed) {
-          return resolve();
-        }
-
-        d(`${jobId}: polling job...`);
-        const job = await this.broker.getJob(jobId);
-        if (!job.last) {
-          d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
-          setTimeout(pollBroker, this.pollIntervalMs);
-        } else {
-          d(`${jobId}: complete 🚀 `);
-          try {
-            await this.broker.completeJob(jobId);
-            return resolve(job);
-          } catch (e) {
-            return reject(e);
-          }
-        }
-      };
-
-      setTimeout(pollBroker, this.pollIntervalMs);
-    });
+    while (!this.isClosed) {
+      d(`${jobId}: polling job...`);
+      const job = await this.broker.getJob(jobId);
+      updateJob(job);
+      if (job.last) return job;
+      d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
+      await new Promise((r) => setTimeout(r, ms, ms));
+    }
   }
 
   private async maybeSetIssueMatrixComment(
@@ -249,8 +233,9 @@ export class GithubClient {
     d({ issueId, job });
 
     // don't update too often
+    const MaxCommentFreqMsec = 3_000;
     const comment = this.currentComment.get(issueId);
-    if (comment && comment.time + this.pollIntervalMs > Date.now()) {
+    if (comment && comment.time + MaxCommentFreqMsec > Date.now()) {
       d(`just updated issue #${issueId} recently; not updating again so soon`);
       return;
     }
@@ -266,7 +251,7 @@ export class GithubClient {
     const d = debug(`${DebugPrefix}:setIssueMatrixComment`);
     const link = `Testing https://gist.github.com/${gist}`;
     const table = generateTable(matrix, this.brokerBaseUrl);
-    const footer = `*I am a bot. [Learn more about what I can do!](https://github.com/electron/bugbot#readme)*`;
+    const footer = `*I am a bot. [Learn what I can do!](https://github.com/electron/bugbot#readme)*`;
     const body = [link, table, footer].join('\n\n');
     d(`issueId ${context.payload.issue.id} body:\n${body}`);
     await this.setIssueComment(body, context);
@@ -394,6 +379,6 @@ export default (robot: Probot): void => {
     authToken: env('BUGBOT_AUTH_TOKEN'),
     brokerBaseUrl: env('BUGBOT_BROKER_URL'),
     robot,
-    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 500),
   });
 };
