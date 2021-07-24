@@ -12,10 +12,12 @@ const hasStable = (releases: Release[]) => releases.some(isStable);
 export function releaseCompare(a: Release, b: Release) {
   const l = a.compareMain(b);
   if (l) return l;
-  // Electron's approach is nightly -> beta -> stable.
-  // Account for 'beta' coming before 'nightly' lexicographically
-  if (a.prerelease[0] === 'nightly' && b.prerelease[0] === 'beta') return -1;
-  if (a.prerelease[0] === 'beta' && b.prerelease[0] === 'nightly') return 1;
+  // Electron's approach is nightly -> other prerelease tags -> stable,
+  // so force `nightly` to sort before other prerelease tags.
+  const [prea] = a.prerelease;
+  const [preb] = b.prerelease;
+  if (prea === 'nightly' && preb !== 'nightly') return -1;
+  if (prea !== 'nightly' && preb === 'nightly') return 1;
   return a.comparePre(b);
 }
 
