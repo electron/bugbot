@@ -193,10 +193,14 @@ export class Runner {
       // FIXME: more reasons
     };
 
-    log(`gist is https://gist.github.com/${gist}`);
-    log(`bisect requested between ${inspect(version_range)}`);
-    log(`bisecting across ${versions.length} versions...`);
-    versions.forEach((ver, idx) => log(`${idx + 1}`.padStart(3, '0'), ver));
+    log(`
+↔ Bisect Requested
+
+  - gist is https://gist.github.com/${gist}
+  - the version range is [${version_range.join('..')}]
+  - there are ${versions.length} versions in this range:
+`);
+    versions.forEach((ver, i) => log('#' + `${i}`.padStart(3, '0'), ver));
 
     let left = 0;
     let right = versions.length - 1;
@@ -208,11 +212,11 @@ export class Runner {
       const mid = Math.round(left + (right - left) / 2);
       const version = versions[mid];
       testOrder.push(mid);
-      log(`bisecting, range [${left}..${right}], mid is ${mid} (${version})`);
+      log(`bisecting, range [${left}..${right}], mid ${mid} (${version})`);
 
       const result = await this.runFiddle(task, version, gist);
       results[mid] = result;
-      log(`${resultString(result)} ${versions[mid]}`);
+      log(`${resultString(result)} ${versions[mid]}\n`);
 
       if (result.code === 0) {
         left = mid;
@@ -228,18 +232,18 @@ export class Runner {
     }
 
     log(`🏁 finished bisecting across ${versions.length} versions...`);
-    versions.forEach((ver, idx) => {
-      const order = testOrder.indexOf(idx);
+    versions.forEach((ver, i) => {
+      const order = testOrder.indexOf(i);
       if (order === -1) return;
       log(
-        `${idx + 1}`.padStart(3, '0'),
-        resultString(results[idx]),
+        '#' + `${i}`.padStart(3, '0'),
+        resultString(results[i]),
         ver,
         `(test #${order + 1})`,
       );
     });
 
-    log('🏁 done bisecting');
+    log('\n🏁 Done bisecting');
     const success = results[left].code === 0 && results[right].code === 1;
     if (success) {
       const good = versions[left];
@@ -302,17 +306,17 @@ export class Runner {
 
       task.addLogData(`
 
-## Running Test
+🧪 Testing
 
-  - date: ${new Date().toLocaleTimeString()},
-  - electron_version: ${version},
+  - date: ${new Date().toLocaleTimeString()}
+  - electron_version: ${version}  https://github.com/electron/electron/releases/tag/v${version}
   - gist: https://gist.github.com/${gistId}
 
-  - os_arch: ${os.arch()},
-  - os_platform: ${os.platform()},
-  - os_release: ${os.release()},
-  - os_version: ${os.version()},
-  - getos: ${this.osInfo},
+  - os_arch: ${os.arch()}
+  - os_platform: ${os.platform()}
+  - os_release: ${os.release()}
+  - os_version: ${os.version()}
+  - getos: ${this.osInfo}
 
 `);
       const opts = { timeout: this.childTimeoutMs };
@@ -330,6 +334,7 @@ export class Runner {
       child.on('error', (err) => (ret.error = err.toString()));
 
       child.on('close', (code) => {
+        onStdout(`\nTest exited with code ${code}\n`);
         d('got exit code from child process close event', code);
         ret.code = code;
         const out = stdout.join('');

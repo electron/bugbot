@@ -81,12 +81,11 @@ export async function prepareElectron(version: string) {
   const currentDir = path.join(dataRoot, 'electron', 'current');
   const currentVersionFile = path.join(currentDir, 'version');
   const currentVersion = await readFile(currentVersionFile);
-  d(`the current electron version is "${currentVersion}"`);
 
   if (currentVersion === version) {
     d(`already installed`);
   } else {
-    d(`unzipping from "${zipfile}" to "${currentDir}"`);
+    d(`installing from "${zipfile}"`);
     await fs.emptyDir(currentDir);
     await extract(zipfile, { dir: currentDir });
   }
