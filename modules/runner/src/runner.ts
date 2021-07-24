@@ -6,7 +6,7 @@ import { inspect } from 'util';
 
 import { URL } from 'url';
 import { randomInt } from 'crypto';
-import { spawn } from 'child_process';
+import { spawnSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { prepareElectron, prepareGist } from './electron';
 import { Task } from './task';
@@ -57,7 +57,7 @@ export class Runner {
     this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
-      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
+      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 60_000);
     this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
     this.uuid = opts.uuid || uuidv4();
@@ -185,29 +185,34 @@ export class Runner {
     const { gist, version_range } = job;
     const versions = await this.versions.getVersionsInRange(version_range);
 
-    const resultString = (result) => {
+    const displayIndex = (i: number) => '#' + i.toString().padStart(4, ' ');
+
+    const displayResult = (result) => {
       if (!result) return '';
-      if (result.code === 0) return '🟢 passed';
-      if (result.code === 1) return '🔴 failed';
+      if (result.status === 0) return '🟢 passed';
+      if (result.status === 1) return '🔴 failed';
       return '🟠 error: test did not pass or fail';
       // FIXME: more reasons
     };
 
-    log(`
-↔ Bisect Requested
-
-  - gist is https://gist.github.com/${gist}
-  - the version range is [${version_range.join('..')}]
-  - there are ${versions.length} versions in this range:
-`);
-    versions.forEach((ver, i) => log('#' + `${i}`.padStart(3, '0'), ver));
+    log(
+      [
+        '📐 Bisect Requested',
+        '',
+        ` - gist is https://gist.github.com/${gist}`,
+        ` - the version range is [${version_range.join('..')}]`,
+        ` - there are ${versions.length} versions in this range:`,
+        '',
+        ...versions.map((ver, i) => `${displayIndex(i)} - ${ver}`),
+      ].join('\n'),
+    );
 
     // basically a binary search
     let left = 0;
     let right = versions.length - 1;
-    let code;
-    const testOrder: number[] = [];
-    const results: ({ code?: number; error?: string } | undefined)[] =
+    let status;
+    const testOrder: (number | undefined)[] = [];
+    const results: ({ status?: number; error?: Error } | undefined)[] =
       new Array(versions.length);
     while (left + 1 < right) {
       const mid = Math.round(left + (right - left) / 2);
@@ -217,35 +222,30 @@ export class Runner {
 
       const result = await this.runFiddle(task, version, gist);
       results[mid] = result;
-      log(`${resultString(result)} ${versions[mid]}\n`);
+      log(`${displayResult(result)} ${versions[mid]}\n`);
 
-      if (result.code === 0) {
+      if (result.status === 0) {
         left = mid;
         continue;
-      } else if (result.code === 1) {
+      } else if (result.status === 1) {
         right = mid;
         continue;
       } else {
         // FIXME: check errors
-        code = result.code;
+        status = result.status;
         break;
       }
     }
 
     log(`🏁 finished bisecting across ${versions.length} versions...`);
     versions.forEach((ver, i) => {
-      const order = testOrder.indexOf(i);
-      if (order === -1) return;
-      log(
-        '#' + `${i}`.padStart(3, '0'),
-        resultString(results[i]),
-        ver,
-        `(test #${order + 1})`,
-      );
+      const n = testOrder.indexOf(i);
+      if (n === -1) return;
+      log(displayIndex(i), displayResult(results[i]), ver, `(test #${n + 1})`);
     });
 
     log('\n🏁 Done bisecting');
-    const success = results[left].code === 0 && results[right].code === 1;
+    const success = results[left].status === 0 && results[right].status === 1;
     if (success) {
       const good = versions[left];
       const bad = versions[right];
@@ -267,7 +267,7 @@ export class Runner {
     } else {
       // TODO(clavin): ^ better wording
       result.error = `Failed to narrow test down to two versions`;
-      result.status = code === 1 ? 'test_error' : 'system_error';
+      result.status = status === 1 ? 'test_error' : 'system_error';
     }
     return result;
   }
@@ -275,15 +275,15 @@ export class Runner {
   private async runTest(task: Task) {
     const { job } = task;
     assertTestJob(job);
-    const { code, error } = await this.runFiddle(task, job.version, job.gist);
+    const { error, status } = await this.runFiddle(task, job.version, job.gist);
 
     const result: Partial<Result> = {};
     if (error) {
       result.status = 'system_error';
-      result.error = `Unable to run Electron Fiddle. ${error}`;
-    } else if (code === 0) {
+      result.error = `Unable to run Electron Fiddle. ${error.toString()}`;
+    } else if (status === 0) {
       result.status = 'success';
-    } else if (code === 1) {
+    } else if (status === 1) {
       result.status = 'failure';
       result.error = 'The test ran and failed.';
     } else {
@@ -293,11 +293,7 @@ export class Runner {
     return result;
   }
 
-  private async runFiddle(
-    task: Task,
-    version: string,
-    gistId: string,
-  ): Promise<{ code?: number; error?: string; out: string }> {
+  private async runFiddle(task: Task, version: string, gistId: string) {
     const d = debug(`${this.debugPrefix}:runFiddle`);
 
     // set up the electron binary and the gist
@@ -309,10 +305,7 @@ export class Runner {
       exec = 'xvfb-run';
     }
 
-    return new Promise((resolve) => {
-      const ret = { code: null, out: '', error: null };
-
-      task.addLogData(`🧪 Testing
+    task.addLogData(`🧪 Testing
 
   - date: ${new Date().toISOString()}
   - electron_version: ${version}  https://github.com/electron/electron/releases/tag/v${version}
@@ -325,30 +318,16 @@ export class Runner {
   - getos: ${this.osInfo}
 
 `);
-      const opts = { timeout: this.childTimeoutMs };
-
-      const child = spawn(exec, args, opts);
-
-      // Save stdout locally so we can parse the result.
-      // Report both stdout + stderr to the broker via addLogData().
-      const stdout: string[] = [];
-      const onData = (dat: string | Buffer) => task.addLogData(dat.toString());
-      const onStdout = (dat: string | Buffer) => stdout.push(dat.toString());
-      child.stderr.on('data', onData);
-      child.stdout.on('data', onData);
-      child.stdout.on('data', onStdout);
-
-      child.on('error', (err) => (ret.error = err.toString()));
-
-      child.on('close', (code) => {
-        onStdout(`\nTest exited with code ${code}\n`);
-        d('got exit code from child process close event', code);
-        ret.code = code;
-        const out = stdout.join('');
-        ret.out = out;
-        d('resolve %O', ret);
-        resolve(ret);
-      });
-    });
+    const opts = {
+      env: {},
+      timeout: this.childTimeoutMs,
+    };
+    d('⏳ fiddle starting', inspect({ exec, args, opts }));
+    const result = spawnSync(exec, args, opts);
+    const { error, pid, signal, status, stderr, stdout } = result;
+    d('⌛ fiddle finished', inspect({ error, pid, signal, status }));
+    task.addLogData(stdout.toString('utf8'));
+    task.addLogData(stderr.toString('utf8'));
+    return { error, status };
   }
 }
