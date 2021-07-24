@@ -1,18 +1,11 @@
-import envPaths from 'env-paths';
-import debug from 'debug';
-import * as path from 'path';
 import * as fs from 'fs-extra';
+import * as path from 'path';
+import debug from 'debug';
+import envPaths from 'env-paths';
 import extract from 'extract-zip';
-import fetch from 'node-fetch';
+import simpleGit from 'simple-git';
 
 import { download as electronDownload } from '@electron/get';
-
-const fetchOpts: Record<string, unknown> = {};
-if (process.env.BUGBOT_GITHUB_PAT) {
-  fetchOpts.headers = {
-    Authorization: `token ${process.env.BUGBOT_GITHUB_PAT}`,
-  };
-}
 
 async function readFile(filename: string): Promise<string | undefined> {
   try {
@@ -103,54 +96,18 @@ export async function prepareElectron(version: string) {
 
 // gists
 
-async function fetchLastGistCommit(
-  gistId: string,
-): Promise<Record<string, any>> {
-  const d = debug(`${DebugPrefix}:${gistId}:fetchLastGistCommit`);
-
-  // fetch 'version' of the latest commit
-  const url = `https://api.github.com/gists/${gistId}/commits?per_page=1`;
-  d('url', url.toString());
-  const response = await fetch(url, fetchOpts);
-  const json = await response.json();
-  d('response.ok', response.ok);
-  d('response.status', response.status);
-  return json[0];
-}
-
 export async function prepareGist(gistId: string): Promise<string> {
   const d = debug(`${DebugPrefix}:${gistId}:prepareGist`);
 
-  // We store gists on disk locally, but gists can be modified upstream.
-  // So check to make sure we have the right version by getting the version
-  // of the latest commit from github
-  const lastCommit = await fetchLastGistCommit(gistId);
-  const version = lastCommit.version as string;
-  const login = lastCommit.user.login as string;
-  const gistsDir = path.join(dataRoot, 'gists');
-  const gistDir = path.join(gistsDir, `${gistId}-${version}`);
-  d('gistDir', gistDir);
-  if (fs.existsSync(gistDir)) {
-    d('already have gist; no need to download');
+  const gistDir = path.join(dataRoot, 'gists', gistId);
+  const git = simpleGit();
+
+  if (!fs.existsSync(gistDir)) {
+    d(`cloning gist into "${gistDir}"`);
+    await git.clone(`https://gist.github.com/${gistId}.git`, gistDir);
   } else {
-    d(`saving gist to "${gistDir}"`);
-    await fs.emptyDir(gistDir);
-    const url = `https://gist.github.com/${login}/${gistId}/archive/${version}.zip`;
-    const response = await fetch(url, fetchOpts);
-
-    // save it to a tempfile
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.ensureDir(paths.temp);
-    const tempfile = path.join(paths.temp, `runner-${gistId}.zip`);
-    d(`Content: downloading gist to "${tempfile}"`);
-    await fs.writeFile(tempfile, buffer, { encoding: 'utf8' });
-
-    // unzip it from the tempfile
-    d(`unzipping gist`);
-    await fs.ensureDir(gistsDir);
-    await extract(tempfile, { dir: gistsDir });
-    d(`unzipped; removing "${tempfile}"`);
-    await fs.remove(tempfile);
+    d(`'git pull origin master' in "${gistDir}"`);
+    await git.cwd(gistDir).pull('origin', 'master', { '--no-rebase': null });
   }
 
   return path.join(gistDir, 'main.js');
