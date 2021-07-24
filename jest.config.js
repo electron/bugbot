@@ -6,7 +6,8 @@ module.exports = {
   coverageDirectory: '<rootDir>/coverage/',
   preset: 'ts-jest',
   projects: [
-    '<rootDir>/modules/*/',
+    '<rootDir>/modules/bot/',
+    '<rootDir>/modules/broker/',
     '<rootDir>/integration-tests',
   ],
 };
