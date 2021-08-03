@@ -23,7 +23,6 @@ describe('github-client', () => {
   const pollIntervalMs = 10;
 
   let ghclient: GithubClient;
-  let mockCompleteJob: jest.Mock;
   let mockGetJob: jest.Mock;
   let mockQueueBisectJob: jest.Mock;
   let mockStopJob: jest.Mock;
@@ -31,13 +30,11 @@ describe('github-client', () => {
   let nockScope: Scope;
 
   beforeEach(() => {
-    mockCompleteJob = jest.fn();
     mockGetJob = jest.fn();
     mockStopJob = jest.fn();
     mockQueueBisectJob = jest.fn();
     (BrokerAPI as jest.Mock).mockImplementation(() => {
       return {
-        completeJob: mockCompleteJob,
         getJob: mockGetJob,
         queueBisectJob: mockQueueBisectJob,
         stopJob: mockStopJob,
@@ -163,8 +160,6 @@ describe('github-client', () => {
           name: 'issue_comment',
           payload: payloadFixture,
         } as any);
-
-        expect(mockCompleteJob).toHaveBeenCalledWith(id);
       });
 
       it('handles failures gracefully', async () => {
@@ -228,8 +223,6 @@ describe('github-client', () => {
           name: 'issue_comment',
           payload: payloadFixture,
         } as any);
-
-        expect(mockCompleteJob).toHaveBeenCalledWith(mockJob.id);
       });
 
       it.todo('stops a test job if one is running');

@@ -8,8 +8,6 @@ import { URL } from 'url';
 import { randomInt } from 'crypto';
 import { spawnSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
-import { Setup } from './setup';
-import { Task } from './task';
 
 import {
   JobId,
@@ -24,6 +22,9 @@ import {
 import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
+
+import { Setup } from './setup';
+import { Task } from './task';
 
 export class Runner {
   private osInfo = '';
