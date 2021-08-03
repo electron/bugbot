@@ -227,7 +227,6 @@ export class GithubClient {
         } else {
           d(`${jobId}: complete 🚀 `);
           try {
-            await this.broker.completeJob(jobId);
             return resolve(job);
           } catch (e) {
             return reject(e);

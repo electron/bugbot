@@ -116,25 +116,4 @@ export default class BrokerAPI {
 
     return response.json();
   }
-
-  public async completeJob(jobId: JobId): Promise<void> {
-    const d = debug(`${DebugPrefix}:completeJob`);
-
-    const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
-    d('url', url.toString());
-
-    const response = await fetch(url.toString(), {
-      body: JSON.stringify([
-        { op: 'replace', path: '/bot_client_data', value: 'complete' },
-      ]),
-      headers: {
-        Authorization: `Bearer ${this.authToken}`,
-        'Content-Type': 'application/json',
-      },
-      method: 'PATCH',
-    });
-
-    const { status, statusText } = response;
-    d('status', status, 'statusText', statusText);
-  }
 }
