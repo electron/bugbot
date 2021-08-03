@@ -14,8 +14,8 @@ import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
 
 import BrokerAPI from './broker-client';
-import { BisectCommand, parseIssueCommand, TestCommand } from './issue-parser';
 import { Labels } from './github-labels';
+import { BisectCommand, parseIssueCommand, TestCommand } from './issue-parser';
 import { generateTable, Matrix } from './table-generator';
 
 const AppName = 'BugBot' as const;
