@@ -147,7 +147,7 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const completedJob = (await this.pollAndReturnJob(jobId)) as BisectJob;
+    const completedJob = (await this.pollJobUntilDone(jobId)) as BisectJob;
     if (completedJob) {
       await this.handleBisectResult(completedJob, context);
     }
@@ -186,75 +186,46 @@ export class GithubClient {
       }
     }
 
-    // set initial matrix comment
-    await this.setIssueMatrixComment(matrix, context, command.gistId);
-
     const ids = await Promise.all(queueJobPromises);
-
     d(`All ${ids.length} jobs queued: %o`, ids);
 
-    const awaitOneJob = async (id: JobId) => {
-      const job = (await this.pollAndReturnJob(id)) as TestJob;
-      matrix[job.platform][job.version] = job;
-      d('%O', matrix);
-      await this.maybeSetIssueMatrixComment(job, matrix, context);
-    };
+    // while the jobs are running, periodically update the comment
+    const CommentIntervalMsec = 5_000;
+    const updateComment = () =>
+      this.setIssueMatrixComment(matrix, context, command.gistId);
+    const interval = setInterval(updateComment, CommentIntervalMsec);
+    await updateComment();
 
-    await Promise.all(ids.map((id) => awaitOneJob(id)));
-    d('all promises settled; sending final update');
-    await this.setIssueMatrixComment(matrix, context, command.gistId);
-    d(`All ${ids.length} test jobs complete!`);
+    // poll jobs until they're all settled
+    const updateMatrix = (j: TestJob) => (matrix[j.platform][j.version] = j);
+    await Promise.all(ids.map((id) => this.pollJobUntilDone(id, updateMatrix)));
+
+    // jobs done; patch the comment one last time to ensure everything is shown
+    d(`All ${ids.length} test jobs complete! Updating the comment`);
+    clearInterval(interval);
+    await updateComment();
   }
 
-  private async pollAndReturnJob(jobId: JobId) {
-    const d = debug(`${DebugPrefix}:pollAndReturnJob`);
-    // FIXME: this state info, such as the timer, needs to be a
-    // class property so that '/test stop' could stop the polling.
-    // Poll until the job is complete
-    d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
-
-    return new Promise<Job | void>((resolve, reject) => {
-      const pollBroker = async () => {
-        if (this.isClosed) {
-          return resolve();
-        }
-
-        d(`${jobId}: polling job...`);
-        const job = await this.broker.getJob(jobId);
-        if (!job.last) {
-          d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
-          setTimeout(pollBroker, this.pollIntervalMs);
-        } else {
-          d(`${jobId}: complete 🚀 `);
-          try {
-            return resolve(job);
-          } catch (e) {
-            return reject(e);
-          }
-        }
-      };
-
-      setTimeout(pollBroker, this.pollIntervalMs);
-    });
-  }
-
-  private async maybeSetIssueMatrixComment(
-    job: TestJob,
-    matrix: Matrix,
-    context: Context<'issue_comment'>,
+  private async pollJobUntilDone(
+    jobId: JobId,
+    // callback to be invoked after each poll loop completes
+    onJobPolled: undefined | ((job: Job) => void) = undefined,
   ) {
-    const d = debug(`${DebugPrefix}:maybeSetIssueMatrixComment`);
-    const issueId = context.payload.issue.id;
-    d({ issueId, job });
+    const ms = this.pollIntervalMs;
+    const d = debug([DebugPrefix, 'pollJobUntilDone', jobId].join(':'));
+    d(`Polling job every ${this.pollIntervalMs}ms`);
 
-    // don't update too often
-    const comment = this.currentComment.get(issueId);
-    if (comment && comment.time + this.pollIntervalMs > Date.now()) {
-      d(`just updated issue #${issueId} recently; not updating again so soon`);
-      return;
+    while (!this.isClosed) {
+      d('polling job...');
+      const job = await this.broker.getJob(jobId);
+      onJobPolled?.(job);
+      if (job.last) {
+        d('complete 🚀');
+        return job;
+      }
+      d('polled and still pending 🐌', JSON.stringify(job));
+      await new Promise((r) => setTimeout(r, ms, ms));
     }
-
-    await this.setIssueMatrixComment(matrix, context, job.gist);
   }
 
   private async setIssueMatrixComment(
@@ -369,6 +340,7 @@ export class GithubClient {
         await context.octokit.issues.updateComment(opts);
         comment.body = body;
         comment.time = Date.now();
+        d('patch done');
         return;
       } catch (error) {
         d('patching existing comment failed; posting a new one instead', error);
@@ -381,6 +353,7 @@ export class GithubClient {
       const opts = context.issue({ body });
       const response = await context.octokit.issues.createComment(opts);
       comment = { body, id: response.data.id, time: Date.now() };
+      d('new comment created; id is', comment.id);
       this.currentComment.set(issueId, comment);
     } catch (error) {
       d('unable to post new comment', error);
