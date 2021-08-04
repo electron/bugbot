@@ -6,6 +6,8 @@ import { createProbot, Probot, ProbotOctokit } from 'probot';
 import { v4 as mkuuid } from 'uuid';
 import { inspect } from 'util';
 
+import { BaseVersions } from 'electron-fiddle-runner';
+
 import { Auth, AuthScope } from '../../modules/broker/src/auth';
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/bot/src/github-client';
@@ -31,6 +33,7 @@ describe('bot-broker-runner', () => {
   const brokerUrl = `http://localhost:43493` as const; // arbitrary port
   const pollIntervalMs = 10;
   const authToken = 'test' as const;
+  const versions = new BaseVersions(fs.readFileSync(path.join(__dirname, 'fixtures', 'electron-versions.json'), 'utf8'));
 
   // BOT
 
@@ -54,6 +57,7 @@ describe('bot-broker-runner', () => {
       brokerBaseUrl: brokerUrl,
       pollIntervalMs,
       robot,
+      versions,
     });
   }
 
@@ -180,11 +184,13 @@ describe('bot-broker-runner', () => {
     const issuePath = `${projectPath}/issues/${issueNumber}` as const;
     const botComment = { id: botCommentId, user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` } };
 
+    /*
     const electronJsNockscope = nock('https://electronjs.org/')
       .get('/headers/index.json')
       .replyWithFile(200, __dirname + '/fixtures/electron-versions.json', {
         'Content-Type': 'application/json',
       });
+    */
 
     ghNockScope = nock('https://api.github.com');
     ghNockScope

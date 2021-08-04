@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo",
     "rootDir": "src"
   },
-  "include": ["src/**/*"],
+  "include": ["test/**/*.ts"],
   "references": [
     { "path": "../modules/bot" },
     { "path": "../modules/broker" },

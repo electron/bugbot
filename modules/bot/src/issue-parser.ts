@@ -6,10 +6,8 @@ import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
 
-import {
-  ElectronVersions,
-  releaseCompare,
-} from '@electron/bugbot-shared/build/electron-versions';
+import { Versions } from 'electron-fiddle-runner';
+import { releaseCompare } from '@electron/bugbot-shared/build/electron-versions';
 import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 // no types exist for this module
@@ -73,11 +71,11 @@ const TESTCASE_URL = 'Testcase Gist URL';
 // If no `gistId` is given, use TESTCASE_URL.
 // If no `goodVersion` is given, use GOOD_VERSION or an old version.
 // If no `badVersion` is given, use BAD_VERSION or the latest release.
-async function parseBisectCommand(
+function parseBisectCommand(
   issueBody: string,
   words: string[],
-  versions: ElectronVersions,
-): Promise<BisectCommand | undefined> {
+  versions: Versions,
+): BisectCommand | undefined {
   const d = debug('issue-parser:parseBisectCommand');
 
   let badVersion: string | undefined;
@@ -91,7 +89,7 @@ async function parseBisectCommand(
       continue;
     }
     const ver = SemVer.coerce(word);
-    if (ver && (await versions.isVersion(ver.version))) {
+    if (ver && versions.isVersion(ver)) {
       if (!goodVersion) {
         goodVersion = ver.version;
       } else {
@@ -105,9 +103,9 @@ async function parseBisectCommand(
   const sections = splitMarkdownByHeader(issueBody);
   d('sections', inspect(sections));
   badVersion ||= SemVer.coerce(sections.get(BAD_VERSION))?.version;
-  badVersion ||= await versions.getLatestVersion();
+  badVersion ||= versions.latest.version;
   goodVersion ||= SemVer.coerce(sections.get(GOOD_VERSION))?.version;
-  goodVersion ||= await versions.getDefaultBisectStart();
+  goodVersion ||= `${versions.supportedMajors[0] - 2}.0.0`;
   gistId ||= getGistId(sections.get(TESTCASE_URL));
 
   // ensure goodVersion < badVersion;
@@ -124,16 +122,32 @@ async function parseBisectCommand(
 }
 
 const ALL_PLATFORMS = ['darwin', 'linux', 'win32'];
+const NUM_OBSOLETE_TO_TEST = 2;
+
+function getVersionsToTest(versions: Versions): Array<string> {
+  const testme: string[] = [];
+
+  const addMajor = (major: number) => {
+    const range = versions.inMajor(major);
+    if (range.length !== 0) testme.push(range.shift().version);
+    if (range.length !== 0) testme.push(range.pop().version);
+  };
+
+  versions.obsoleteMajors.slice(NUM_OBSOLETE_TO_TEST).forEach(addMajor);
+  versions.supportedMajors.forEach(addMajor);
+  versions.prereleaseMajors.forEach(addMajor);
+  return testme;
+}
 
 // /bugbot test [gistId | platform... | version...]
 // If no `gistId` is given, use TESTCASE_URL.
 // If no `platform`s are given, use `ALL_PLATFORMS`
 // If no `version`s are given, use BAD_VERSION or the latest release.
-async function parseTestCommand(
+function parseTestCommand(
   issueBody: string,
   words: string[],
-  versions: ElectronVersions,
-): Promise<TestCommand | undefined> {
+  versions: Versions,
+): TestCommand | undefined {
   const d = debug('issue-parser:parseTestCommand');
   const sections = splitMarkdownByHeader(issueBody);
 
@@ -156,7 +170,7 @@ async function parseTestCommand(
       continue;
     }
     const ver = SemVer.coerce(word);
-    if (ver && (await versions.isVersion(ver.version))) {
+    if (ver && versions.isVersion(ver.version)) {
       ret.versions.push(ver.version);
       continue;
     }
@@ -165,7 +179,7 @@ async function parseTestCommand(
 
   // fallback values
   if (ret.versions.length === 0) {
-    ret.versions.push(...(await versions.getVersionsToTest()));
+    ret.versions.push(...getVersionsToTest(versions));
   }
   if (ret.platforms.length === 0) {
     ret.platforms.push(...(ALL_PLATFORMS as Platform[]));
@@ -180,11 +194,11 @@ async function parseTestCommand(
     : undefined;
 }
 
-export async function parseIssueCommand(
+export function parseIssueCommand(
   issueBody: string,
   cmd: string,
-  versions: ElectronVersions,
-): Promise<IssueCommand | undefined> {
+  versions: Versions,
+): IssueCommand | undefined {
   const d = debug('issue-parser:parseIssueCommand');
 
   const words = cmd
@@ -197,9 +211,9 @@ export async function parseIssueCommand(
   if (words[0] !== '/bugbot') return undefined;
   switch (words[1]) {
     case 'bisect':
-      return await parseBisectCommand(issueBody, words.slice(2), versions);
+      return parseBisectCommand(issueBody, words.slice(2), versions);
     case 'test':
-      return await parseTestCommand(issueBody, words.slice(2), versions);
+      return parseTestCommand(issueBody, words.slice(2), versions);
     default:
       return undefined;
   }

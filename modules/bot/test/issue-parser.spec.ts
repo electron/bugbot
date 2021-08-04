@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
+import { BaseVersions } from 'electron-fiddle-runner';
 
 import {
   BisectCommand,
@@ -10,24 +10,40 @@ import {
 } from '../src/issue-parser';
 
 describe('issue-parser', () => {
-  const versionsMock = {
-    getDefaultBisectStart: jest.fn(),
-    getLatestVersion: jest.fn(),
-    getVersionsToTest: jest.fn(),
-    isVersion: jest.fn(),
-  };
-  const versions = (versionsMock as undefined) as ElectronVersions;
-  const fakeLatestVersion = '13.0.0' as const;
-  const fakeBisectStart = '3.1.4' as const;
+  const versions = new BaseVersions([
+    '13.0.2',
+    '13.0.1',
+    '13.0.0',
+    '12.0.3',
+    '12.0.2',
+    '12.0.1',
+    '12.0.0',
+    '11.0.2',
+    '11.0.1',
+    '11.0.0',
+    '10.1.0',
+    '10.0.2',
+    '10.0.1',
+    '10.0.0',
+    '9.0.3',
+    '9.0.2',
+    '9.0.1',
+    '9.0.0',
+    '8.0.2',
+    '8.0.1',
+    '8.0.0',
+    '7.0.2',
+    '7.0.1',
+    '7.0.0',
+    '6.1.4',
+    '6.1.2',
+    '6.1.0',
+    '6.0.0',
+  ]);
+  const fakeLatestVersion = versions.latest.version;
+  const fakeBisectStart = `${versions.supportedMajors[0] - 2}.0.0`;
 
-  beforeEach(() => {
-    versionsMock.getLatestVersion.mockResolvedValue(fakeLatestVersion);
-    versionsMock.getDefaultBisectStart.mockResolvedValue(fakeBisectStart);
-    versionsMock.isVersion.mockResolvedValue(true);
-    versionsMock.getVersionsToTest.mockResolvedValue([fakeBisectStart, fakeLatestVersion]);
-  });
-
-  describe('await parseIssueCommand()', () => {
+  describe('parseIssueCommand()', () => {
     const fixtureGistId = '24848aefcbb922444b148321a1821be6' as const;
     const otherGistId = '8c5fc0c6a5153d49b5a4a56d3ed9da8f' as const;
 
@@ -45,9 +61,9 @@ describe('issue-parser', () => {
         ['does not begin with "/bugbot"', '/bugbo bisect'],
         ['has no command', '/bugbot'],
         ['has a command that is not "bisect" or "test"', '/bugbot fnord'],
-      ])('%s', async (name: string, comment: string) => {
+      ])('%s', (name: string, comment: string) => {
         const issueBody = getIssueBody('issue.md');
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toBeUndefined();
       });
     });
@@ -59,75 +75,88 @@ describe('issue-parser', () => {
         gistId: fixtureGistId,
         type: 'test',
         platforms: ['darwin', 'linux', 'win32'],
-        versions: [fakeBisectStart, fakeLatestVersion],
+        versions: [
+          '8.0.0',
+          '8.0.2',
+          '9.0.0',
+          '9.0.3',
+          '10.0.0',
+          '10.1.0',
+          '11.0.0',
+          '11.0.2',
+          '12.0.0',
+          '12.0.3',
+          '13.0.0',
+          '13.0.2',
+        ],
       };
 
-      it('uses a gist from the comment, if provided', async () => {
+      it('uses a gist from the comment, if provided', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} https://gist.github.com/${otherGistId}/`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           gistId: otherGistId,
         });
       });
 
-      it('finds a gist from the issue body', async () => {
+      it('finds a gist from the issue body', () => {
         const issueBody = getIssueBody('issue.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('returns undefined if it has an invalid gist', async () => {
+      it('returns undefined if it has an invalid gist', () => {
         const issueBody = getIssueBody('issue-gist-invalid.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toBeUndefined();
       });
 
-      it('finds versions provided in the command', async () => {
+      it('finds versions provided in the command', () => {
         const issueBody = getIssueBody('issue.md');
         const versionNumbers = ['10.0.0', '10.1.0', '9.0.0', '12.0.0'];
         const comment = `${COMMENT} ${versionNumbers.join(' ')}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           versions: versionNumbers,
         });
       });
 
-      it('finds platforms provided in the command', async () => {
+      it('finds platforms provided in the command', () => {
         const issueBody = getIssueBody('issue.md');
         const platforms = ['darwin', 'linux'];
         const comment = `${COMMENT} ${platforms.join(' ')}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({ ...expectedCommand, platforms });
       });
 
-      it('ignores garbage inputs', async () => {
+      it('ignores garbage inputs', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} gromble frotz splart`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('returns undefined if it has an invalid gist', async () => {
+      it('returns undefined if it has an invalid gist', () => {
         const issueBody = getIssueBody('issue-gist-invalid.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toBeUndefined();
       });
 
-      it('returns undefined if it has a missing gist', async () => {
+      it('returns undefined if it has a missing gist', () => {
         const issueBody = getIssueBody('issue-missing-info.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toBeUndefined();
       });
 
-      it('does not parse win32 as Electron 32.0.0', async () => {
+      it('does not parse win32 as Electron 32.0.0', () => {
         const issueBody = getIssueBody('issue.md');
         const platforms = ['linux', 'win32'];
         const vers = ['11.0.2'];
         const comment = `${COMMENT} ${platforms.join(' ')} ${vers.join(' ')}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           platforms,
@@ -154,55 +183,59 @@ describe('issue-parser', () => {
         expect(otherBadVersion).not.toBe(expectedCommand.badVersion);
       });
 
-      it('finds a gist and version range', async () => {
+      it('finds a gist and version range', () => {
         const issueBody = getIssueBody('issue.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('is not confused by extra whitespace in the comment body', async () => {
+      it('is not confused by extra whitespace in the comment body', () => {
         const issueBody = getIssueBody('issue.md');
-        const command = await parseIssueCommand(issueBody, `\n  \n  /bugbot   bisect \n\n\n `, versions);
+        const command = parseIssueCommand(
+          issueBody,
+          '\n  \n  /bugbot   bisect \n\n\n ',
+          versions,
+        );
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('coerces version numbers into semver', async () => {
+      it('coerces version numbers into semver', () => {
         const issueBody = getIssueBody('issue-versions-non-semantic.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('handles a trailing slash at the end of the gist URL', async () => {
+      it('handles a trailing slash at the end of the gist URL', () => {
         const issueBody = getIssueBody('issue-gist-trailing-slash.md');
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('reads a gist from the issue comment', async () => {
+      it('reads a gist from the issue comment', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} ${otherGistId}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           gistId: otherGistId,
         });
       });
 
-      it('reads a goodVersion from the issue comment', async () => {
+      it('reads a goodVersion from the issue comment', () => {
         const issueBody = getIssueBody('issue.md');
         expect(otherGoodVersion).not.toBe(expectedCommand.goodVersion);
         const comment = `${COMMENT} ${otherGoodVersion}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: otherGoodVersion,
         });
       });
 
-      it('reads a goodVersion and badVersion from the issue comment', async () => {
+      it('reads a goodVersion and badVersion from the issue comment', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} ${otherGoodVersion} ${otherBadVersion}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: otherGoodVersion,
@@ -210,10 +243,10 @@ describe('issue-parser', () => {
         });
       });
 
-      it('ensures that goodVersion is older than newVersion', async () => {
+      it('ensures that goodVersion is older than newVersion', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} ${otherBadVersion} ${otherGoodVersion}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: otherGoodVersion,
@@ -221,17 +254,17 @@ describe('issue-parser', () => {
         });
       });
 
-      it('ignores inscrutable comment arguments', async () => {
+      it('ignores inscrutable comment arguments', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} fnord`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('uses ElectronVersions defaults if the issue has no version info', async () => {
+      it('uses ElectronVersions defaults if the issue has no version info', () => {
         const issueBody = getIssueBody('issue-versions-invalid.md');
         const comment = COMMENT;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: fakeBisectStart,
@@ -239,22 +272,23 @@ describe('issue-parser', () => {
         });
       });
 
-      it('falls back to ElectronVersions for bisect start point', async () => {
+      it('falls back to ElectronVersions for bisect start point', () => {
         const issueBody = getIssueBody('issue-missing-info.md');
         const comment = `${COMMENT} ${fixtureGistId}`;
-        const command = await parseIssueCommand(issueBody, comment, versions);
+        const command = parseIssueCommand(issueBody, comment, versions);
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: fakeBisectStart,
+          badVersion: fakeLatestVersion
         });
       });
 
       it.each([
         ['has an invalid gist', 'issue-gist-invalid.md'],
         ['does not have all necessary information', 'issue-missing-info.md'],
-      ])('returns undefined if %s', async (name: string, fixture: string) => {
+      ])('returns undefined if %s', (name: string, fixture: string) => {
         const issueBody = getIssueBody(fixture);
-        const command = await parseIssueCommand(issueBody, COMMENT, versions);
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toBeUndefined();
       });
     });

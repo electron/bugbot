@@ -5,6 +5,8 @@ process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 import nock, { Scope } from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 
+import { ElectronVersions } from 'electron-fiddle-runner';
+
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
 import payloadFixture from './fixtures/issue_comment.created.bisect.json';
@@ -29,7 +31,7 @@ describe('github-client', () => {
   let robot: Probot;
   let nockScope: Scope;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockGetJob = jest.fn();
     mockStopJob = jest.fn();
     mockQueueBisectJob = jest.fn();
@@ -56,6 +58,7 @@ describe('github-client', () => {
       brokerBaseUrl,
       pollIntervalMs,
       robot,
+      versions: await ElectronVersions.create(),
     });
 
     nock.disableNetConnect();

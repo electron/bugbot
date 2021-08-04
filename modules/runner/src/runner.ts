@@ -1,13 +1,12 @@
 import debug from 'debug';
-import * as os from 'os';
 import fetch from 'node-fetch';
-import getos from 'getos';
-import { inspect } from 'util';
+import { PassThrough } from 'stream';
 
 import { URL } from 'url';
 import { randomInt } from 'crypto';
-import { spawnSync } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
+
+import { Runner as FiddleRunner } from 'electron-fiddle-runner';
 
 import {
   JobId,
@@ -21,22 +20,17 @@ import {
 } from '@electron/bugbot-shared/build/interfaces';
 import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
-import { ElectronVersions } from '@electron/bugbot-shared/build/electron-versions';
 
-import { Setup } from './setup';
 import { Task } from './task';
 
 export class Runner {
-  private osInfo = '';
   private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
   private readonly debugPrefix: string;
-  private readonly fiddleExec: string;
   private readonly logIntervalMs: number;
   private readonly loop: RotaryLoop;
-  private readonly setup: Setup;
-  private readonly versions = new ElectronVersions();
+  private readonly fiddleRunner: FiddleRunner;
   public readonly platform: Platform;
   public readonly uuid: RunnerId;
 
@@ -48,14 +42,13 @@ export class Runner {
     authToken?: string;
     brokerUrl?: string;
     childTimeoutMs?: number;
-    fiddleExec?: string;
+    fiddleRunner: FiddleRunner;
     logIntervalMs?: number;
     platform?: Platform;
     pollIntervalMs?: number;
-    setup: Setup;
     uuid?: string;
   }) {
-    this.setup = opts.setup;
+    this.fiddleRunner = opts.fiddleRunner;
     this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
@@ -67,7 +60,6 @@ export class Runner {
     const pollIntervalMs =
       opts.pollIntervalMs || envInt('BUGBOT_POLL_INTERVAL_MS', 20_000);
     this.loop = new RotaryLoop(this.debugPrefix, pollIntervalMs, this.pollOnce);
-    getos((err, result) => (this.osInfo = inspect(result || err)));
   }
 
   public start = () => this.loop.start();
@@ -175,7 +167,7 @@ export class Runner {
     );
   }
 
-  private async runBisect(task: Task) {
+  private async runBisect(task: Task): Promise<Partial<Result>> {
     const d = debug(`${this.debugPrefix}:runBisect`);
     const log = (first, ...rest) => {
       task.addLogData([first, ...rest].join(' '));
@@ -185,151 +177,58 @@ export class Runner {
     const { job } = task;
     assertBisectJob(job);
     const { gist, version_range } = job;
-    const versions = await this.versions.getVersionsInRange(version_range);
+    const [v1, v2] = version_range;
+    log('bisecting', gist, v1, v2);
 
-    const displayIndex = (i: number) => '#' + i.toString().padStart(4, ' ');
+    const out = new PassThrough();
+    out.on('data', (chunk: string | Buffer) => log(chunk.toString()));
 
-    const displayResult = (result) => {
-      if (!result) return '';
-      if (result.status === 0) return '🟢 passed';
-      if (result.status === 1) return '🔴 failed';
-      return '🟠 error: test did not pass or fail';
-      // FIXME: more reasons
-    };
-
-    log(
-      [
-        '📐 Bisect Requested',
-        '',
-        ` - gist is https://gist.github.com/${gist}`,
-        ` - the version range is [${version_range.join('..')}]`,
-        ` - there are ${versions.length} versions in this range:`,
-        '',
-        ...versions.map((ver, i) => `${displayIndex(i)} - ${ver}`),
-      ].join('\n'),
-    );
-
-    // basically a binary search
-    let left = 0;
-    let right = versions.length - 1;
-    let status;
-    const testOrder: (number | undefined)[] = [];
-    const results: ({ status?: number; error?: Error } | undefined)[] =
-      new Array(versions.length);
-    while (left + 1 < right) {
-      const mid = Math.round(left + (right - left) / 2);
-      const version = versions[mid];
-      testOrder.push(mid);
-      log(`bisecting, range [${left}..${right}], mid ${mid} (${version})`);
-
-      const result = await this.runFiddle(task, version, gist);
-      results[mid] = result;
-      log(`${displayResult(result)} ${versions[mid]}\n`);
-
-      if (result.status === 0) {
-        left = mid;
-        continue;
-      } else if (result.status === 1) {
-        right = mid;
-        continue;
-      } else {
-        // FIXME: check errors
-        status = result.status;
-        break;
-      }
-    }
-
-    log(`🏁 finished bisecting across ${versions.length} versions...`);
-    versions.forEach((ver, i) => {
-      const n = testOrder.indexOf(i);
-      if (n === -1) return;
-      log(displayIndex(i), displayResult(results[i]), ver, `(test #${n + 1})`);
+    const result = await this.fiddleRunner.bisect(v1, v2, gist, {
+      headless: true,
+      out,
+      showConfig: true,
+      timeout: this.childTimeoutMs,
     });
 
-    log('\n🏁 Done bisecting');
-    const success = results[left].status === 0 && results[right].status === 1;
-    if (success) {
-      const good = versions[left];
-      const bad = versions[right];
-      const results = [
-        `🟢 passed ${good}`,
-        `🔴 failed ${bad}`,
-        'Commits between versions:',
-        `↔ https://github.com/electron/electron/compare/v${good}...v${bad}`,
-      ].join('\n');
-      log(results);
+    // TODO(anyone): sync the naming of status strings and
+    // Result properties between bugbot and electron-fiddle-runner
+    if (result.status === 'bisect_succeeded') {
+      return { version_range: result.range, status: 'success' };
     } else {
-      // FIXME: log some failure
+      return { version_range: result.range, status: result.status };
     }
-
-    const result: Partial<Result> = {};
-    if (success) {
-      result.status = 'success';
-      result.version_range = [versions[left], versions[right]];
-    } else {
-      // TODO(clavin): ^ better wording
-      result.error = `Failed to narrow test down to two versions`;
-      result.status = status === 1 ? 'test_error' : 'system_error';
-    }
-    return result;
   }
 
-  private async runTest(task: Task) {
+  private async runTest(task: Task): Promise<Partial<Result>> {
+    const d = debug(`${this.debugPrefix}:runBisect`);
+    const log = (first, ...rest) => {
+      task.addLogData([first, ...rest].join(' '));
+      d(first, ...rest);
+    };
+
     const { job } = task;
     assertTestJob(job);
-    const { error, status } = await this.runFiddle(task, job.version, job.gist);
+    const { gist, version } = job;
 
-    const result: Partial<Result> = {};
-    if (error) {
-      result.status = 'system_error';
-      result.error = `Unable to run Electron Fiddle. ${error.toString()}`;
-    } else if (status === 0) {
-      result.status = 'success';
-    } else if (status === 1) {
-      result.status = 'failure';
-      result.error = 'The test ran and failed.';
-    } else {
-      result.status = 'test_error';
-      result.error = 'Electron Fiddle was unable to complete the test.';
-    }
-    return result;
-  }
+    const out = new PassThrough();
+    out.on('data', (chunk: string | Buffer) => log(chunk.toString()));
 
-  private async runFiddle(task: Task, version: string, gistId: string) {
-    const d = debug(`${this.debugPrefix}:runFiddle`);
-
-    // set up the electron binary and the gist
-    let exec = await this.setup.prepareElectron(version);
-    const folder = await this.setup.prepareGist(gistId);
-    const args = [folder];
-    if (process.platform !== 'darwin' && process.platform !== 'win32') {
-      args.unshift(exec);
-      exec = 'xvfb-run';
-    }
-
-    task.addLogData(`🧪 Testing
-
-  - date: ${new Date().toISOString()}
-  - electron_version: ${version}  https://github.com/electron/electron/releases/tag/v${version}
-  - gist: https://gist.github.com/${gistId}
-
-  - os_arch: ${os.arch()}
-  - os_platform: ${process.platform}
-  - os_release: ${os.release()}
-  - os_version: ${os.version()}
-  - getos: ${this.osInfo}
-
-`);
-    const opts = {
-      env: {},
+    const result = await this.fiddleRunner.run(version, gist, {
+      headless: true,
+      out,
+      showConfig: true,
       timeout: this.childTimeoutMs,
-    };
-    d('⏳ fiddle starting', inspect({ exec, args, opts }));
-    const result = spawnSync(exec, args, opts);
-    const { error, pid, signal, status, stderr, stdout } = result;
-    d('⌛ fiddle finished', inspect({ error, pid, signal, status }));
-    task.addLogData(stdout.toString('utf8'));
-    task.addLogData(stderr.toString('utf8'));
-    return { error, status };
+    });
+
+    // TODO(anyone): sync the naming of status strings and
+    // Result properties between bugbot and electron-fiddle-runner
+    switch (result.status) {
+      case 'test_passed':
+        return { status: 'success' };
+      case 'test_failed':
+        return { status: 'failure' };
+      default:
+        return { status: result.status };
+    }
   }
 }
