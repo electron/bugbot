@@ -226,7 +226,7 @@ export class Runner {
       case 'test_passed':
         return { status: 'success' };
       case 'test_failed':
-        return { status: 'failure' };
+        return { status: 'failure', error: 'The test ran and failed.' };
       default:
         return { status: result.status };
     }

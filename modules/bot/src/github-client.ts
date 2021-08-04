@@ -110,11 +110,13 @@ export class GithubClient {
    * @param context Probot context object
    */
   private async handleManualCommand(context: Context<'issue_comment'>) {
+    const d = debug(`${DebugPrefix}:handleManualComand`);
     const promises: Promise<void>[] = [];
     const { issue } = context.payload;
 
     for (const line of context.payload.comment.body.split('\n')) {
       const cmd = parseIssueCommand(issue.body, line, this.versions);
+      d(inspect({ cmd }));
 
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
@@ -195,9 +197,9 @@ export class GithubClient {
     // while the jobs are running, periodically update the comment
     const CommentIntervalMsec = 3_000;
     const updateComment = () =>
-      void this.setIssueMatrixComment(matrix, context, command.gistId);
+      this.setIssueMatrixComment(matrix, context, command.gistId);
     const interval = setInterval(updateComment, CommentIntervalMsec);
-    updateComment();
+    await updateComment();
 
     // poll jobs until they're all settled
     const updateMatrix = (j: TestJob) => (matrix[j.platform][j.version] = j);
@@ -206,7 +208,7 @@ export class GithubClient {
     // jobs done; patch the comment one last time to ensure everything is shown
     d(`All ${ids.length} test jobs complete! Updating the comment`);
     clearInterval(interval);
-    updateComment();
+    await updateComment();
   }
 
   private async pollUntilDone(
@@ -341,6 +343,7 @@ export class GithubClient {
         await context.octokit.issues.updateComment(opts);
         comment.body = body;
         comment.time = Date.now();
+        d(`done patching existing comment ${comment.id}`);
         return;
       } catch (error) {
         d('patching existing comment failed; posting a new one instead', error);

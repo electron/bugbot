@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import * as path from 'path';
 import nock, { Scope } from 'nock';
 import { URL } from 'url';
@@ -8,9 +8,11 @@ import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 import {
   BaseVersions,
-  Runner as FiddleRunner,
+  BisectResult,
   Installer,
   Paths,
+  Runner as FiddleRunner,
+  TestResult,
 } from 'electron-fiddle-runner';
 
 import { Broker } from '../../modules/broker/src/broker';
@@ -26,8 +28,9 @@ describe('bot-broker-runner', () => {
   const pollIntervalMs = 10;
   const authToken = 'test' as const;
 
-  const verFixture = path.join(__dirname, 'fixtures', 'electron-versions.json');
-  const versions = new BaseVersions(fs.readFileSync(verFixture, 'utf8'));
+  const versionFile = path.join(__dirname, 'fixtures', 'releases.json');
+  const versionJson = fs.readJsonSync(versionFile, { encoding: 'utf8' });
+  const versions = new BaseVersions(versionJson);
 
   // BOT
 
@@ -68,21 +71,26 @@ describe('bot-broker-runner', () => {
 
   const runners = new Map<Platform, Runner>();
 
-  async function startRunners() {
+  // async function startRunners() {
+  function startRunners() {
+    const fiddleRunner = {
+      bisect: jest.fn(),
+      run: jest.fn(),
+    };
     // run tests with a fake version of Electron
-    const installerMock = { install: jest.fn() };
-    const electronMock = path.join(__dirname, 'fixtures', 'electron');
-    installerMock.install.mockResolvedValue(electronMock);
+    // const installerMock = { install: jest.fn() };
+    // const electronMock = path.join(__dirname, 'fixtures', 'electron');
+    // installerMock.install.mockResolvedValue(electronMock);
 
-    const fiddleRunner = await FiddleRunner.create({
-      installer: installerMock as any, // 'any' because it's a fake Installer
-    });
+    // const fiddleRunner = await FiddleRunner.create({
+    //   installer: installerMock as any, // 'any' because it's a fake Installer
+    // });
 
     for (const platform of ['linux'] as Platform[]) {
       const runner = new Runner({
         authToken,
         brokerUrl,
-        fiddleRunner,
+        fiddleRunner: fiddleRunner as any,
         logIntervalMs: 1, // minimize batching to avoid timing issues during testing
         platform,
         pollIntervalMs,
@@ -90,6 +98,8 @@ describe('bot-broker-runner', () => {
       void runner.start();
       runners.set(platform, runner);
     }
+
+    return { fiddleRunner };
   }
 
   beforeAll(() => {
@@ -126,7 +136,8 @@ describe('bot-broker-runner', () => {
   async function startWithDefaults() {
     startProbot();
     await startBroker();
-    await startRunners();
+    // await startRunners();
+    return startRunners();
   }
 
   it('starts', async () => {
@@ -157,7 +168,13 @@ describe('bot-broker-runner', () => {
       .patch(`${projectPath}/issues/comments/${botCommentId}`)
       .reply(200);
 
-    await startWithDefaults();
+    const { fiddleRunner } = await startWithDefaults();
+    const mockBisectResult: BisectResult = {
+      range: ['10.3.2', '10.4.0'],
+      status: 'bisect_succeeded',
+    };
+    fiddleRunner.bisect = jest.fn().mockResolvedValue(mockBisectResult);
+
     const filename = path.join(fixtureDir, 'issue_comment.created.bisect.json');
     await robot.receive({
       name: 'issue_comment',
@@ -214,8 +231,12 @@ describe('bot-broker-runner', () => {
       .patch(`${projectPath}/issues/comments/${botCommentId}`)
       .reply(200);
 
+    const { fiddleRunner } = await startWithDefaults();
+
+    const mockTestResult: TestResult = { status: 'test_failed' };
+    fiddleRunner.run.mockResolvedValue(mockTestResult);
+
     const filename = path.join(fixtureDir, 'issue_comment.created.test.json');
-    await startWithDefaults();
     await robot.receive({
       name: 'issue_comment',
       payload: JSON.parse(fs.readFileSync(filename, { encoding: 'utf8' })),
