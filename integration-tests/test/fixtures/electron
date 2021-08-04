@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
-// This script will play back electron-fiddle sessions that were
-// recorded with `./electron-fiddle-record`
+// This script pretends to be electron by playing back actual
+// electron sessions that were recorded with `./electron-record`
 
 const fs = require('fs');
 const hash = require('object-hash');
 const path = require('path');
 
-// We only want the args that are passed to electron-fiddle, so remove
+// We only want the args that are passed to electron, so remove
 // the /path/to/node and /path/to/electron-fiddle args that come first
 function removeLeadingArgs(argv) {
-  const keep = (arg) => !/(node|electron-fiddle)$/.test(arg);
+  const keep = (arg) => !/(node|electron)$/.test(arg);
   return argv.slice(argv.findIndex(keep));
 }
 
@@ -19,7 +19,7 @@ function getFilenames(argv) {
   args = removeLeadingArgs(argv);
   const argv_hash = hash(args);
   // build filenames from the session hash
-  const prefix = path.resolve(__dirname, 'electron-fiddle-sessions', argv_hash);
+  const prefix = path.resolve(__dirname, 'electron-sessions', argv_hash);
   const logFile = `${prefix}.log`;
   const exitFile = `${prefix}.code`;
   return { args, exitFile, logFile };
@@ -27,6 +27,7 @@ function getFilenames(argv) {
 
 if (require.main === module) {
   const { args, exitFile, logFile } = getFilenames(process.argv);
+  console.log('process.argv:', process.argv.join(' '));
   console.log('hashing args:', args.join(' '));
   console.log(fs.readFileSync(logFile, 'utf8'));
   process.exit(Number.parseInt(fs.readFileSync(exitFile, 'utf8')));

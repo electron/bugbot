@@ -4,13 +4,19 @@ import nock, { Scope } from 'nock';
 import { URL } from 'url';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 
-import { BaseVersions } from 'electron-fiddle-runner';
+import { Platform } from '@electron/bugbot-shared/build/interfaces';
+
+import {
+  BaseVersions,
+  Runner as FiddleRunner,
+  Installer,
+  Paths,
+} from 'electron-fiddle-runner';
+
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/bot/src/github-client';
 import { Runner } from '../../modules/runner/src/runner';
 import { Server as BrokerServer } from '../../modules/broker/src/server';
-
-import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60_000);
 
@@ -19,7 +25,9 @@ describe('bot-broker-runner', () => {
   const brokerUrl = `http://localhost:43493` as const; // arbitrary port
   const pollIntervalMs = 10;
   const authToken = 'test' as const;
-  const versions = new BaseVersions(fs.readFileSync(path.join(__dirname, 'fixtures', 'electron-versions.json'), 'utf8'));
+
+  const verFixture = path.join(__dirname, 'fixtures', 'electron-versions.json');
+  const versions = new BaseVersions(fs.readFileSync(verFixture, 'utf8'));
 
   // BOT
 
@@ -60,17 +68,26 @@ describe('bot-broker-runner', () => {
 
   const runners = new Map<Platform, Runner>();
 
-  function startRunners() {
+  async function startRunners() {
+    // run tests with a fake version of Electron
+    const installerMock = { install: jest.fn() };
+    const electronMock = path.join(__dirname, 'fixtures', 'electron');
+    installerMock.install.mockResolvedValue(electronMock);
+
+    const fiddleRunner = await FiddleRunner.create({
+      installer: installerMock as any, // 'any' because it's a fake Installer
+    });
+
     for (const platform of ['linux'] as Platform[]) {
       const runner = new Runner({
         authToken,
         brokerUrl,
-        fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
+        fiddleRunner,
         logIntervalMs: 1, // minimize batching to avoid timing issues during testing
         platform,
         pollIntervalMs,
       });
-      runner.start();
+      void runner.start();
       runners.set(platform, runner);
     }
   }
@@ -109,7 +126,7 @@ describe('bot-broker-runner', () => {
   async function startWithDefaults() {
     startProbot();
     await startBroker();
-    startRunners();
+    await startRunners();
   }
 
   it('starts', async () => {
