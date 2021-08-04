@@ -2,8 +2,12 @@ process.env.BUGBOT_BROKER_URL = 'http://localhost:9099';
 process.env.BUGBOT_GITHUB_LOGIN = 'erick-bugbot';
 process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 
+import * as path from 'path';
+import * as fs from 'fs-extra';
 import nock, { Scope } from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
+
+import { BaseVersions } from 'electron-fiddle-runner';
 
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';
@@ -51,11 +55,15 @@ describe('github-client', () => {
       },
     });
 
+    const releasesFile = path.join(__dirname, 'fixtures', 'releases.json');
+    const releasesJson = fs.readJsonSync(releasesFile, { encoding: 'utf8' });
+
     ghclient = new GithubClient({
       authToken,
       brokerBaseUrl,
       pollIntervalMs,
       robot,
+      versions: new BaseVersions(releasesJson),
     });
 
     nock.disableNetConnect();

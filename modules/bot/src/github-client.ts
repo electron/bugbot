@@ -3,6 +3,8 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
+import { ElectronVersions, Versions } from 'electron-fiddle-runner';
+
 import {
   BisectJob,
   Job,
@@ -15,7 +17,6 @@ import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
 import { BisectCommand, parseIssueCommand, TestCommand } from './issue-parser';
-import { ElectronVersions } from './electron-versions';
 import { generateTable, Matrix } from './table-generator';
 
 const AppName = 'BugBot' as const;
@@ -33,7 +34,7 @@ export class GithubClient {
   private readonly brokerBaseUrl: string;
   private readonly pollIntervalMs: number;
   private readonly robot: Probot;
-  private readonly versions = new ElectronVersions();
+  private readonly versions: Versions;
 
   // issue id # -> bugbot's comment in that issue for the current task
   private readonly currentComment = new Map<number, BotCommentInfo>();
@@ -43,6 +44,7 @@ export class GithubClient {
     brokerBaseUrl: string;
     pollIntervalMs: number;
     robot: Probot;
+    versions: Versions;
   }) {
     const d = debug(`${DebugPrefix}:constructor`);
 
@@ -112,7 +114,7 @@ export class GithubClient {
     const { issue } = context.payload;
 
     for (const line of context.payload.comment.body.split('\n')) {
-      const cmd = await parseIssueCommand(issue.body, line, this.versions);
+      const cmd = parseIssueCommand(issue.body, line, this.versions);
 
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
@@ -388,11 +390,13 @@ export class GithubClient {
   }
 }
 
-export default (robot: Probot): void => {
+export default async (robot: Probot): Promise<void> => {
+  const versions = await ElectronVersions.create();
   new GithubClient({
     authToken: env('BUGBOT_AUTH_TOKEN'),
     brokerBaseUrl: env('BUGBOT_BROKER_URL'),
+    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 500),
     robot,
-    pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 20_000),
+    versions,
   });
 };
