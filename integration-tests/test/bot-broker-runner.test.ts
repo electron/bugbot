@@ -3,26 +3,13 @@ import * as path from 'path';
 import nock, { Scope } from 'nock';
 import { URL } from 'url';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
-import { v4 as mkuuid } from 'uuid';
-import { inspect } from 'util';
 
-import { Auth, AuthScope } from '../../modules/broker/src/auth';
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/bot/src/github-client';
 import { Runner } from '../../modules/runner/src/runner';
 import { Server as BrokerServer } from '../../modules/broker/src/server';
-import { Labels } from '../../modules/bot/src/github-labels';
-import { Task } from '../../modules/broker/src/task';
 
-import {
-  BisectJob,
-  Current,
-  JobType,
-  Platform,
-  Result,
-  TestJob,
-  VersionRange,
-} from '@electron/bugbot-shared/build/interfaces';
+import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 jest.setTimeout(60_000);
 
@@ -37,7 +24,6 @@ describe('bot-broker-runner', () => {
   let ghclient: GithubClient;
   let robot: Probot;
   let ghNockScope: Scope;
-  let brokerNockScope: Scope;
   function startProbot() {
     robot = createProbot({
       overrides: {
@@ -128,24 +114,28 @@ describe('bot-broker-runner', () => {
     expect(brokerServer.brokerUrl).toStrictEqual(new URL(brokerUrl));
   });
 
-
   it('bisects', async () => {
     const botCommentId = 1 as const;
     const issueNumber = 10 as const;
     const projectPath = '/repos/erickzhao/bugbot' as const;
     const issuePath = `${projectPath}/issues/${issueNumber}` as const;
-    const botComment = { id: botCommentId, user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` } };
     ghNockScope = nock('https://api.github.com');
     ghNockScope
       .get(`${projectPath}/collaborators/erickzhao/permission`)
       .reply(200, { permission: 'admin' })
-      .post(`${issuePath}/labels`).reply(200)
+      .post(`${issuePath}/labels`)
+      .reply(200)
       // create a new comment:
-      .post(`${issuePath}/comments`).reply(200, { id: botCommentId })
-      .delete(`${issuePath}/labels/bugbot%2Ftest-running`).reply(200)
+      .post(`${issuePath}/comments`)
+      .reply(200, { id: botCommentId })
+      .delete(`${issuePath}/labels/bugbot%2Ftest-running`)
+      .reply(200)
       // ... task runs...
-      .post(`${issuePath}/labels`).reply(200)
-      .patch(`${projectPath}/issues/comments/${botCommentId}`).reply(200); // update the comment
+      .post(`${issuePath}/labels`)
+      .reply(200)
+      // update the comment
+      .patch(`${projectPath}/issues/comments/${botCommentId}`)
+      .reply(200);
 
     await startWithDefaults();
     const filename = path.join(fixtureDir, 'issue_comment.created.bisect.json');
@@ -156,21 +146,25 @@ describe('bot-broker-runner', () => {
 
     const tasks = broker.getTasks();
     expect(tasks.length).toBe(1);
-    expect(tasks).toMatchObject([{
-      job: {
-        gist: '59444f92bffd5730944a0de6d85067fd',
-        history: [{
-          status: 'success',
-          version_range: ['10.3.2', '10.4.0'],
-        }],
-        last: {
-          status: 'success',
-          version_range: ['10.3.2', '10.4.0'],
+    expect(tasks).toMatchObject([
+      {
+        job: {
+          gist: '59444f92bffd5730944a0de6d85067fd',
+          history: [
+            {
+              status: 'success',
+              version_range: ['10.3.2', '10.4.0'],
+            },
+          ],
+          last: {
+            status: 'success',
+            version_range: ['10.3.2', '10.4.0'],
+          },
+          type: 'bisect',
+          version_range: ['10.1.6', '11.0.2'],
         },
-        type: 'bisect',
-        version_range: ['10.1.6', '11.0.2'],
-      }
-    }]);
+      },
+    ]);
   });
 
   it('tests', async () => {
@@ -178,9 +172,9 @@ describe('bot-broker-runner', () => {
     const issueNumber = 10 as const;
     const projectPath = '/repos/erickzhao/bugbot' as const;
     const issuePath = `${projectPath}/issues/${issueNumber}` as const;
-    const botComment = { id: botCommentId, user: { login: `${process.env.BUGBOT_GITHUB_LOGIN}[bot]` } };
 
-    const electronJsNockscope = nock('https://electronjs.org/')
+    const electronJsNockScope = nock('https://electronjs.org/');
+    electronJsNockScope
       .get('/headers/index.json')
       .replyWithFile(200, __dirname + '/fixtures/electron-versions.json', {
         'Content-Type': 'application/json',
@@ -192,9 +186,11 @@ describe('bot-broker-runner', () => {
       .get(`${projectPath}/collaborators/erickzhao/permission`)
       .reply(200, { permission: 'admin' })
       // create a new comment:
-      .post(`${issuePath}/comments`).reply(200, { id: botCommentId })
+      .post(`${issuePath}/comments`)
+      .reply(200, { id: botCommentId })
       // and when the test is finished, update the comment
-      .patch(`${projectPath}/issues/comments/${botCommentId}`).reply(200);
+      .patch(`${projectPath}/issues/comments/${botCommentId}`)
+      .reply(200);
 
     const filename = path.join(fixtureDir, 'issue_comment.created.test.json');
     await startWithDefaults();
@@ -205,23 +201,25 @@ describe('bot-broker-runner', () => {
 
     const tasks = broker.getTasks();
     expect(tasks.length).toBe(1);
-    expect(tasks).toMatchObject([{
-      job: {
-        gist: '59444f92bffd5730944a0de6d85067fd',
-        history: [
-          {
+    expect(tasks).toMatchObject([
+      {
+        job: {
+          gist: '59444f92bffd5730944a0de6d85067fd',
+          history: [
+            {
+              status: 'failure',
+              error: 'The test ran and failed.',
+            },
+          ],
+          type: 'test',
+          version: '12.0.0',
+          platform: 'linux',
+          last: {
             status: 'failure',
             error: 'The test ran and failed.',
           },
-        ],
-        type: 'test',
-        version: '12.0.0',
-        platform: 'linux',
-        last: {
-          status: 'failure',
-          error: 'The test ran and failed.',
         },
       },
-    }]);
+    ]);
   });
 });

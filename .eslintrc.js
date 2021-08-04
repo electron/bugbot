@@ -13,7 +13,7 @@ const config = {
   parserOptions: {
     ecmaVersion: 2020,
     project: [
-      './integration-tests/tsconfig.json',
+      './integration-tests/tsconfig.eslint.json',
       './modules/bot/tsconfig.eslint.json',
       './modules/broker/tsconfig.eslint.json',
       './modules/runner/tsconfig.eslint.json',

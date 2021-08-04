@@ -6,6 +6,7 @@
   "compilerOptions": {
     "composite": true,
     "declaration": true, // required by "composite"
+    "downlevelIteration": true,
     "target": "ES2019",
     "lib": [
       "ES2019"
