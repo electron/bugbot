@@ -391,12 +391,11 @@ export class GithubClient {
 }
 
 export default async (robot: Probot): Promise<void> => {
-  const versions = await ElectronVersions.create();
   new GithubClient({
     authToken: env('BUGBOT_AUTH_TOKEN'),
     brokerBaseUrl: env('BUGBOT_BROKER_URL'),
     pollIntervalMs: envInt('BUGBOT_POLL_INTERVAL_MS', 500),
     robot,
-    versions,
+    versions: await ElectronVersions.create(),
   });
 };

@@ -138,7 +138,7 @@ function getVersionsToTest(versions: Versions): Array<string> {
     if (range.length !== 0) testme.push(range.pop().version);
   };
 
-  versions.obsoleteMajors.slice(NUM_OBSOLETE_TO_TEST).forEach(addMajor);
+  versions.obsoleteMajors.slice(-NUM_OBSOLETE_TO_TEST).forEach(addMajor);
   versions.supportedMajors.forEach(addMajor);
   versions.prereleaseMajors.forEach(addMajor);
   return testme;
