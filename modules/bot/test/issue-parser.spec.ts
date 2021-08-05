@@ -261,7 +261,7 @@ describe('issue-parser', () => {
         expect(command).toStrictEqual(expectedCommand);
       });
 
-      it('uses ElectronVersions defaults if the issue has no version info', () => {
+      it('uses Versions defaults if the issue has no version info', () => {
         const issueBody = getIssueBody('issue-versions-invalid.md');
         const comment = COMMENT;
         const command = parseIssueCommand(issueBody, comment, versions);
@@ -272,7 +272,7 @@ describe('issue-parser', () => {
         });
       });
 
-      it('falls back to ElectronVersions for bisect start point', () => {
+      it('falls back to Versions for bisect start point', () => {
         const issueBody = getIssueBody('issue-missing-info.md');
         const comment = `${COMMENT} ${fixtureGistId}`;
         const command = parseIssueCommand(issueBody, comment, versions);

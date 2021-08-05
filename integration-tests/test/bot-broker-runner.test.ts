@@ -4,8 +4,6 @@ import nock, { Scope } from 'nock';
 import { URL } from 'url';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 
-import { Platform } from '@electron/bugbot-shared/build/interfaces';
-
 import {
   BaseVersions,
   BisectResult,
@@ -20,6 +18,8 @@ import { GithubClient } from '../../modules/bot/src/github-client';
 import { Runner } from '../../modules/runner/src/runner';
 import { Server as BrokerServer } from '../../modules/broker/src/server';
 
+import { Platform } from '@electron/bugbot-shared/build/interfaces';
+
 jest.setTimeout(60_000);
 
 describe('bot-broker-runner', () => {
@@ -27,10 +27,6 @@ describe('bot-broker-runner', () => {
   const brokerUrl = `http://localhost:43493` as const; // arbitrary port
   const pollIntervalMs = 10;
   const authToken = 'test' as const;
-
-  const versionFile = path.join(__dirname, 'fixtures', 'releases.json');
-  const versionJson = fs.readJsonSync(versionFile, { encoding: 'utf8' });
-  const versions = new BaseVersions(versionJson);
 
   // BOT
 
@@ -48,12 +44,14 @@ describe('bot-broker-runner', () => {
       },
     });
 
+    const releasesFile = path.join(__dirname, 'fixtures', 'releases.json');
+    const releasesJson = fs.readJsonSync(releasesFile, { encoding: 'utf8' });
     ghclient = new GithubClient({
       authToken,
       brokerBaseUrl: brokerUrl,
       pollIntervalMs,
       robot,
-      versions,
+      versions: new BaseVersions(releasesJson),
     });
   }
 
@@ -71,20 +69,11 @@ describe('bot-broker-runner', () => {
 
   const runners = new Map<Platform, Runner>();
 
-  // async function startRunners() {
   function startRunners() {
     const fiddleRunner = {
       bisect: jest.fn(),
       run: jest.fn(),
     };
-    // run tests with a fake version of Electron
-    // const installerMock = { install: jest.fn() };
-    // const electronMock = path.join(__dirname, 'fixtures', 'electron');
-    // installerMock.install.mockResolvedValue(electronMock);
-
-    // const fiddleRunner = await FiddleRunner.create({
-    //   installer: installerMock as any, // 'any' because it's a fake Installer
-    // });
 
     for (const platform of ['linux'] as Platform[]) {
       const runner = new Runner({
@@ -136,7 +125,6 @@ describe('bot-broker-runner', () => {
   async function startWithDefaults() {
     startProbot();
     await startBroker();
-    // await startRunners();
     return startRunners();
   }
 
@@ -209,15 +197,6 @@ describe('bot-broker-runner', () => {
     const issueNumber = 10 as const;
     const projectPath = '/repos/erickzhao/bugbot' as const;
     const issuePath = `${projectPath}/issues/${issueNumber}` as const;
-
-    /*
-    const electronJsNockScope = nock('https://electronjs.org/');
-    electronJsNockScope
-      .get('/headers/index.json')
-      .replyWithFile(200, __dirname + '/fixtures/electron-versions.json', {
-        'Content-Type': 'application/json',
-      });
-    */
 
     ghNockScope = nock('https://api.github.com');
     ghNockScope

@@ -7,9 +7,9 @@
     "composite": true,
     "declaration": true, // required by "composite"
     "downlevelIteration": true,
-    "target": "ES2019",
+    "target": "ES2020",
     "lib": [
-      "ES2019"
+      "ES2020"
     ],
     "module": "CommonJS",
     "moduleResolution": "node",
