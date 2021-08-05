@@ -6,7 +6,7 @@ import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
 
-import { Versions, compareVersions } from 'electron-fiddle-runner';
+import { Versions, compareVersions } from 'fiddle-core';
 
 import { Platform } from '@electron/bugbot-shared/build/interfaces';
 

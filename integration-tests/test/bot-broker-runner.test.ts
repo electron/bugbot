@@ -6,7 +6,7 @@ import { createProbot, Probot, ProbotOctokit } from 'probot';
 import { v4 as mkuuid } from 'uuid';
 import { inspect } from 'util';
 
-import { BaseVersions } from 'electron-fiddle-runner';
+import { BaseVersions } from 'fiddle-core';
 
 import { Auth, AuthScope } from '../../modules/broker/src/auth';
 import { Broker } from '../../modules/broker/src/broker';

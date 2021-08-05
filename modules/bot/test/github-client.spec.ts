@@ -7,7 +7,7 @@ import * as fs from 'fs-extra';
 import nock, { Scope } from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 
-import { BaseVersions } from 'electron-fiddle-runner';
+import { BaseVersions } from 'fiddle-core';
 
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';

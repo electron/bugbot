@@ -3,7 +3,7 @@ import { Context, Probot } from 'probot';
 import { URL } from 'url';
 import { inspect } from 'util';
 
-import { ElectronVersions, Versions } from 'electron-fiddle-runner';
+import { ElectronVersions, Versions } from 'fiddle-core';
 
 import {
   BisectJob,

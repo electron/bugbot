@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { BaseVersions } from 'electron-fiddle-runner';
+import { BaseVersions } from 'fiddle-core';
 
 import {
   BisectCommand,
