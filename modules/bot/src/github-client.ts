@@ -224,7 +224,7 @@ export class GithubClient {
         return job;
       }
       d('polled and still pending 🐌', JSON.stringify(job));
-      await new Promise((r) => setTimeout(r, ms));
+      await new Promise((r) => setTimeout(r, ms, ms));
     }
   }
 
