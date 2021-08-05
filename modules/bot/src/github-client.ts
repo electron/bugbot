@@ -190,10 +190,10 @@ export class GithubClient {
     d(`All ${ids.length} jobs queued: %o`, ids);
 
     // while the jobs are running, periodically update the comment
-    const CommentIntervalMsec = 5_000;
+    const COMMENT_INTERVAL_MSEC = 5_000 as const;
     const updateComment = () =>
       this.setIssueMatrixComment(matrix, context, command.gistId);
-    const interval = setInterval(updateComment, CommentIntervalMsec);
+    const interval = setInterval(updateComment, COMMENT_INTERVAL_MSEC);
     await updateComment();
 
     // poll jobs until they're all settled
