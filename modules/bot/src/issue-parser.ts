@@ -1,11 +1,13 @@
-import * as SemVer from 'semver';
+import * as semver from 'semver';
 import debug from 'debug';
 import fromMarkdown = require('mdast-util-from-markdown');
 import toString = require('mdast-util-to-string');
 import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
-import { ElectronVersions, releaseCompare } from './electron-versions';
+
+import { Versions, compareVersions } from 'fiddle-core';
+
 import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 // no types exist for this module
@@ -69,16 +71,16 @@ const TESTCASE_URL = 'Testcase Gist URL';
 // If no `gistId` is given, use TESTCASE_URL.
 // If no `goodVersion` is given, use GOOD_VERSION or an old version.
 // If no `badVersion` is given, use BAD_VERSION or the latest release.
-async function parseBisectCommand(
+function parseBisectCommand(
   issueBody: string,
   words: string[],
-  versions: ElectronVersions,
-): Promise<BisectCommand | undefined> {
+  versions: Versions,
+): BisectCommand | undefined {
   const d = debug('issue-parser:parseBisectCommand');
 
-  let badVersion: string | undefined;
+  let badVersion: semver.SemVer | undefined;
   let gistId: string | undefined;
-  let goodVersion: string | undefined;
+  let goodVersion: semver.SemVer | undefined;
 
   for (const word of words) {
     const id = getGistId(word);
@@ -86,12 +88,12 @@ async function parseBisectCommand(
       gistId = id;
       continue;
     }
-    const ver = SemVer.coerce(word);
-    if (ver && (await versions.isVersion(ver.version))) {
+    const ver = semver.coerce(word);
+    if (ver && versions.isVersion(ver)) {
       if (!goodVersion) {
-        goodVersion = ver.version;
+        goodVersion = ver;
       } else {
-        badVersion = ver.version;
+        badVersion = ver;
       }
       continue;
     }
@@ -100,36 +102,57 @@ async function parseBisectCommand(
   // if any pieces are missing, fill them in from the issue body
   const sections = splitMarkdownByHeader(issueBody);
   d('sections', inspect(sections));
-  badVersion ||= SemVer.coerce(sections.get(BAD_VERSION))?.version;
-  badVersion ||= await versions.getLatestVersion();
-  goodVersion ||= SemVer.coerce(sections.get(GOOD_VERSION))?.version;
-  goodVersion ||= await versions.getDefaultBisectStart();
+  badVersion ||= semver.coerce(sections.get(BAD_VERSION));
+  badVersion ||= versions.latest;
+  goodVersion ||= semver.coerce(sections.get(GOOD_VERSION));
+  goodVersion ||= semver.parse(`${versions.supportedMajors[0] - 2}.0.0`);
   gistId ||= getGistId(sections.get(TESTCASE_URL));
 
   // ensure goodVersion < badVersion;
-  const semGood = SemVer.parse(goodVersion);
-  const semBad = SemVer.parse(badVersion);
-  if (semGood && semBad && releaseCompare(semGood, semBad) > 0) {
+  const semGood = semver.parse(goodVersion);
+  const semBad = semver.parse(badVersion);
+  if (semGood && semBad && compareVersions(semGood, semBad) > 0) {
     [goodVersion, badVersion] = [badVersion, goodVersion];
   }
 
-  d({ badVersion, gistId, goodVersion });
+  d('%o', { badVersion, gistId, goodVersion });
   return badVersion && gistId && goodVersion
-    ? { type: 'bisect', badVersion, gistId, goodVersion }
+    ? {
+        badVersion: badVersion?.version,
+        gistId,
+        goodVersion: goodVersion?.version,
+        type: 'bisect',
+      }
     : undefined;
 }
 
 const ALL_PLATFORMS = ['darwin', 'linux', 'win32'];
+const NUM_OBSOLETE_TO_TEST = 2;
+
+function getVersionsToTest(versions: Versions): Array<string> {
+  const testme: string[] = [];
+
+  const addMajor = (major: number) => {
+    const range = versions.inMajor(major);
+    if (range.length !== 0) testme.push(range.shift().version);
+    if (range.length !== 0) testme.push(range.pop().version);
+  };
+
+  versions.obsoleteMajors.slice(-NUM_OBSOLETE_TO_TEST).forEach(addMajor);
+  versions.supportedMajors.forEach(addMajor);
+  versions.prereleaseMajors.forEach(addMajor);
+  return testme;
+}
 
 // /bugbot test [gistId | platform... | version...]
 // If no `gistId` is given, use TESTCASE_URL.
 // If no `platform`s are given, use `ALL_PLATFORMS`
 // If no `version`s are given, use BAD_VERSION or the latest release.
-async function parseTestCommand(
+function parseTestCommand(
   issueBody: string,
   words: string[],
-  versions: ElectronVersions,
-): Promise<TestCommand | undefined> {
+  versions: Versions,
+): TestCommand | undefined {
   const d = debug('issue-parser:parseTestCommand');
   const sections = splitMarkdownByHeader(issueBody);
 
@@ -151,8 +174,8 @@ async function parseTestCommand(
       ret.platforms.push(word as Platform);
       continue;
     }
-    const ver = SemVer.coerce(word);
-    if (ver && (await versions.isVersion(ver.version))) {
+    const ver = semver.coerce(word);
+    if (ver && versions.isVersion(ver.version)) {
       ret.versions.push(ver.version);
       continue;
     }
@@ -161,7 +184,7 @@ async function parseTestCommand(
 
   // fallback values
   if (ret.versions.length === 0) {
-    ret.versions.push(...(await versions.getVersionsToTest()));
+    ret.versions.push(...getVersionsToTest(versions));
   }
   if (ret.platforms.length === 0) {
     ret.platforms.push(...(ALL_PLATFORMS as Platform[]));
@@ -176,11 +199,11 @@ async function parseTestCommand(
     : undefined;
 }
 
-export async function parseIssueCommand(
+export function parseIssueCommand(
   issueBody: string,
   cmd: string,
-  versions: ElectronVersions,
-): Promise<IssueCommand | undefined> {
+  versions: Versions,
+): IssueCommand | undefined {
   const d = debug('issue-parser:parseIssueCommand');
 
   const words = cmd
@@ -193,9 +216,9 @@ export async function parseIssueCommand(
   if (words[0] !== '/bugbot') return undefined;
   switch (words[1]) {
     case 'bisect':
-      return await parseBisectCommand(issueBody, words.slice(2), versions);
+      return parseBisectCommand(issueBody, words.slice(2), versions);
     case 'test':
-      return await parseTestCommand(issueBody, words.slice(2), versions);
+      return parseTestCommand(issueBody, words.slice(2), versions);
     default:
       return undefined;
   }

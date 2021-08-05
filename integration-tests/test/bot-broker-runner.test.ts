@@ -1,8 +1,10 @@
-import * as fs from 'fs';
+import * as fs from 'fs-extra';
 import * as path from 'path';
 import nock, { Scope } from 'nock';
 import { URL } from 'url';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
+
+import { BaseVersions } from 'fiddle-core';
 
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/bot/src/github-client';
@@ -35,11 +37,14 @@ describe('bot-broker-runner', () => {
       },
     });
 
+    const releasesFile = path.join(__dirname, 'fixtures', 'releases.json');
+    const releasesJson = fs.readJsonSync(releasesFile, { encoding: 'utf8' });
     ghclient = new GithubClient({
       authToken,
       brokerBaseUrl: brokerUrl,
       pollIntervalMs,
       robot,
+      versions: new BaseVersions(releasesJson),
     });
   }
 
@@ -67,7 +72,7 @@ describe('bot-broker-runner', () => {
         platform,
         pollIntervalMs,
       });
-      runner.start();
+      void runner.start();
       runners.set(platform, runner);
     }
   }
@@ -106,7 +111,7 @@ describe('bot-broker-runner', () => {
   async function startWithDefaults() {
     startProbot();
     await startBroker();
-    startRunners();
+    await startRunners();
   }
 
   it('starts', async () => {
@@ -172,13 +177,6 @@ describe('bot-broker-runner', () => {
     const issueNumber = 10 as const;
     const projectPath = '/repos/erickzhao/bugbot' as const;
     const issuePath = `${projectPath}/issues/${issueNumber}` as const;
-
-    const electronJsNockScope = nock('https://electronjs.org/');
-    electronJsNockScope
-      .get('/headers/index.json')
-      .replyWithFile(200, __dirname + '/fixtures/electron-versions.json', {
-        'Content-Type': 'application/json',
-      });
 
     ghNockScope = nock('https://api.github.com');
     ghNockScope
