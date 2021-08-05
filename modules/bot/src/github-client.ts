@@ -151,7 +151,7 @@ export class GithubClient {
     const jobId = await this.broker.queueBisectJob(bisectCmd);
     d(`Queued bisect job ${jobId}`);
 
-    const completedJob = (await this.pollUntilDone(jobId)) as BisectJob;
+    const completedJob = (await this.pollJobUntilDone(jobId)) as BisectJob;
     if (completedJob) {
       await this.handleBisectResult(completedJob, context);
     }
@@ -191,19 +191,18 @@ export class GithubClient {
     }
 
     const ids = await Promise.all(queueJobPromises);
-
     d(`All ${ids.length} jobs queued: %o`, ids);
 
     // while the jobs are running, periodically update the comment
-    const CommentIntervalMsec = 3_000;
+    const COMMENT_INTERVAL_MSEC = 5_000 as const;
     const updateComment = () =>
       this.setIssueMatrixComment(matrix, context, command.gistId);
-    const interval = setInterval(updateComment, CommentIntervalMsec);
+    const interval = setInterval(updateComment, COMMENT_INTERVAL_MSEC);
     await updateComment();
 
     // poll jobs until they're all settled
     const updateMatrix = (j: TestJob) => (matrix[j.platform][j.version] = j);
-    await Promise.all(ids.map((id) => this.pollUntilDone(id, updateMatrix)));
+    await Promise.all(ids.map((id) => this.pollJobUntilDone(id, updateMatrix)));
 
     // jobs done; patch the comment one last time to ensure everything is shown
     d(`All ${ids.length} test jobs complete! Updating the comment`);
@@ -211,22 +210,24 @@ export class GithubClient {
     await updateComment();
   }
 
-  private async pollUntilDone(
+  private async pollJobUntilDone(
     jobId: JobId,
-    updateJob: (job: Job) => unknown = () => {
-      /* no-op */
-    },
+    // callback to be invoked after each poll loop completes
+    onJobPolled: undefined | ((job: Job) => void) = undefined,
   ) {
     const ms = this.pollIntervalMs;
-    const d = debug(`${DebugPrefix}:pollAndReturnJob`);
-    d(`Polling job '${jobId}' every ${this.pollIntervalMs}ms`);
+    const d = debug([DebugPrefix, 'pollJobUntilDone', jobId].join(':'));
+    d(`Polling job every ${this.pollIntervalMs}ms`);
 
     while (!this.isClosed) {
-      d(`${jobId}: polling job...`);
+      d('polling job...');
       const job = await this.broker.getJob(jobId);
-      updateJob(job);
-      if (job.last) return job;
-      d(`${jobId}: polled and still pending 🐌`, JSON.stringify(job));
+      onJobPolled?.(job);
+      if (job.last) {
+        d('complete 🚀');
+        return job;
+      }
+      d('polled and still pending 🐌', JSON.stringify(job));
       await new Promise((r) => setTimeout(r, ms, ms));
     }
   }
@@ -343,7 +344,7 @@ export class GithubClient {
         await context.octokit.issues.updateComment(opts);
         comment.body = body;
         comment.time = Date.now();
-        d(`done patching existing comment ${comment.id}`);
+        d('patch done');
         return;
       } catch (error) {
         d('patching existing comment failed; posting a new one instead', error);
@@ -356,6 +357,7 @@ export class GithubClient {
       const opts = context.issue({ body });
       const response = await context.octokit.issues.createComment(opts);
       comment = { body, id: response.data.id, time: Date.now() };
+      d('new comment created; id is', comment.id);
       this.currentComment.set(issueId, comment);
     } catch (error) {
       d('unable to post new comment', error);

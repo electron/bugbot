@@ -24,15 +24,16 @@ import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 import { Task } from './task';
 
 export class Runner {
+  public readonly platform: Platform;
+  public readonly uuid: RunnerId;
+  private readonly debugPrefix: string;
+
   private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
-  private readonly debugPrefix: string;
+  private readonly fiddleRunner: FiddleRunner;
   private readonly logIntervalMs: number;
   private readonly loop: RotaryLoop;
-  private readonly fiddleRunner: FiddleRunner;
-  public readonly platform: Platform;
-  public readonly uuid: RunnerId;
 
   /**
    * Creates and initializes the runner from environment variables and default

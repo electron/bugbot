@@ -1,6 +1,5 @@
 import debug from 'debug';
 import fetch from 'node-fetch';
-
 import { Operation as PatchOp } from 'fast-json-patch';
 import { URL } from 'url';
 
