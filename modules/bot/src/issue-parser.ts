@@ -1,4 +1,4 @@
-import * as SemVer from 'semver';
+import * as semver from 'semver';
 import debug from 'debug';
 import fromMarkdown = require('mdast-util-from-markdown');
 import toString = require('mdast-util-to-string');
@@ -6,8 +6,8 @@ import { Heading } from 'mdast';
 import { Node } from 'unist';
 import { inspect } from 'util';
 
-import { Versions } from 'electron-fiddle-runner';
-import { releaseCompare } from '@electron/bugbot-shared/build/electron-versions';
+import { Versions, compareVersions } from 'electron-fiddle-runner';
+
 import { Platform } from '@electron/bugbot-shared/build/interfaces';
 
 // no types exist for this module
@@ -78,9 +78,9 @@ function parseBisectCommand(
 ): BisectCommand | undefined {
   const d = debug('issue-parser:parseBisectCommand');
 
-  let badVersion: string | undefined;
+  let badVersion: semver.SemVer | undefined;
   let gistId: string | undefined;
-  let goodVersion: string | undefined;
+  let goodVersion: semver.SemVer | undefined;
 
   for (const word of words) {
     const id = getGistId(word);
@@ -88,12 +88,12 @@ function parseBisectCommand(
       gistId = id;
       continue;
     }
-    const ver = SemVer.coerce(word);
+    const ver = semver.coerce(word);
     if (ver && versions.isVersion(ver)) {
       if (!goodVersion) {
-        goodVersion = ver.version;
+        goodVersion = ver;
       } else {
-        badVersion = ver.version;
+        badVersion = ver;
       }
       continue;
     }
@@ -102,22 +102,27 @@ function parseBisectCommand(
   // if any pieces are missing, fill them in from the issue body
   const sections = splitMarkdownByHeader(issueBody);
   d('sections', inspect(sections));
-  badVersion ||= SemVer.coerce(sections.get(BAD_VERSION))?.version;
-  badVersion ||= versions.latest.version;
-  goodVersion ||= SemVer.coerce(sections.get(GOOD_VERSION))?.version;
-  goodVersion ||= `${versions.supportedMajors[0] - 2}.0.0`;
+  badVersion ||= semver.coerce(sections.get(BAD_VERSION));
+  badVersion ||= versions.latest;
+  goodVersion ||= semver.coerce(sections.get(GOOD_VERSION));
+  goodVersion ||= semver.parse(`${versions.supportedMajors[0] - 2}.0.0`);
   gistId ||= getGistId(sections.get(TESTCASE_URL));
 
   // ensure goodVersion < badVersion;
-  const semGood = SemVer.parse(goodVersion);
-  const semBad = SemVer.parse(badVersion);
-  if (semGood && semBad && releaseCompare(semGood, semBad) > 0) {
+  const semGood = semver.parse(goodVersion);
+  const semBad = semver.parse(badVersion);
+  if (semGood && semBad && compareVersions(semGood, semBad) > 0) {
     [goodVersion, badVersion] = [badVersion, goodVersion];
   }
 
-  d({ badVersion, gistId, goodVersion });
+  d('%o', { badVersion, gistId, goodVersion });
   return badVersion && gistId && goodVersion
-    ? { type: 'bisect', badVersion, gistId, goodVersion }
+    ? {
+        badVersion: badVersion?.version,
+        gistId,
+        goodVersion: goodVersion?.version,
+        type: 'bisect',
+      }
     : undefined;
 }
 
@@ -133,7 +138,7 @@ function getVersionsToTest(versions: Versions): Array<string> {
     if (range.length !== 0) testme.push(range.pop().version);
   };
 
-  versions.obsoleteMajors.slice(NUM_OBSOLETE_TO_TEST).forEach(addMajor);
+  versions.obsoleteMajors.slice(-NUM_OBSOLETE_TO_TEST).forEach(addMajor);
   versions.supportedMajors.forEach(addMajor);
   versions.prereleaseMajors.forEach(addMajor);
   return testme;
@@ -169,7 +174,7 @@ function parseTestCommand(
       ret.platforms.push(word as Platform);
       continue;
     }
-    const ver = SemVer.coerce(word);
+    const ver = semver.coerce(word);
     if (ver && versions.isVersion(ver.version)) {
       ret.versions.push(ver.version);
       continue;
