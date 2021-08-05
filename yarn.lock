@@ -2787,10 +2787,10 @@ fd-slicer@~1.1.0:
   dependencies:
     pend "~1.2.0"
 
-fiddle-core@^0.0.1:
-  version "0.0.1"
-  resolved "https://registry.yarnpkg.com/fiddle-core/-/fiddle-core-0.0.1.tgz#e10112f67f297a2d9f894de84522bd48de8b8968"
-  integrity sha512-8+TEJyZKMNn9IbOrm3p+p4g4cJD4+xspS6WYyT07JYheCCYFOukpeTdvEJewUp6/hANblEuSRPZvYIgBw81YuA==
+fiddle-core@^0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/fiddle-core/-/fiddle-core-0.0.2.tgz#a25ecca158d28a36a923bb284791f06c9fc27c7b"
+  integrity sha512-Idr6sjCmFFISPk5Y+w7q46ZBVHVLeasqMRlfotbfeoQGHeR0C47xE7t+AZsvTJPmaXcBrCxiS1M/bUTzaE+5jQ==
   dependencies:
     "@electron/get" "^1.12.4"
     debug "^4.3.1"

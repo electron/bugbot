@@ -14,6 +14,6 @@
     "uuid": "^8.3.2"
   },
   "dependencies": {
-    "fiddle-core": "^0.0.1"
+    "fiddle-core": "^0.0.2"
   }
 }
