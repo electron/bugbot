@@ -5,7 +5,7 @@ process.env.BUGBOT_AUTH_TOKEN = 'fake_token';
 import nock, { Scope } from 'nock';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 
-import { ElectronVersions } from 'electron-fiddle-runner';
+import { ElectronVersions } from 'fiddle-core';
 
 import BrokerAPI from '../src/broker-client';
 import { GithubClient } from '../src/github-client';

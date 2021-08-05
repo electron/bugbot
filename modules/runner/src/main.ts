@@ -5,7 +5,7 @@ import {
   ElectronVersions,
   Installer,
   Runner as FiddleRunner,
-} from 'electron-fiddle-runner';
+} from 'fiddle-core';
 import { Runner } from './runner';
 
 const d = debug('runner');

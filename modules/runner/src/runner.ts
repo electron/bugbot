@@ -6,7 +6,7 @@ import { URL } from 'url';
 import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Runner as FiddleRunner } from 'electron-fiddle-runner';
+import { Runner as FiddleRunner } from 'fiddle-core';
 
 import {
   JobId,
@@ -191,7 +191,7 @@ export class Runner {
     });
 
     // TODO(anyone): sync the naming of status strings and
-    // Result properties between bugbot and electron-fiddle-runner
+    // Result properties between bugbot and fiddle-core
     if (result.status === 'bisect_succeeded') {
       return { version_range: result.range, status: 'success' };
     } else {
@@ -221,7 +221,7 @@ export class Runner {
     });
 
     // TODO(anyone): sync the naming of status strings and
-    // Result properties between bugbot and electron-fiddle-runner
+    // Result properties between bugbot and fiddle-core
     switch (result.status) {
       case 'test_passed':
         return { status: 'success' };

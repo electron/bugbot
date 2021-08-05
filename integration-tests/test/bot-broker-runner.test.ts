@@ -13,7 +13,7 @@ import {
   Paths,
   Runner as FiddleRunner,
   TestResult,
-} from 'electron-fiddle-runner';
+} from 'fiddle-core';
 
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/bot/src/github-client';
