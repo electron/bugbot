@@ -51,7 +51,7 @@ Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#usin
 | `BUGBOT_BROKER_URL` | Required by all | The base URL for the broker, e.g. `https://bugbot.electronjs.org:8443`. | None |
 | `BUGBOT_CHILD_TIMEOUT_MS` | Runner | When to cancel a hung child | 5 minutes |
 | `BUGBOT_FIDDLE_EXEC` | Runner | Used to invoke electron-fiddle. This can include other space-delimited command-line arguments, e.g. `xvfb-run electron-fiddle` | '[which](https://github.com/npm/node-which) electron-fiddle' |
-| `BUGBOT_POLL_INTERVAL_MS` | Bot, Runner | How frequently to poll the Broker | 20 seconds |
+| `BUGBOT_POLL_INTERVAL_MS` | Bot, Runner | How frequently to poll the Broker | bot: 500 msec. runner: 20 sec |
 | `BUGBOT_AUTH_TOKEN` | Required: Bot, Runner; Optional: Broker | The auth token for communications with the Broker |
 | `BUGBOT_GITHUB_LOGIN` | Bot | The name of the GitHub app registered for the Probot client |
 | `BUGBOT_LOG_METRICS_URL` | Broker | The remote Loki endpoint to send log metrics to |
