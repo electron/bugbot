@@ -225,10 +225,21 @@ export class Runner {
     switch (result.status) {
       case 'test_passed':
         return { status: 'success' };
+
       case 'test_failed':
         return { status: 'failure', error: 'The test ran and failed.' };
-      default:
-        return { status: result.status };
+
+      case 'test_error':
+        return {
+          error: 'The test could not complete due to an error in the test.',
+          status: 'test_error',
+        };
+
+      case 'system_error':
+        return {
+          error: 'The test could not be run due to a system error.',
+          status: 'system_error',
+        };
     }
   }
 }

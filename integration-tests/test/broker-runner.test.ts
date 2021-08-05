@@ -38,19 +38,26 @@ describe('runner', () => {
   }
 
   function createRunner(opts: Record<string, unknown> = {}) {
+    const fiddleRunner = {
+      bisect: jest.fn(),
+      run: jest.fn(),
+    };
+
     runner = new Runner({
       authToken,
       brokerUrl,
-      fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
+      fiddleRunner: fiddleRunner as any,
       logIntervalMs: 1, // minimize batching to avoid timing issues during testing
       platform,
       ...opts,
     });
+
+    return { fiddleRunner };
   }
 
   afterEach(async () => {
     await brokerServer.stop();
-    runner.stop();
+    await runner.stop();
   });
 
   it('starts', async () => {
@@ -143,7 +150,13 @@ describe('runner', () => {
       const { job } = task;
       expect(job.last).toBeUndefined();
       expect(job.history).toHaveLength(0);
-      await runTask(task);
+      const fiddleRunner = {
+        bisect: jest.fn().mockResolvedValue({
+          status: 'bisect_succeeded',
+          range: [version_range[0], version_range[1]],
+        }),
+      };
+      await runTask(task, { fiddleRunner });
     });
 
     it('sets job.last', () => {
@@ -174,13 +187,6 @@ describe('runner', () => {
       const { job } = task;
       expect(job.current).toBeFalsy();
     });
-
-    it('includes the commit range to job.log', () => {
-      const log = task.getRawLog();
-      const [a, b] = version_range;
-      const url = `https://github.com/electron/electron/compare/v${a}...v${b}`;
-      expect(log).toMatch(url);
-    });
   });
 
   describe('handles test that pass', () => {
@@ -191,7 +197,10 @@ describe('runner', () => {
       const { job } = task;
       expect(job.last).toBeUndefined();
       expect(job.history).toHaveLength(0);
-      await runTask(task);
+      const fiddleRunner = {
+        run: jest.fn().mockResolvedValue({ status: 'test_passed' }),
+      };
+      await runTask(task, { fiddleRunner });
     });
 
     it('sets job.last', () => {
@@ -220,7 +229,10 @@ describe('runner', () => {
       const { job } = task;
       expect(job.last).toBeUndefined();
       expect(job.history).toHaveLength(0);
-      await runTask(task);
+      const fiddleRunner = {
+        run: jest.fn().mockResolvedValue({ status: 'test_failed' }),
+      };
+      await runTask(task, { fiddleRunner });
     });
 
     it('sets job.last', () => {
@@ -243,13 +255,15 @@ describe('runner', () => {
 
   it('returns a system error if electron-fiddle cannot start', async () => {
     const childTimeoutMs = 200;
-    const fiddleExec = '/dev/null';
     const task = createTestTask();
+    const fiddleRunner = {
+      run: jest.fn().mockResolvedValue({ status: 'system_error' }),
+    };
 
-    await runTask(task, { childTimeoutMs, fiddleExec });
+    await runTask(task, { childTimeoutMs, fiddleRunner });
     const { last } = task.job;
     expect(last).toMatchObject({
-      error: expect.stringMatching(fiddleExec),
+      error: 'The test could not be run due to a system error.',
       status: 'system_error',
     });
   });
