@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -b",
-    "start": "node ./build/main.js",
+    "start": "pm2-runtime start ./build/main.js",
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --coverage"
   },
@@ -13,6 +13,7 @@
     "@electron/bugbot-shared": "*",
     "debug": "^4.3.1",
     "node-fetch": "^2.6.1",
+    "pm2": "^5.1.0",
     "string-argv": "^0.3.1",
     "uuid": "^8.3.2",
     "which": "^2.0.2"
