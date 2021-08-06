@@ -127,7 +127,7 @@ export class GithubClient {
           {
             event: 'run_job',
             kind: 'bisect',
-            issue_id: issue.id,
+            issue_url: issue.html_url,
           },
           { module: 'bot' },
         );
@@ -137,7 +137,7 @@ export class GithubClient {
           {
             event: 'run_job',
             kind: 'test_matrix',
-            issue_id: issue.id,
+            issue_url: issue.html_url,
           },
           { module: 'bot' },
         );
