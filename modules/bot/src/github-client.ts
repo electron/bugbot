@@ -110,13 +110,11 @@ export class GithubClient {
    * @param context Probot context object
    */
   private async handleManualCommand(context: Context<'issue_comment'>) {
-    const d = debug(`${DebugPrefix}:handleManualComand`);
     const promises: Promise<void>[] = [];
     const { issue } = context.payload;
 
     for (const line of context.payload.comment.body.split('\n')) {
       const cmd = parseIssueCommand(issue.body, line, this.versions);
-      d(inspect({ cmd }));
 
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
@@ -240,7 +238,7 @@ export class GithubClient {
     const d = debug(`${DebugPrefix}:setIssueMatrixComment`);
     const link = `Testing https://gist.github.com/${gist}`;
     const table = generateTable(matrix, this.brokerBaseUrl);
-    const footer = `*I am a bot. [Learn what I can do!](https://github.com/electron/bugbot#readme)*`;
+    const footer = `*I am a bot. [Learn more about what I can do!](https://github.com/electron/bugbot#readme)*`;
     const body = [link, table, footer].join('\n\n');
     d(`issueId ${context.payload.issue.id} body:\n${body}`);
     await this.setIssueComment(body, context);

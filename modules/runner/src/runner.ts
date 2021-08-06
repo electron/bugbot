@@ -1,7 +1,6 @@
 import debug from 'debug';
 import fetch from 'node-fetch';
 import { PassThrough } from 'stream';
-
 import { URL } from 'url';
 import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
@@ -111,6 +110,7 @@ export class Runner {
       if (await t.claimForRunner()) task = t;
     }
 
+    d('task %o', task);
     return task;
   }
 
