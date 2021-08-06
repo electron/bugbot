@@ -13,6 +13,7 @@ import {
   TestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
+import { logMetric } from '@electron/bugbot-shared/build/log-metric';
 
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
@@ -28,6 +29,10 @@ interface BotCommentInfo {
   time: number; // epoch msec
 }
 
+function getCurrentCommentKey(context: Context<'issue_comment'>): string {
+  return `${context.payload.issue.id}:${context.payload.comment.id}`;
+}
+
 export class GithubClient {
   private isClosed = false;
   private readonly broker: BrokerAPI;
@@ -36,8 +41,8 @@ export class GithubClient {
   private readonly robot: Probot;
   private readonly versions: Versions;
 
-  // issue id # -> bugbot's comment in that issue for the current task
-  private readonly currentComment = new Map<number, BotCommentInfo>();
+  // `${issue id}:${comment id}` -> bugbot's comment in that issue for the current task
+  private readonly currentComment = new Map<string, BotCommentInfo>();
 
   constructor(opts: {
     authToken: string;
@@ -118,15 +123,31 @@ export class GithubClient {
 
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
+        logMetric(
+          {
+            event: 'run_job',
+            kind: 'bisect',
+            issue_id: issue.id,
+          },
+          { module: 'bot' },
+        );
         promises.push(this.runBisectJob(cmd, context));
       } else if (cmd?.type === JobType.test) {
+        logMetric(
+          {
+            event: 'run_job',
+            kind: 'test_matrix',
+            issue_id: issue.id,
+          },
+          { module: 'bot' },
+        );
         promises.push(this.runTestMatrix(cmd, context));
       }
     }
 
     await Promise.all(promises);
 
-    this.currentComment.delete(issue.id);
+    this.currentComment.delete(getCurrentCommentKey(context));
   }
 
   private async runBisectJob(
@@ -326,7 +347,8 @@ export class GithubClient {
     const issueId = context.payload.issue.id;
     d(`setting issue #${issueId} bot comment:\n%s`, body);
 
-    let comment = this.currentComment.get(issueId);
+    const currentCommentKey = getCurrentCommentKey(context);
+    let comment = this.currentComment.get(currentCommentKey);
 
     // maybe do nothing
     if (body === comment?.body) {
@@ -356,7 +378,7 @@ export class GithubClient {
       const response = await context.octokit.issues.createComment(opts);
       comment = { body, id: response.data.id, time: Date.now() };
       d('new comment created; id is', comment.id);
-      this.currentComment.set(issueId, comment);
+      this.currentComment.set(currentCommentKey, comment);
     } catch (error) {
       d('unable to post new comment', error);
     }
