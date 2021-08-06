@@ -4,7 +4,14 @@ import nock, { Scope } from 'nock';
 import { URL } from 'url';
 import { createProbot, Probot, ProbotOctokit } from 'probot';
 
-import { BaseVersions } from 'fiddle-core';
+import {
+  BaseVersions,
+  BisectResult,
+  Installer,
+  Paths,
+  Runner as FiddleRunner,
+  TestResult,
+} from 'fiddle-core';
 
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/bot/src/github-client';
@@ -63,11 +70,16 @@ describe('bot-broker-runner', () => {
   const runners = new Map<Platform, Runner>();
 
   function startRunners() {
+    const fiddleRunner = {
+      bisect: jest.fn(),
+      run: jest.fn(),
+    };
+
     for (const platform of ['linux'] as Platform[]) {
       const runner = new Runner({
         authToken,
         brokerUrl,
-        fiddleExec: path.resolve(__dirname, 'fixtures', 'electron-fiddle'),
+        fiddleRunner: fiddleRunner as any,
         logIntervalMs: 1, // minimize batching to avoid timing issues during testing
         platform,
         pollIntervalMs,
@@ -75,6 +87,8 @@ describe('bot-broker-runner', () => {
       void runner.start();
       runners.set(platform, runner);
     }
+
+    return { fiddleRunner };
   }
 
   beforeAll(() => {
@@ -111,7 +125,7 @@ describe('bot-broker-runner', () => {
   async function startWithDefaults() {
     startProbot();
     await startBroker();
-    await startRunners();
+    return startRunners();
   }
 
   it('starts', async () => {
@@ -142,7 +156,13 @@ describe('bot-broker-runner', () => {
       .patch(`${projectPath}/issues/comments/${botCommentId}`)
       .reply(200);
 
-    await startWithDefaults();
+    const { fiddleRunner } = await startWithDefaults();
+    const mockBisectResult: BisectResult = {
+      range: ['10.3.2', '10.4.0'],
+      status: 'bisect_succeeded',
+    };
+    fiddleRunner.bisect = jest.fn().mockResolvedValue(mockBisectResult);
+
     const filename = path.join(fixtureDir, 'issue_comment.created.bisect.json');
     await robot.receive({
       name: 'issue_comment',
@@ -190,8 +210,12 @@ describe('bot-broker-runner', () => {
       .patch(`${projectPath}/issues/comments/${botCommentId}`)
       .reply(200);
 
+    const { fiddleRunner } = await startWithDefaults();
+
+    const mockTestResult: TestResult = { status: 'test_failed' };
+    fiddleRunner.run.mockResolvedValue(mockTestResult);
+
     const filename = path.join(fixtureDir, 'issue_comment.created.test.json');
-    await startWithDefaults();
     await robot.receive({
       name: 'issue_comment',
       payload: JSON.parse(fs.readFileSync(filename, { encoding: 'utf8' })),

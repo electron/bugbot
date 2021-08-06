@@ -1,12 +1,11 @@
 import debug from 'debug';
 import fetch from 'node-fetch';
-import stringArgv from 'string-argv';
-import which from 'which';
+import { PassThrough } from 'stream';
 import { URL } from 'url';
-import { inspect } from 'util';
 import { randomInt } from 'crypto';
-import { spawn } from 'child_process';
 import { v4 as uuidv4 } from 'uuid';
+
+import { Runner as FiddleRunner } from 'fiddle-core';
 
 import {
   JobId,
@@ -21,7 +20,6 @@ import {
 import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
 
-import { parseFiddleBisectOutput } from './fiddle-bisect-parser';
 import { Task } from './task';
 
 export class Runner {
@@ -32,8 +30,7 @@ export class Runner {
   private readonly authToken: string;
   private readonly brokerUrl: string;
   private readonly childTimeoutMs: number;
-  private readonly fiddleExec: string;
-  private readonly fiddleArgv: string[];
+  private readonly fiddleRunner: FiddleRunner;
   private readonly logIntervalMs: number;
   private readonly loop: RotaryLoop;
 
@@ -41,28 +38,21 @@ export class Runner {
    * Creates and initializes the runner from environment variables and default
    * values, then starts the runner's execution loop.
    */
-  constructor(
-    opts: {
-      authToken?: string;
-      brokerUrl?: string;
-      childTimeoutMs?: number;
-      fiddleExec?: string;
-      logIntervalMs?: number;
-      platform?: Platform;
-      pollIntervalMs?: number;
-      uuid?: string;
-    } = {},
-  ) {
+  constructor(opts: {
+    authToken?: string;
+    brokerUrl?: string;
+    childTimeoutMs?: number;
+    fiddleRunner: FiddleRunner;
+    logIntervalMs?: number;
+    platform?: Platform;
+    pollIntervalMs?: number;
+    uuid?: string;
+  }) {
+    this.fiddleRunner = opts.fiddleRunner;
     this.authToken = opts.authToken || env('BUGBOT_AUTH_TOKEN');
     this.brokerUrl = opts.brokerUrl || env('BUGBOT_BROKER_URL');
     this.childTimeoutMs =
-      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 5 * 60_000);
-    this.fiddleArgv = stringArgv(
-      opts.fiddleExec ||
-        process.env.BUGBOT_FIDDLE_EXEC ||
-        which.sync('electron-fiddle'),
-    );
-    this.fiddleExec = this.fiddleArgv.shift();
+      opts.childTimeoutMs || envInt('BUGBOT_CHILD_TIMEOUT_MS', 60_000);
     this.logIntervalMs = opts.logIntervalMs ?? 2_000;
     this.platform = (opts.platform || process.platform) as Platform;
     this.uuid = opts.uuid || uuidv4();
@@ -84,7 +74,7 @@ export class Runner {
       d('next task: %o', task);
 
       // run the job
-      d(task.job.id, 'running job');
+      d(`running job.id "${task.job.id}"`);
       let result: Partial<Result>;
       switch (task.job.type) {
         case JobType.bisect:
@@ -178,113 +168,79 @@ export class Runner {
     );
   }
 
-  private async runBisect(task: Task) {
+  private async runBisect(task: Task): Promise<Partial<Result>> {
     const d = debug(`${this.debugPrefix}:runBisect`);
+    const log = (first, ...rest) => {
+      task.addLogData([first, ...rest].join(' '));
+      d(first, ...rest);
+    };
 
     const { job } = task;
     assertBisectJob(job);
+    const { gist, version_range } = job;
+    const [v1, v2] = version_range;
+    log('bisecting', gist, v1, v2);
 
-    const { code, error, out } = await this.runFiddle(task, [
-      ...this.fiddleArgv,
-      ...[JobType.bisect, job.version_range[0], job.version_range[1]],
-      ...['--fiddle', job.gist],
-      '--full',
-      '--log-config',
-    ]);
+    const out = new PassThrough();
+    out.on('data', (chunk: string | Buffer) => log(chunk.toString()));
 
-    const result: Partial<Result> = {};
-    try {
-      const res = parseFiddleBisectOutput(out);
-      if (res.success) {
-        result.status = 'success';
-        result.version_range = [res.goodVersion, res.badVersion];
-      } else {
-        // TODO(clavin): ^ better wording
-        result.error = `Failed to narrow test down to two versions: ${error}`;
-        result.status = code === 1 ? 'test_error' : 'system_error';
-      }
-    } catch (parseErr: unknown) {
-      d('fiddle bisect parse error: %O', parseErr);
-      result.status = 'system_error';
-      result.error = parseErr.toString();
+    const result = await this.fiddleRunner.bisect(v1, v2, gist, {
+      headless: true,
+      out,
+      showConfig: true,
+      timeout: this.childTimeoutMs,
+    });
+
+    // TODO(anyone): sync the naming of status strings and
+    // Result properties between bugbot and fiddle-core
+    if (result.status === 'bisect_succeeded') {
+      return { version_range: result.range, status: 'success' };
+    } else {
+      return { version_range: result.range, status: result.status };
     }
-    return result;
   }
 
-  private async runTest(task: Task) {
+  private async runTest(task: Task): Promise<Partial<Result>> {
+    const d = debug(`${this.debugPrefix}:runBisect`);
+    const log = (first, ...rest) => {
+      task.addLogData([first, ...rest].join(' '));
+      d(first, ...rest);
+    };
+
     const { job } = task;
     assertTestJob(job);
-    const { code, error } = await this.runFiddle(task, [
-      ...this.fiddleArgv,
-      JobType.test,
-      ...['--version', job.version],
-      ...['--fiddle', job.gist],
-      '--log-config',
-    ]);
+    const { gist, version } = job;
 
-    const result: Partial<Result> = {};
-    if (error) {
-      result.status = 'system_error';
-      result.error = `Unable to run Electron Fiddle. ${error}`;
-    } else if (code === 0) {
-      result.status = 'success';
-    } else if (code === 1) {
-      result.status = 'failure';
-      result.error = 'The test ran and failed.';
-    } else {
-      result.status = 'test_error';
-      result.error = 'Electron Fiddle was unable to complete the test.';
-    }
-    return result;
-  }
+    const out = new PassThrough();
+    out.on('data', (chunk: string | Buffer) => log(chunk.toString()));
 
-  private async runFiddle(
-    task: Task,
-    args: string[],
-  ): Promise<{ code?: number; error?: string; out: string }> {
-    return new Promise((resolve) => {
-      const d = debug(`${this.debugPrefix}:runFiddle`);
-      const ret = { code: null, out: '', error: null };
-
-      const { childTimeoutMs, fiddleExec } = this;
-      const opts = { timeout: childTimeoutMs };
-
-      const prefix = `[${new Date().toLocaleTimeString()}] Runner:`;
-      const startupLog = [
-        `${prefix} runner id '${this.uuid}' (platform: '${this.platform}')`,
-        `${prefix} spawning '${fiddleExec}' ${args.join(' ')}`,
-        `${prefix}   ... with opts ${inspect(opts)}`,
-      ] as const;
-      task.addLogData(startupLog.join('\n'));
-
-      d(`${fiddleExec} ${args.join(' ')}`);
-      d('opts: %o', opts);
-      const child = spawn(fiddleExec, args, opts);
-
-      // Save stdout locally so we can parse the result.
-      // Report both stdout + stderr to the broker via addLogData().
-      const stdout: string[] = [];
-      const onData = (dat: string | Buffer) => task.addLogData(dat.toString());
-      const onStdout = (dat: string | Buffer) => stdout.push(dat.toString());
-      child.stderr.on('data', onData);
-      child.stdout.on('data', onData);
-      child.stdout.on('data', onStdout);
-
-      child.on('error', (err) => (ret.error = err.toString()));
-
-      child.on('close', (code) => {
-        d('got exit code from child process close event', code);
-        const out = stdout.join('');
-        const match = /Electron Fiddle is exiting with code (\d+)/.exec(out);
-        if (match) {
-          code = Number.parseInt(match[1]);
-          d(`got exit code "${code}" from log message "${match[0]}"`);
-        }
-        ret.code = code;
-        ret.out = out;
-        d('resolve %O', ret);
-        resolve(ret);
-      });
+    const result = await this.fiddleRunner.run(version, gist, {
+      headless: true,
+      out,
+      showConfig: true,
+      timeout: this.childTimeoutMs,
     });
+
+    // TODO(anyone): sync the naming of status strings and
+    // Result properties between bugbot and fiddle-core
+    switch (result.status) {
+      case 'test_passed':
+        return { status: 'success' };
+
+      case 'test_failed':
+        return { status: 'failure', error: 'The test ran and failed.' };
+
+      case 'test_error':
+        return {
+          error: 'The test could not complete due to an error in the test.',
+          status: 'test_error',
+        };
+
+      case 'system_error':
+        return {
+          error: 'The test could not be run due to a system error.',
+          status: 'system_error',
+        };
+    }
   }
 }

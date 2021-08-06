@@ -1,8 +1,0 @@
-[6:06:44 PM] Electron exited with code 0.
-[6:06:44 PM] Runner: autobisect Electron 10.3.2 - finished test ✅ passed
-[6:06:44 PM] Runner: autobisect complete
-[6:06:44 PM] Runner: autobisect ✅ passed 10.3.2
-[6:06:44 PM] Runner: autobisect ❌ failed 10.4.0
-[6:06:44 PM] Runner: autobisect Commits between versions:
-[6:06:44 PM] https://github.com/electron/electron/compare/v10.3.2...v10.4.0
-[6:06:44 PM] Task: Bisect  success
