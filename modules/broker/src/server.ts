@@ -10,7 +10,6 @@ import { klona } from 'klona/json';
 
 import { assertJob } from '@electron/bugbot-shared/build/interfaces';
 import { env, getEnvData } from '@electron/bugbot-shared/build/env-vars';
-import { logMetric } from '@electron/bugbot-shared/build/log-metric';
 
 import { ALL_SCOPES, Auth, AuthScope } from './auth';
 import { Broker } from './broker';
@@ -150,12 +149,6 @@ export class Server {
       assertJob(req.body);
       const task = new Task(req.body);
       this.broker.addTask(task);
-      logMetric(
-        {
-          event: 'task_created',
-        },
-        { module: 'broker' },
-      );
       res.status(201).send(escapeHtml(task.job.id));
     } catch (error: unknown) {
       d('bad job', error);
