@@ -13,6 +13,7 @@ import {
   TestJob,
 } from '@electron/bugbot-shared/build/interfaces';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
+import { logMetric } from '@electron/bugbot-shared/build/log-metric';
 
 import BrokerAPI from './broker-client';
 import { Labels } from './github-labels';
@@ -118,8 +119,24 @@ export class GithubClient {
 
       // TODO(any): add 'stop' command
       if (cmd?.type === JobType.bisect) {
+        logMetric(
+          {
+            event: 'run_job',
+            kind: 'bisect',
+            issue_id: issue.id,
+          },
+          { module: 'bot' },
+        );
         promises.push(this.runBisectJob(cmd, context));
       } else if (cmd?.type === JobType.test) {
+        logMetric(
+          {
+            event: 'run_job',
+            kind: 'test_matrix',
+            issue_id: issue.id,
+          },
+          { module: 'bot' },
+        );
         promises.push(this.runTestMatrix(cmd, context));
       }
     }
