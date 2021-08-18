@@ -15,7 +15,7 @@ import fetch from 'node-fetch';
  * large group of different kinds of log messages (e.g. which module made it).
  */
 export function logMetric(
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   labels: Record<string, string> = {},
 ): void {
   const d = debug('log-metric');

@@ -63,14 +63,15 @@ export class GithubClient {
     this.listenToRobot();
   }
 
-  public close() {
+  public close(): void {
     this.isClosed = true;
   }
 
   private listenToRobot() {
     const d = debug(`${DebugPrefix}:listenToRobot`);
 
-    const debugContext = (context) => d(context.name, inspect(context.payload));
+    const debugContext = (context: Context) =>
+      d(context.name, inspect(context.payload));
     this.robot.on('issue_comment', debugContext);
     this.robot.on('issues.opened', debugContext);
     this.robot.on('issues.labeled', debugContext);
@@ -215,7 +216,7 @@ export class GithubClient {
     // while the jobs are running, periodically update the comment
     const COMMENT_INTERVAL_MSEC = 5_000 as const;
     const updateComment = () =>
-      this.setIssueMatrixComment(matrix, context, command.gistId);
+      void this.setIssueMatrixComment(matrix, context, command.gistId);
     const interval = setInterval(updateComment, COMMENT_INTERVAL_MSEC);
     await updateComment();
 

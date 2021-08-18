@@ -24,6 +24,31 @@ function getTaskBody(task: Task) {
   return { body, etag };
 }
 
+/**
+ * This matches the type of `req.query` from express.
+ */
+interface ExpressReqQuery {
+  [key: string]: string | string[] | ExpressReqQuery | ExpressReqQuery[];
+}
+
+/**
+ * Normalizes an express request query to a flat object by discarding "deep"
+ * entries.
+ */
+function pickShallowQueryFields(
+  query: ExpressReqQuery,
+): Record<string, string> {
+  const result = {} as Record<string, string>;
+
+  for (const [key, value] of Object.entries(query)) {
+    if (typeof value === 'string') {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
 export class Server {
   public readonly brokerUrl: URL;
 
@@ -215,14 +240,16 @@ export class Server {
 
     d(`getJobs: query: ${JSON.stringify(req.query)}`);
     const jobs = this.broker.getTasks().map((task) => task.job);
-    const ids = Server.filter(jobs, req.query as any).map((job) => job.id);
+    const ids = Server.filter(jobs, pickShallowQueryFields(req.query)).map(
+      (job) => job.id,
+    );
     res.status(200).json(ids);
   }
 
   private postTokens(req: express.Request, res: express.Response) {
     // Get the scopes from the body and try to make sure it looks like a token
     // data object
-    const tokenData = req.body;
+    const tokenData = req.body as Partial<{ scopes: AuthScope[] }>;
 
     // Ensure it is an object
     if (typeof tokenData !== 'object') {
@@ -249,13 +276,13 @@ export class Server {
     }
 
     // Create the token and send it back
-    const token = this.auth.createToken(tokenData);
+    const token = this.auth.createToken(tokenData.scopes);
     res.status(200).json(token);
   }
 
   private deleteTokens(req: express.Request, res: express.Response) {
     // Get the token and make sure it looks like a token
-    const token = req.body;
+    const token = req.body as unknown;
     if (typeof token !== 'string') {
       res.status(400).send('Must send token as a string');
       return;
