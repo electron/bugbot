@@ -19,6 +19,7 @@ export type BisectCommand = {
   gistId: string;
   goodVersion: string;
   type: 'bisect';
+  platform: Platform;
 };
 
 export type TestCommand = {
@@ -37,8 +38,11 @@ export function splitMarkdownByHeader(markdown: string): Map<string, string> {
   for (const child of tree.children) {
     if (child.type === 'heading') {
       const headerName = child.children[0].value as string;
+      // Need to escape the header name here because the string input gets put into a RegExp value
+      // https://stackoverflow.com/a/3561711/5602134
+      const escapedHeader = headerName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
       let content = '';
-      heading(tree, headerName, (_start: Heading, nodes: Array<Node>) => {
+      heading(tree, escapedHeader, (_start: Heading, nodes: Array<Node>) => {
         content = toString(nodes);
       });
       sections.set(headerName, content.trim());
@@ -63,14 +67,41 @@ export function getGistId(input?: string): string | null {
   return null;
 }
 
-const BAD_VERSION = 'Electron Version';
-const GOOD_VERSION = 'Last Known Working Electron Version';
-const TESTCASE_URL = 'Testcase Gist URL';
+export function getPlatform(maybePlatform: string): Platform | undefined {
+  const lowercasePlatform = maybePlatform.toLowerCase();
+  const platformMatches: Map<Platform, string[]> = new Map();
+  platformMatches.set('darwin', ['macos', 'mac', 'osx']);
+  platformMatches.set('linux', ['linux', 'ubuntu']);
+  platformMatches.set('win32', ['windows']);
 
-// /bugbot bisect [gistId] [goodVersion [badVersion]]
+  for (const [platform, matches] of platformMatches.entries()) {
+    if (lowercasePlatform.includes(platform)) return platform;
+    for (const match of matches) {
+      if (lowercasePlatform.includes(match)) return platform;
+    }
+  }
+
+  return undefined;
+}
+
+const ISSUE_SECTIONS = {
+  badVersion: 'Electron Version',
+  goodVersion: 'Last Known Working Electron Version',
+  gistId: 'Testcase Gist URL',
+  platform: 'What operating system are you using?',
+};
+
+const ALL_PLATFORMS: Platform[] = ['darwin', 'linux', 'win32'];
+
+export function isValidPlatform(value: string): value is Platform {
+  return ALL_PLATFORMS.includes(value as Platform);
+}
+
+// /bugbot bisect [gistId] [goodVersion [badVersion]] [platform]
 // If no `gistId` is given, use TESTCASE_URL.
 // If no `goodVersion` is given, use GOOD_VERSION or an old version.
 // If no `badVersion` is given, use BAD_VERSION or the latest release.
+// If no `platform` is given, use the platform from the reported issue or Linux.
 function parseBisectCommand(
   issueBody: string,
   words: string[],
@@ -81,6 +112,7 @@ function parseBisectCommand(
   let badVersion: semver.SemVer | undefined;
   let gistId: string | undefined;
   let goodVersion: semver.SemVer | undefined;
+  let platform: Platform | undefined;
 
   for (const word of words) {
     const id = getGistId(word);
@@ -97,16 +129,22 @@ function parseBisectCommand(
       }
       continue;
     }
+    const plat = getPlatform(word);
+    if (isValidPlatform(plat)) {
+      platform = plat;
+      continue;
+    }
   }
 
   // if any pieces are missing, fill them in from the issue body
   const sections = splitMarkdownByHeader(issueBody);
   d('sections', inspect(sections));
-  badVersion ||= semver.coerce(sections.get(BAD_VERSION));
+  badVersion ||= semver.coerce(sections.get(ISSUE_SECTIONS.badVersion));
   badVersion ||= versions.latest;
-  goodVersion ||= semver.coerce(sections.get(GOOD_VERSION));
+  goodVersion ||= semver.coerce(sections.get(ISSUE_SECTIONS.goodVersion));
   goodVersion ||= semver.parse(`${versions.supportedMajors[0] - 2}.0.0`);
-  gistId ||= getGistId(sections.get(TESTCASE_URL));
+  gistId ||= getGistId(sections.get(ISSUE_SECTIONS.gistId));
+  platform ||= getPlatform(sections.get(ISSUE_SECTIONS.platform)) ?? 'linux';
 
   // ensure goodVersion < badVersion;
   const semGood = semver.parse(goodVersion);
@@ -115,18 +153,18 @@ function parseBisectCommand(
     [goodVersion, badVersion] = [badVersion, goodVersion];
   }
 
-  d('%o', { badVersion, gistId, goodVersion });
-  return badVersion && gistId && goodVersion
+  d('%o', { badVersion, gistId, goodVersion, platform });
+  return badVersion && gistId && goodVersion && platform
     ? {
         badVersion: badVersion?.version,
         gistId,
         goodVersion: goodVersion?.version,
+        platform,
         type: 'bisect',
       }
     : undefined;
 }
 
-const ALL_PLATFORMS = ['darwin', 'linux', 'win32'];
 const NUM_OBSOLETE_TO_TEST = 2;
 
 function getVersionsToTest(versions: Versions): Array<string> {
@@ -170,8 +208,8 @@ function parseTestCommand(
       ret.gistId = id;
       continue;
     }
-    if (ALL_PLATFORMS.includes(word)) {
-      ret.platforms.push(word as Platform);
+    if (isValidPlatform(word)) {
+      ret.platforms.push(word);
       continue;
     }
     const ver = semver.coerce(word);
@@ -187,10 +225,10 @@ function parseTestCommand(
     ret.versions.push(...getVersionsToTest(versions));
   }
   if (ret.platforms.length === 0) {
-    ret.platforms.push(...(ALL_PLATFORMS as Platform[]));
+    ret.platforms.push(...ALL_PLATFORMS);
   }
   if (!ret.gistId) {
-    ret.gistId = getGistId(sections.get(TESTCASE_URL));
+    ret.gistId = getGistId(sections.get(ISSUE_SECTIONS.gistId));
   }
 
   d('after filling in defaults: %o', ret);

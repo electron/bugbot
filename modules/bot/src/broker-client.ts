@@ -35,6 +35,7 @@ export default class BrokerAPI {
       gist: command.gistId,
       history: [],
       id: mkuuid(),
+      platform: command.platform,
       time_added: Date.now(),
       type: JobType.bisect,
       version_range: [command.goodVersion, command.badVersion],

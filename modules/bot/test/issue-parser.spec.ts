@@ -175,6 +175,7 @@ describe('issue-parser', () => {
         badVersion: '13.0.0',
         gistId: fixtureGistId,
         goodVersion: '12.0.0',
+        platform: 'win32',
         type: 'bisect',
       };
 
@@ -183,7 +184,7 @@ describe('issue-parser', () => {
         expect(otherBadVersion).not.toBe(expectedCommand.badVersion);
       });
 
-      it('finds a gist and version range', () => {
+      it('finds a gist, version range, and platform', () => {
         const issueBody = getIssueBody('issue.md');
         const command = parseIssueCommand(issueBody, COMMENT, versions);
         expect(command).toStrictEqual(expectedCommand);
@@ -254,6 +255,33 @@ describe('issue-parser', () => {
         });
       });
 
+      it('reads a platform from the issue comment', () => {
+        const issueBody = getIssueBody('issue.md');
+        const comment = `${COMMENT} darwin`;
+        const command = parseIssueCommand(issueBody, comment, versions);
+        expect(command).toStrictEqual({
+          ...expectedCommand,
+          platform: 'darwin',
+        });
+      });
+
+      it.each([
+        ['linux', 'Ubuntu'],
+        ['darwin', 'OSX'],
+        ['win32', 'Windows'],
+      ])(
+        'can match an approximate platform name for %s in the issue comment',
+        (platform, approximateName) => {
+          const issueBody = getIssueBody('issue.md');
+          const comment = `${COMMENT} ${approximateName}`;
+          const command = parseIssueCommand(issueBody, comment, versions);
+          expect(command).toStrictEqual({
+            ...expectedCommand,
+            platform,
+          });
+        },
+      );
+
       it('ignores inscrutable comment arguments', () => {
         const issueBody = getIssueBody('issue.md');
         const comment = `${COMMENT} fnord`;
@@ -279,7 +307,7 @@ describe('issue-parser', () => {
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: fakeBisectStart,
-          badVersion: fakeLatestVersion
+          badVersion: fakeLatestVersion,
         });
       });
 
