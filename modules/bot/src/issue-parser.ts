@@ -154,7 +154,7 @@ function parseBisectCommand(
   }
 
   d('%o', { badVersion, gistId, goodVersion, platform });
-  return badVersion && gistId && goodVersion && platform
+  return badVersion && gistId && goodVersion
     ? {
         badVersion: badVersion?.version,
         gistId,
