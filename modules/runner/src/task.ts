@@ -40,7 +40,7 @@ export class Task {
     d(`resp.status ${resp.status}`);
   }
 
-  public addLogData(data: string) {
+  public addLogData(data: string): void {
     // save the URL to safeguard against this.jobId being cleared at end-of-job
     const log_url = new URL(`api/jobs/${this.job.id}/log`, this.brokerUrl);
     this.logBuffer.push(data);

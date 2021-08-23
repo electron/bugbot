@@ -3,12 +3,9 @@ import { debug } from 'debug';
 import { URL } from 'url';
 import table from 'markdown-table';
 
-// FIXME(any): better typing here
-export interface Matrix {
-  linux?: any;
-  darwin?: any;
-  win32?: any;
-}
+export type Matrix = {
+  [_ in Platform]?: Record<string, TestJob>;
+};
 
 const pendingLabel = 'Pending&ensp;🟡';
 
@@ -51,7 +48,10 @@ function versionMarkdown(version: string) {
   return `[${version}](https://github.com/electron/electron/releases/tag/v${version})`;
 }
 
-export function generateTable(jobMatrix: Matrix, brokerBaseUrl: string) {
+export function generateTable(
+  jobMatrix: Matrix,
+  brokerBaseUrl: string,
+): string {
   const d = debug('bot:generateTable');
   d('input matrix %O', jobMatrix);
 
@@ -70,14 +70,14 @@ export function generateTable(jobMatrix: Matrix, brokerBaseUrl: string) {
     const versionRow = [versionMarkdown(version)];
 
     for (const plat of platforms) {
-      const result = jobMatrix[plat][version] as TestJob;
+      const result = jobMatrix[plat][version];
       versionRow.push(generateCell(result, brokerBaseUrl));
     }
 
     tableInput.push(versionRow);
   }
 
-  const align = ['l', ...new Array(platforms.length).fill('r')];
+  const align = ['l', ...(new Array(platforms.length).fill('r') as string[])];
   const tableOutput = table(tableInput, { align });
   d(tableOutput);
   return tableOutput;

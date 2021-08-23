@@ -24,16 +24,6 @@ const config = {
     tsconfigRootDir: __dirname,
   },
   rules: {
-    // TODO(anyone): re-enable any of these tests & fix the warnings
-    '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/no-misused-promises': 'off',
-    '@typescript-eslint/no-unsafe-assignment': 'off',
-    '@typescript-eslint/no-unsafe-call': 'off',
-    '@typescript-eslint/no-unsafe-member-access': 'off',
-    '@typescript-eslint/no-unsafe-return': 'off',
-    '@typescript-eslint/restrict-template-expressions': 'off',
-
     // a la carte warnings
     'no-template-curly-in-string': 'error',
   }

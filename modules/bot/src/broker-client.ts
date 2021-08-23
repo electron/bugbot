@@ -94,7 +94,7 @@ export default class BrokerAPI {
     return jobId;
   }
 
-  public stopJob(jobId: JobId) {
+  public stopJob(jobId: JobId): void {
     const url = new URL(`/api/jobs/${jobId}`, this.baseURL);
     console.log('stopping job', { url });
   }
@@ -114,6 +114,6 @@ export default class BrokerAPI {
     const { status, statusText } = response;
     d('status', status, 'statusText', statusText);
 
-    return response.json();
+    return response.json() as Promise<Job>;
   }
 }

@@ -16,6 +16,7 @@ import {
   assertJob,
   assertBisectJob,
   assertTestJob,
+  Job,
 } from '@electron/bugbot-shared/build/interfaces';
 import { RotaryLoop } from '@electron/bugbot-shared/build/rotary-loop';
 import { env, envInt } from '@electron/bugbot-shared/build/env-vars';
@@ -62,9 +63,9 @@ export class Runner {
     this.loop = new RotaryLoop(this.debugPrefix, pollIntervalMs, this.pollOnce);
   }
 
-  public start = () => this.loop.start();
+  public start = (): Promise<void> => this.loop.start();
 
-  public stop = () => this.loop.stop();
+  public stop = (): Promise<void> => this.loop.stop();
 
   public pollOnce = async (): Promise<void> => {
     let task: Task | undefined;
@@ -136,7 +137,7 @@ export class Runner {
       headers: {
         Authorization: `Bearer ${this.authToken}`,
       },
-    }).then((res) => res.json());
+    }).then((res) => res.json() as Promise<JobId[]>);
   }
 
   private async fetchTask(id: JobId): Promise<Task> {
@@ -155,7 +156,7 @@ export class Runner {
       throw new Error('missing etag in broker job response');
     }
 
-    const job = await resp.json();
+    const job = (await resp.json()) as Job;
     d('job %o', job);
     assertJob(job);
     return new Task(
@@ -170,9 +171,10 @@ export class Runner {
 
   private async runBisect(task: Task): Promise<Partial<Result>> {
     const d = debug(`${this.debugPrefix}:runBisect`);
-    const log = (first, ...rest) => {
-      task.addLogData([first, ...rest].join(' '));
-      d(first, ...rest);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const log = (...args: [any, ...any]) => {
+      task.addLogData(args.join(' '));
+      d(...args);
     };
 
     const { job } = task;
@@ -202,9 +204,10 @@ export class Runner {
 
   private async runTest(task: Task): Promise<Partial<Result>> {
     const d = debug(`${this.debugPrefix}:runBisect`);
-    const log = (first, ...rest) => {
-      task.addLogData([first, ...rest].join(' '));
-      d(first, ...rest);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const log = (...args: [any, ...any]) => {
+      task.addLogData(args.join(' '));
+      d(...args);
     };
 
     const { job } = task;

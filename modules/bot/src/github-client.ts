@@ -63,14 +63,15 @@ export class GithubClient {
     this.listenToRobot();
   }
 
-  public close() {
+  public close(): void {
     this.isClosed = true;
   }
 
   private listenToRobot() {
     const d = debug(`${DebugPrefix}:listenToRobot`);
 
-    const debugContext = (context) => d(context.name, inspect(context.payload));
+    const debugContext = (context: Context) =>
+      d(context.name, inspect(context.payload));
     this.robot.on('issue_comment', debugContext);
     this.robot.on('issues.opened', debugContext);
     this.robot.on('issues.labeled', debugContext);
@@ -216,7 +217,13 @@ export class GithubClient {
     const COMMENT_INTERVAL_MSEC = 5_000 as const;
     const updateComment = () =>
       this.setIssueMatrixComment(matrix, context, command.gistId);
-    const interval = setInterval(updateComment, COMMENT_INTERVAL_MSEC);
+    const interval = setInterval(
+      () =>
+        void updateComment().catch((err) =>
+          d('error updating comment on interval:', err),
+        ),
+      COMMENT_INTERVAL_MSEC,
+    );
     await updateComment();
 
     // poll jobs until they're all settled

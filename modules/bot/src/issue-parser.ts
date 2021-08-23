@@ -1,6 +1,7 @@
 import * as semver from 'semver';
 import debug from 'debug';
 import fromMarkdown = require('mdast-util-from-markdown');
+import heading = require('mdast-util-heading-range');
 import toString = require('mdast-util-to-string');
 import { Heading } from 'mdast';
 import { Node } from 'unist';
@@ -9,10 +10,6 @@ import { inspect } from 'util';
 import { Versions, compareVersions } from 'fiddle-core';
 
 import { Platform } from '@electron/bugbot-shared/build/interfaces';
-
-// no types exist for this module
-//eslint-disable-next-line @typescript-eslint/no-var-requires
-const heading = require('mdast-util-heading-range');
 
 export type BisectCommand = {
   badVersion: string;
