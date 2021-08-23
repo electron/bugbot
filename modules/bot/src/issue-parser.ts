@@ -8,7 +8,10 @@ import { inspect } from 'util';
 
 import { Versions, compareVersions } from 'fiddle-core';
 
-import { Platform } from '@electron/bugbot-shared/build/interfaces';
+import {
+  ALL_PLATFORMS,
+  Platform,
+} from '@electron/bugbot-shared/build/interfaces';
 
 // no types exist for this module
 //eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -90,8 +93,6 @@ const ISSUE_SECTIONS = {
   gistId: 'Testcase Gist URL',
   platform: 'What operating system are you using?',
 };
-
-const ALL_PLATFORMS: Platform[] = ['darwin', 'linux', 'win32'];
 
 export function isValidPlatform(value: string): value is Platform {
   return ALL_PLATFORMS.includes(value as Platform);
