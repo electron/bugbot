@@ -216,8 +216,14 @@ export class GithubClient {
     // while the jobs are running, periodically update the comment
     const COMMENT_INTERVAL_MSEC = 5_000 as const;
     const updateComment = () =>
-      void this.setIssueMatrixComment(matrix, context, command.gistId);
-    const interval = setInterval(updateComment, COMMENT_INTERVAL_MSEC);
+      this.setIssueMatrixComment(matrix, context, command.gistId);
+    const interval = setInterval(
+      () =>
+        void updateComment().catch((err) =>
+          d('error updating comment on interval:', err),
+        ),
+      COMMENT_INTERVAL_MSEC,
+    );
     await updateComment();
 
     // poll jobs until they're all settled
