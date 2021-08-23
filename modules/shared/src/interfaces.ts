@@ -16,8 +16,13 @@ const JobIdPredicate = ow.string.validate((str) => ({
   message: `Expected value to be a UUID, got ${str}`,
 }));
 
-export type Platform = 'darwin' | 'linux' | 'win32';
-const PlatformPredicate = ow.string.oneOf(['darwin', 'linux', 'win32']);
+// Editing `PLATFORM_LIST` should automatically update the constants after it,
+// including the `Platform` type thanks to some type magic :)
+const PLATFORM_LIST = ['darwin', 'linux', 'win32'] as const;
+
+export type Platform = typeof PLATFORM_LIST[number];
+export const ALL_PLATFORMS: readonly Platform[] = PLATFORM_LIST;
+const PlatformPredicate = ow.string.oneOf(ALL_PLATFORMS);
 
 export type RunnerId = string;
 const RunnerIdPredicate = ow.string;
