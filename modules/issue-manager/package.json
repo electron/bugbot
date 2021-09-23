@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "@electron/bugbot-bot",
+  "name": "@electron/bugbot-issue-manager",
   "version": "0.0.1",
   "main": "dist/github-client.js",
   "scripts": {

@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "build": "yarn workspaces run build",
-    "start:bot": "yarn workspace @electron/bugbot-bot start",
+    "start:issue-manager": "yarn workspace @electron/bugbot-issue-manager start",
     "start:broker": "yarn workspace @electron/bugbot-broker start",
     "start:runner": "yarn workspace @electron/bugbot-runner start",
     "test": "jest --runInBand",

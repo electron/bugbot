@@ -1,1 +1,0 @@
-web: yarn workspace @electron/bugbot-bot start
