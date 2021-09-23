@@ -279,8 +279,14 @@ describe('issue-parser', () => {
         expect(command).toStrictEqual({
           ...expectedCommand,
           goodVersion: fakeBisectStart,
-          badVersion: fakeLatestVersion
+          badVersion: fakeLatestVersion,
         });
+      });
+
+      it('handles case insensitive markdown headings', () => {
+        const issueBody = getIssueBody('issue-random-capitalization.md');
+        const command = parseIssueCommand(issueBody, COMMENT, versions);
+        expect(command).toStrictEqual(expectedCommand);
       });
 
       it.each([

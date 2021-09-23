@@ -38,7 +38,7 @@ export function splitMarkdownByHeader(markdown: string): Map<string, string> {
       heading(tree, headerName, (_start: Heading, nodes: Array<Node>) => {
         content = toString(nodes);
       });
-      sections.set(headerName, content.trim());
+      sections.set(headerName.toLowerCase(), content.trim());
     }
   }
 
@@ -99,11 +99,11 @@ function parseBisectCommand(
   // if any pieces are missing, fill them in from the issue body
   const sections = splitMarkdownByHeader(issueBody);
   d('sections', inspect(sections));
-  badVersion ||= semver.coerce(sections.get(BAD_VERSION));
+  badVersion ||= semver.coerce(sections.get(BAD_VERSION.toLowerCase()));
   badVersion ||= versions.latest;
-  goodVersion ||= semver.coerce(sections.get(GOOD_VERSION));
+  goodVersion ||= semver.coerce(sections.get(GOOD_VERSION.toLowerCase()));
   goodVersion ||= semver.parse(`${versions.supportedMajors[0] - 2}.0.0`);
-  gistId ||= getGistId(sections.get(TESTCASE_URL));
+  gistId ||= getGistId(sections.get(TESTCASE_URL.toLowerCase()));
 
   // ensure goodVersion < badVersion;
   const semGood = semver.parse(goodVersion);
@@ -187,7 +187,7 @@ function parseTestCommand(
     ret.platforms.push(...(ALL_PLATFORMS as Platform[]));
   }
   if (!ret.gistId) {
-    ret.gistId = getGistId(sections.get(TESTCASE_URL));
+    ret.gistId = getGistId(sections.get(TESTCASE_URL.toLowerCase()));
   }
 
   d('after filling in defaults: %o', ret);
