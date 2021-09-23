@@ -1,5 +1,5 @@
 {
-  "name": "@electron/bugbot-bot",
+  "name": "@electron/bugbot-@electron/bugbot-issue-manager",
   "description": "Probot client for Electron's issue tracker bug bot.",
   "repository": "https://github.com/electron/bugbot",
   "success_url": "/probot",
@@ -28,7 +28,7 @@
     },
     "PROCFILE": {
       "description": "Path to Procfile from repository root",
-      "value": "modules/bot/Procfile"
+      "value": "modules/issue-manager/Procfile"
     },
     "WEBHOOK_SECRET": {
       "description": "Webhook secret for the GitHub App."

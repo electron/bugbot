@@ -14,7 +14,7 @@ const config = {
     ecmaVersion: 2020,
     project: [
       './integration-tests/tsconfig.eslint.json',
-      './modules/bot/tsconfig.eslint.json',
+      './modules/issue-manager/tsconfig.eslint.json',
       './modules/broker/tsconfig.eslint.json',
       './modules/runner/tsconfig.eslint.json',
       './modules/shared/tsconfig.eslint.json',

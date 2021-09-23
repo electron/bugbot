@@ -14,7 +14,7 @@ import {
 } from 'fiddle-core';
 
 import { Broker } from '../../modules/broker/src/broker';
-import { GithubClient } from '../../modules/bot/src/github-client';
+import { GithubClient } from '../../modules/issue-manager/src/github-client';
 import { Runner } from '../../modules/runner/src/runner';
 import { Server as BrokerServer } from '../../modules/broker/src/server';
 

@@ -4,7 +4,7 @@
   // NOTE: this list should be synced with the "workspaces" field in the root `package.json` file.
   "references": [
     { "path": "./modules/shared" },
-    { "path": "./modules/bot" },
+    { "path": "./modules/issue-manager" },
     { "path": "./modules/broker" },
     { "path": "./modules/runner" },
   ],
