@@ -5,7 +5,7 @@ import { URL } from 'url';
 import { randomInt } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-import { Runner as FiddleRunner } from 'fiddle-core';
+import { Runner as FiddleRunner } from '@electron/fiddle-core';
 
 import {
   JobId,

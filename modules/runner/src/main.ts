@@ -5,7 +5,7 @@ import {
   ElectronVersions,
   Installer,
   Runner as FiddleRunner,
-} from 'fiddle-core';
+} from '@electron/fiddle-core';
 
 import { Runner } from './runner';
 
