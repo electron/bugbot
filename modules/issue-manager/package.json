@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@electron/bugbot-shared": "*",
+    "@electron/fiddle-core": "^1.0.2",
     "debug": "^4.3.2",
-    "fiddle-core": "^0.0.2",
     "markdown-table": "^2.0.0",
     "mdast": "^3.0.0",
     "mdast-util-from-markdown": "^0.8.5",

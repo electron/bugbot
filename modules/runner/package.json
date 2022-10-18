@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@electron/bugbot-shared": "*",
+    "@electron/fiddle-core": "^1.0.2",
     "debug": "^4.3.1",
-    "fiddle-core": "^0.0.2",
     "node-fetch": "^2.6.1",
     "p-limit": "^3.1.0",
     "pm2": "^5.1.0",

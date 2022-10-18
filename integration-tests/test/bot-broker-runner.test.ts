@@ -11,7 +11,7 @@ import {
   Paths,
   Runner as FiddleRunner,
   TestResult,
-} from 'fiddle-core';
+} from '@electron/fiddle-core';
 
 import { Broker } from '../../modules/broker/src/broker';
 import { GithubClient } from '../../modules/issue-manager/src/github-client';
