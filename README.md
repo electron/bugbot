@@ -21,7 +21,7 @@ After uploading your test to gist.github.com, file an [Electron bug report](http
 
 ### By maintainers
 
-Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#using-trop), you can start BugBot with issue comments. To begin bisection, add a comment that looks like this:
+Much like [trop](https://github.com/electron/trop/blob/main/docs/usage.md#using-trop), you can start BugBot with issue comments. To begin bisection, add a comment that looks like this:
 
 ```
 /bugbot test [gist] [platforms...] [versions...]
@@ -29,7 +29,7 @@ Much like [trop](https://github.com/electron/trop/blob/master/docs/usage.md#usin
 
 - If no `gist` is given, use the issue body's `Testcase Gist URL`.
 - If no `platforms` are given, test on Linux, macOS, and Windows.
-- If no `versions` are given, test the first version and latest version of each prerelease branch, of [each supported branch](https://www.electronjs.org/docs/tutorial/support#supported-versions), and of the two branches before that.
+- If no `versions` are given, test the first version and latest version of each prerelease branch, of [each supported branch](https://www.electronjs.org/docs/latest/tutorial/electron-timelines), and of the two branches before that.
 
 
 ```

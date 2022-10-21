@@ -82,7 +82,7 @@ export class GithubClient {
     this.robot.on('issue_comment.edited', (ctx) => this.onIssueComment(ctx));
   }
 
-  // from https://github.com/electron/trop/blob/master/src/utils.ts
+  // from https://github.com/electron/trop/blob/main/src/utils.ts
   private async isAuthorizedUser(
     context: Context<'issue_comment'>,
     username: string,
