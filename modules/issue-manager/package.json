@@ -21,7 +21,7 @@
     "mdast-util-to-string": "^2.0.0",
     "node-fetch": "^2.6.1",
     "probot": "^12.0.0",
-    "semver": "^7.3.5",
+    "semver": "^7.5.2",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
